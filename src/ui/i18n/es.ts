@@ -11,8 +11,6 @@ export const es = {
   },
   hoy: {
     titulo: 'Tu sesión de hoy',
-    vacio: 'El Prescriptor llega en la Fase 3. Por ahora, entrená lo que más rinde: jugá una partida lenta contra el motor y prestá atención a tus decisiones.',
-    accion: 'Ir a jugar',
   },
   sesion: {
     subtitulo: 'Plan de hoy',
@@ -126,6 +124,7 @@ export const es = {
     sinPendientes: 'No tenés partidas sin analizar.',
     analizar: 'Analizar',
     yaAnalizada: 'Analizada',
+    muyCortaParaAnalizar: 'Muy corta para analizar',
     volver: 'Volver al Panel',
 
     // Fase 1

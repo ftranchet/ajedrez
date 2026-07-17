@@ -5,7 +5,7 @@
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
 import type { CalibrationRecord, GameRecord, Profile, RadarAttempt, Ritmo } from '../../core/types';
-import { buildGameRecord } from '../../core/game';
+import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
 import { brierScore } from '../../core/calibration';
@@ -64,26 +64,29 @@ export function PanelScreen() {
           <p className="m-0 text-secondary">{t.panel.sinPartidas}</p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {games.map((g) => (
-              <li key={g.id} className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface px-4 py-3">
-                <div className="flex items-baseline justify-between">
-                  <span className="font-mono text-sm text-secondary">
-                    {new Date(g.fecha).toLocaleDateString('es-AR')}
-                  </span>
-                  <span className="text-sm text-tertiary">
-                    {formatJugadas(Math.ceil(g.tiemposPorJugadaMs.length / 2))}
-                  </span>
-                  <span className="font-mono text-sm text-primary">{g.resultado}</span>
-                </div>
-                {g.analizada ? (
-                  <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
-                ) : (
-                  <button onClick={() => void useAnalysisStore.getState().iniciar(g.id)} className="btn-secondary">
-                    {t.analisis.analizar}
-                  </button>
-                )}
-              </li>
-            ))}
+            {games.map((g) => {
+              const jugadas = plyCountFromPgn(g.pgn);
+              return (
+                <li key={g.id} className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface px-4 py-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-mono text-sm text-secondary">
+                      {new Date(g.fecha).toLocaleDateString('es-AR')}
+                    </span>
+                    <span className="text-sm text-tertiary">{formatJugadas(Math.ceil(jugadas / 2))}</span>
+                    <span className="font-mono text-sm text-primary">{g.resultado}</span>
+                  </div>
+                  {g.analizada ? (
+                    <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
+                  ) : jugadas === 0 ? (
+                    <span className="text-xs text-tertiary">{t.analisis.muyCortaParaAnalizar}</span>
+                  ) : (
+                    <button onClick={() => void useAnalysisStore.getState().iniciar(g.id)} className="btn-secondary">
+                      {t.analisis.analizar}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

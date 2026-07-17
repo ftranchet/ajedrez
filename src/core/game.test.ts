@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGameRecord, deriveResult } from './game';
+import { buildGameRecord, deriveResult, plyCountFromPgn } from './game';
 
 describe('deriveResult', () => {
   it('mate al blanco (mueven blancas y están en mate) → 0-1', () => {
@@ -44,5 +44,21 @@ describe('buildGameRecord', () => {
     expect(g.id).toBeTruthy();
     expect(new Date(g.fecha).toString()).not.toBe('Invalid Date');
     expect(g.tiemposPorJugadaMs).toEqual([1200, 800]);
+  });
+});
+
+describe('plyCountFromPgn', () => {
+  it('cuenta medias jugadas de un PGN, sin depender de tiemposPorJugadaMs (RF-2.2)', () => {
+    // Partidas importadas por PGN siempre tienen tiemposPorJugadaMs vacío
+    // (RF-1.5 solo mide partidas jugadas localmente); esto lee el PGN en sí.
+    expect(plyCountFromPgn('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *')).toBe(6);
+  });
+
+  it('una partida sin jugadas da 0', () => {
+    expect(plyCountFromPgn('*')).toBe(0);
+  });
+
+  it('un PGN inválido da 0 en vez de tirar una excepción', () => {
+    expect(plyCountFromPgn('esto no es un pgn')).toBe(0);
   });
 });

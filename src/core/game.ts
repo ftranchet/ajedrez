@@ -1,3 +1,4 @@
+import { Chess } from 'chess.js';
 import type { Color, GameRecord, Resultado } from './types';
 
 export interface ResultInput {
@@ -38,4 +39,20 @@ export function buildGameRecord(args: BuildGameArgs): GameRecord {
     analizada: false,
     fecha: args.fecha ?? new Date().toISOString(),
   };
+}
+
+/**
+ * Cantidad de medias jugadas de la partida, leída del PGN. A diferencia de
+ * `tiemposPorJugadaMs.length` (que solo tiene datos para partidas jugadas
+ * localmente, RF-1.5), esto vale para cualquier origen — incluida una
+ * importada por PGN (RF-2.2), donde `tiemposPorJugadaMs` siempre está vacío.
+ */
+export function plyCountFromPgn(pgn: string): number {
+  const chess = new Chess();
+  try {
+    chess.loadPgn(pgn, { strict: false });
+  } catch {
+    return 0;
+  }
+  return chess.history().length;
 }
