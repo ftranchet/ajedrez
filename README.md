@@ -15,8 +15,5 @@ Aplicación web progresiva (PWA) que prescribe tu entrenamiento de ajedrez para 
 ## Licencia
 **GPLv3** (ver `LICENSE` y ADR-0006). El archivo `LICENSE` contiene el texto oficial, sin modificaciones, tomado de gnu.org/licenses/gpl-3.0.txt.
 
-## Pendientes de la base documental
-- Copiar los tres documentos de investigación previos a `docs/evidence/` (ver `docs/evidence/README.md`).
-
 ## Estado
-Pre-código. Fase 0 en curso (ver `docs/roadmap.md`).
+Base documental completa. Pre-código: Fase 0 en curso (ver `docs/roadmap.md`).
