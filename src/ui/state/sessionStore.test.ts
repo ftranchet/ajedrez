@@ -14,6 +14,9 @@ beforeEach(async () => {
   await db.errorCards.clear();
   await db.radarItems.clear();
   await db.calibrationRecords.clear();
+  await db.radarProgress.clear();
+  await db.radarDatasetMeta.clear();
+  await db.radarAttempts.clear();
 });
 
 describe('sessionStore — bloque Radar', () => {
@@ -56,6 +59,9 @@ describe('sessionStore — bloque Radar', () => {
     expect(cards[0].ladoAMover).toBe(ladoEsperado);
     expect(cards[0].origen).toBe('radar');
     expect(cards[0].fsrs.lapses).toBe(0); // tarjeta nueva, todavía no hay lapso
+    const attempts = await db.radarAttempts.toArray();
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({ itemId: item.id, acierto: false, tipo: item.tipo });
   });
 
   it('con muestreo de confianza forzado, guarda el registro de calibración antes de crear la tarjeta', async () => {
@@ -104,6 +110,30 @@ describe('sessionStore — bloque Radar', () => {
     vi.restoreAllMocks();
     expect(s.phase).toBe('fin');
     expect(guard).toBeLessThan(50);
+  });
+
+  it('persiste la dificultad y los aciertos recientes para la sesión siguiente (RF-5.5)', async () => {
+    await useSessionStore.getState().start();
+    const s = useSessionStore.getState();
+    const ratingInicial = s.radarSelState.ratingCentro;
+    const item = s.radarItem!;
+
+    s.radarEval('igual');
+    const [from, destinos] = s.dests.entries().next().value as [string, string[]];
+    const to = destinos.find((d) => from + d !== item.solucion[0]) ?? destinos[0];
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    await s.radarUserMove(from as never, to as never);
+    await s.radarContinuar();
+    vi.restoreAllMocks();
+
+    const guardado = await db.radarProgress.get('principal');
+    expect(guardado?.aciertosRecientes).toHaveLength(1);
+    expect(guardado?.ratingCentro).not.toBe(ratingInicial);
+
+    useSessionStore.getState().volver();
+    await useSessionStore.getState().start();
+    expect(useSessionStore.getState().radarSelState.ratingCentro).toBe(guardado?.ratingCentro);
+    expect(useSessionStore.getState().radarAciertosRecientes).toEqual(guardado?.aciertosRecientes);
   });
 });
 

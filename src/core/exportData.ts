@@ -1,7 +1,7 @@
 // Exportación e importación de datos (E14): lógica pura de armado y
 // validación del paquete. La mecánica de archivo (.zip) vive en
 // services/export — acá no hay File, Blob ni fetch (CONTRIBUTING regla 4).
-import type { CalibrationRecord, ErrorCard, GameRecord } from './types';
+import type { CalibrationRecord, ErrorCard, GameRecord, RadarAttempt, RadarProgress } from './types';
 import { SCHEMA_VERSION } from '../services/storage/db';
 
 export interface ExportManifest {
@@ -15,12 +15,16 @@ export interface ExportBundle {
   games: GameRecord[];
   errorCards: ErrorCard[];
   calibrationRecords: CalibrationRecord[];
+  radarProgress: RadarProgress[];
+  radarAttempts: RadarAttempt[];
 }
 
 export interface ExportSourceData {
   games: GameRecord[];
   errorCards: ErrorCard[];
   calibrationRecords: CalibrationRecord[];
+  radarProgress: RadarProgress[];
+  radarAttempts: RadarAttempt[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -30,6 +34,8 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     games: data.games,
     errorCards: data.errorCards,
     calibrationRecords: data.calibrationRecords,
+    radarProgress: data.radarProgress,
+    radarAttempts: data.radarAttempts,
   };
 }
 
@@ -54,6 +60,15 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (!Array.isArray(obj.games) || !Array.isArray(obj.errorCards) || !Array.isArray(obj.calibrationRecords)) {
     return { ok: false, error: 'El paquete no tiene la forma esperada (faltan partidas, tarjetas o calibración).' };
   }
+  // Los archivos de Fase 1 anteriores a la persistencia del Radar no traen
+  // este campo. Restaurarlos conserva todos sus datos y arranca el selector
+  // con el estado inicial, en vez de rechazar un respaldo válido.
+  if (obj.radarProgress !== undefined && !Array.isArray(obj.radarProgress)) {
+    return { ok: false, error: 'El progreso del Radar no tiene la forma esperada.' };
+  }
+  if (obj.radarAttempts !== undefined && !Array.isArray(obj.radarAttempts)) {
+    return { ok: false, error: 'El historial del Radar no tiene la forma esperada.' };
+  }
   return {
     ok: true,
     bundle: {
@@ -61,6 +76,8 @@ export function validateImportBundle(raw: unknown): ImportResult {
       games: obj.games as GameRecord[],
       errorCards: obj.errorCards as ErrorCard[],
       calibrationRecords: obj.calibrationRecords as CalibrationRecord[],
+      radarProgress: (obj.radarProgress ?? []) as RadarProgress[],
+      radarAttempts: (obj.radarAttempts ?? []) as RadarAttempt[],
     },
   };
 }

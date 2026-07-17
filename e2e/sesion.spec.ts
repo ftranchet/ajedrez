@@ -7,6 +7,37 @@
 // verifica que la UI está bien conectada a esa lógica, no se reprueba la
 // lógica misma.
 import { expect, test, type Page } from '@playwright/test';
+import { RADAR_DATASET_VERSION } from '../src/services/puzzles/seedData';
+
+const radarFixture = {
+  id: 'e2e-radar-envenenada',
+  fen: 'rnb1kbnr/ppp2ppp/8/3q4/8/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 2 4',
+  tipo: 'envenenada',
+  temas: ['fixture-e2e'],
+  rating: 1200,
+  solucion: ['d5h5'],
+  fuente: 'seed-dev',
+};
+
+async function seedRadarFixture(page: Page) {
+  await page.evaluate(
+    ({ item, version }) =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('elomax');
+        request.onsuccess = () => {
+          const db = request.result;
+          const transaction = db.transaction(['radarItems', 'radarDatasetMeta'], 'readwrite');
+          transaction.objectStore('radarItems').clear();
+          transaction.objectStore('radarItems').put(item);
+          transaction.objectStore('radarDatasetMeta').put({ id: 'catalogo', version, seededAt: new Date().toISOString() });
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+        };
+        request.onerror = () => reject(request.error);
+      }),
+    { item: radarFixture, version: RADAR_DATASET_VERSION },
+  );
+}
 
 // El tablero se orienta según quién mueve (RF-5.2, convención tipo Lichess:
 // la posición se ve siempre desde la perspectiva de quien tiene que jugar).
@@ -33,6 +64,7 @@ test.describe('sesión simple: Radar', () => {
     });
     await page.goto('./');
     await page.getByText('Tu sesión de hoy').waitFor();
+    await seedRadarFixture(page);
     await page.getByRole('button', { name: 'Empezar sesión' }).click();
 
     const board = page.locator('cg-board');
@@ -49,10 +81,8 @@ test.describe('sesión simple: Radar', () => {
     await page.getByRole('button', { name: 'Igual' }).click();
     await page.getByText('Ahora jugá tu respuesta').waitFor();
 
-    // Con Math.random forzado a 0, el selector del Radar sirve siempre la
-    // primera posición dentro de la banda de rating inicial: seed-04
-    // (envenenada, dama negra en d5, solución d5→h5). Verificado a mano
-    // contra el pool sembrado antes de fijar este test.
+    // El catálogo se fija dentro de IndexedDB para que el spec no dependa de
+    // la versión real de datos que se publique con cada lote del Radar.
     await clickSquare(page, board, 'd', 5);
     await clickSquare(page, board, 'h', 5);
 

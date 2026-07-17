@@ -6,6 +6,8 @@ import { buildExportBundle, validateImportBundle, type ExportSourceData, type Im
 import { errorCardRepo } from '../storage/errorCardRepo';
 import { calibrationRepo } from '../storage/calibrationRepo';
 import { gameRepo } from '../storage/gameRepo';
+import { radarProgressRepo } from '../storage/radarProgressRepo';
+import { radarAttemptRepo } from '../storage/radarAttemptRepo';
 import { db } from '../storage/db';
 
 function pgnFileName(gameId: string): string {
@@ -18,6 +20,8 @@ export async function exportAllData(): Promise<Uint8Array> {
     games: await gameRepo.list(),
     errorCards: await errorCardRepo.list(),
     calibrationRecords: await calibrationRepo.list(),
+    radarProgress: await radarProgressRepo.list(),
+    radarAttempts: await radarAttemptRepo.list(),
   };
   const bundle = buildExportBundle(data);
 
@@ -26,6 +30,8 @@ export async function exportAllData(): Promise<Uint8Array> {
     'games.json': strToU8(JSON.stringify(bundle.games, null, 2)),
     'errorCards.json': strToU8(JSON.stringify(bundle.errorCards, null, 2)),
     'calibrationRecords.json': strToU8(JSON.stringify(bundle.calibrationRecords, null, 2)),
+    'radarProgress.json': strToU8(JSON.stringify(bundle.radarProgress, null, 2)),
+    'radarAttempts.json': strToU8(JSON.stringify(bundle.radarAttempts, null, 2)),
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
@@ -36,7 +42,7 @@ export async function exportAllData(): Promise<Uint8Array> {
   return zipSync(files, { level: 6 });
 }
 
-export type ImportOutcome = { ok: true; resumen: { partidas: number; tarjetas: number; calibraciones: number } } | { ok: false; error: string };
+export type ImportOutcome = { ok: true; resumen: { partidas: number; tarjetas: number; calibraciones: number; respuestasRadar: number } } | { ok: false; error: string };
 
 /** Restaura un .zip exportado previamente (RF-14.2), con migración validada. */
 export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome> {
@@ -51,6 +57,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const gamesRaw = unzipped['games.json'];
   const errorCardsRaw = unzipped['errorCards.json'];
   const calibrationRaw = unzipped['calibrationRecords.json'];
+  const radarProgressRaw = unzipped['radarProgress.json'];
+  const radarAttemptsRaw = unzipped['radarAttempts.json'];
   if (!manifestRaw || !gamesRaw || !errorCardsRaw || !calibrationRaw) {
     return { ok: false, error: 'Faltan archivos dentro del .zip (¿es una exportación de ELOmax?).' };
   }
@@ -62,6 +70,10 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       games: JSON.parse(strFromU8(gamesRaw)),
       errorCards: JSON.parse(strFromU8(errorCardsRaw)),
       calibrationRecords: JSON.parse(strFromU8(calibrationRaw)),
+      // Los respaldos creados antes de esta mejora no tenían progreso del
+      // Radar; importarlos debe seguir siendo posible (RF-14.2).
+      radarProgress: radarProgressRaw ? JSON.parse(strFromU8(radarProgressRaw)) : [],
+      radarAttempts: radarAttemptsRaw ? JSON.parse(strFromU8(radarAttemptsRaw)) : [],
     };
   } catch {
     return { ok: false, error: 'Algún archivo dentro del .zip no es JSON válido.' };
@@ -71,10 +83,12 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   if (!result.ok) return { ok: false, error: result.error };
 
   const { bundle } = result;
-  await db.transaction('rw', db.games, db.errorCards, db.calibrationRecords, async () => {
+  await db.transaction('rw', db.games, db.errorCards, db.calibrationRecords, db.radarProgress, db.radarAttempts, async () => {
     if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
     if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
     if (bundle.calibrationRecords.length > 0) await db.calibrationRecords.bulkPut(bundle.calibrationRecords);
+    if (bundle.radarProgress.length > 0) await db.radarProgress.bulkPut(bundle.radarProgress);
+    if (bundle.radarAttempts.length > 0) await db.radarAttempts.bulkPut(bundle.radarAttempts);
   });
 
   return {
@@ -83,6 +97,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       partidas: bundle.games.length,
       tarjetas: bundle.errorCards.length,
       calibraciones: bundle.calibrationRecords.length,
+      respuestasRadar: bundle.radarAttempts.length,
     },
   };
 }

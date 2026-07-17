@@ -8,6 +8,7 @@ Aplicación web progresiva (PWA) que prescribe tu entrenamiento de ajedrez para 
 - **`docs/PRD.md`** — requisitos de producto: la fuente de verdad. Empezar por acá.
 - **`CONTRIBUTING.md`** — reglas de trabajo para cualquier colaborador, persona o agente de IA.
 - **`docs/roadmap.md`** — fases de construcción con criterios de salida.
+- **`docs/radar-dataset.md`** — origen, generación y validación del catálogo offline del Radar.
 - **`docs/design-system.md`** — identidad visual, tokens y componentes.
 - **`docs/prototipos/`** — referencia visual y prototipo interactivo del design system (abrir en navegador).
 - **`docs/adr/`** — decisiones de arquitectura (qué se decidió, por qué, qué se descartó).
@@ -28,4 +29,4 @@ Más comandos (build, test, lint, typecheck) en `CONTRIBUTING.md`.
 **GPLv3** (ver `LICENSE` y ADR-0006). El archivo `LICENSE` contiene el texto oficial, sin modificaciones, tomado de gnu.org/licenses/gpl-3.0.txt.
 
 ## Estado
-Base documental completa. Fase 0 (Fundaciones) y Fase 1 (Radar + Cola Universal) implementadas — criterios de salida verificados en emulación, pendiente de validar en un dispositivo real (ver `docs/roadmap.md`).
+Fase 0 (Fundaciones) está completa. Fase 1 (Radar + Cola Universal) está completa técnicamente, con un lote real de 100 posiciones y datos adaptativos persistentes; falta su validación de uso real durante siete días antes de declararla cerrada (ver `docs/roadmap.md`).

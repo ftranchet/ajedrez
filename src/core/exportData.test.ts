@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildExportBundle, validateImportBundle } from './exportData';
 import { SCHEMA_VERSION } from '../services/storage/db';
 
-const empty = { games: [], errorCards: [], calibrationRecords: [] };
+const empty = { games: [], errorCards: [], calibrationRecords: [], radarProgress: [], radarAttempts: [] };
 
 describe('buildExportBundle', () => {
   it('incluye la versión de esquema actual y la fecha de exportación', () => {

@@ -4,9 +4,10 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { GameRecord } from '../../core/types';
+import type { GameRecord, RadarAttempt } from '../../core/types';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
+import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
 import { t } from '../i18n/es';
 
 function formatJugadas(n: number): string {
@@ -15,11 +16,15 @@ function formatJugadas(n: number): string {
 
 export function PanelScreen() {
   const [games, setGames] = useState<GameRecord[] | null>(null);
+  const [radarAttempts, setRadarAttempts] = useState<RadarAttempt[] | null>(null);
 
   useEffect(() => {
     let alive = true;
     void gameRepo.list().then((g) => {
       if (alive) setGames(g);
+    });
+    void radarAttemptRepo.list().then((attempts) => {
+      if (alive) setRadarAttempts(attempts);
     });
     return () => {
       alive = false;
@@ -52,8 +57,33 @@ export function PanelScreen() {
         )}
       </section>
 
+      <RadarSummary attempts={radarAttempts} />
+
       <DatosSection />
     </div>
+  );
+}
+
+function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
+  if (attempts === null) return null;
+  if (attempts.length === 0) {
+    return (
+      <section>
+        <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.radar}</h2>
+        <p className="m-0 text-secondary">{t.panel.radarSinRespuestas}</p>
+      </section>
+    );
+  }
+  const recent = attempts.slice(0, 50);
+  const porcentaje = Math.round((recent.filter((attempt) => attempt.acierto).length / recent.length) * 100);
+  return (
+    <section>
+      <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.radar}</h2>
+      <p className="m-0 text-primary">
+        {t.panel.radarTasa.replace('{n}', String(recent.length)).replace('{porcentaje}', String(porcentaje))}
+      </p>
+      <p className="m-0 mt-1 text-sm text-secondary">{t.panel.radarMeta}</p>
+    </section>
   );
 }
 
@@ -93,7 +123,8 @@ function DatosSection() {
           t.panel.importadoOk
             .replace('{partidas}', String(outcome.resumen.partidas))
             .replace('{tarjetas}', String(outcome.resumen.tarjetas))
-            .replace('{calibraciones}', String(outcome.resumen.calibraciones)),
+            .replace('{calibraciones}', String(outcome.resumen.calibraciones))
+            .replace('{radar}', String(outcome.resumen.respuestasRadar)),
         );
       } else {
         setMensaje(`${t.panel.importadoError}: ${outcome.error}`);

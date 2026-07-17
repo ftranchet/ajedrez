@@ -4,7 +4,7 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, ErrorCard, RadarItem } from '../../core/types';
+import type { CalibrationRecord, Color, ErrorCard, RadarItem, RadarProgress } from '../../core/types';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
@@ -19,6 +19,8 @@ import { shouldSampleConfidence } from '../../core/calibration';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
+import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
+import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/radarProgressRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { computeDests } from './chessBoardUtils';
 
@@ -97,6 +99,26 @@ function tasaAciertoReciente(historial: boolean[]): number {
   return ventana.filter(Boolean).length / ventana.length;
 }
 
+function selectionFromProgress(progress: RadarProgress | undefined): RadarSelectionState {
+  if (!progress) return { ...RADAR_INITIAL_STATE };
+  return {
+    historialTipos: progress.historialTipos,
+    historialIds: progress.historialIds,
+    ratingCentro: progress.ratingCentro,
+  };
+}
+
+function progressFromState(selection: RadarSelectionState, aciertosRecientes: boolean[]): RadarProgress {
+  return {
+    id: RADAR_PROGRESS_ID,
+    historialTipos: selection.historialTipos,
+    historialIds: selection.historialIds,
+    ratingCentro: selection.ratingCentro,
+    aciertosRecientes,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export const useSessionStore = create<SessionState>((set, get) => {
   function loadRadarItem(item: RadarItem | null) {
     if (!item) {
@@ -135,9 +157,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   async function beginRadar() {
     const pool = get().radarPool;
-    const selState = RADAR_INITIAL_STATE;
+    const selState = get().radarSelState;
     const item = selectNextRadarItem(pool, selState, Math.random);
-    set({ phase: 'radar', radarSelState: item ? recordServed(selState, item) : selState });
+    const nextSelState = item ? recordServed(selState, item) : selState;
+    set({ phase: 'radar', radarSelState: nextSelState });
+    await radarProgressRepo.save(progressFromState(nextSelState, get().radarAciertosRecientes));
     loadRadarItem(item);
   }
 
@@ -177,9 +201,17 @@ export const useSessionStore = create<SessionState>((set, get) => {
     async start() {
       set({ phase: 'cargando' });
       await radarItemRepo.ensureSeeded();
-      const [allCards, pool] = await Promise.all([errorCardRepo.list(), radarItemRepo.list()]);
+      const [allCards, pool, progress] = await Promise.all([errorCardRepo.list(), radarItemRepo.list(), radarProgressRepo.get()]);
       const due = dueErrorCards(allCards);
-      set({ radarPool: pool, colaCards: due, colaIndex: 0, dueCount: due.length });
+      set({
+        radarPool: pool,
+        colaCards: due,
+        colaIndex: 0,
+        dueCount: due.length,
+        radarSelState: selectionFromProgress(progress),
+        radarAciertosRecientes: progress?.aciertosRecientes ?? [],
+        radarServidos: 0,
+      });
       if (due.length > 0) {
         set({ phase: 'cola' });
         loadColaCard(due[0]);
@@ -292,7 +324,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
         return;
       }
       const item = selectNextRadarItem(s.radarPool, selState, Math.random);
-      set({ radarSelState: item ? recordServed(selState, item) : selState });
+      const nextSelState = item ? recordServed(selState, item) : selState;
+      set({ radarSelState: nextSelState });
+      await radarProgressRepo.save(progressFromState(nextSelState, get().radarAciertosRecientes));
       loadRadarItem(item);
     },
   };
@@ -302,6 +336,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarServidos: s.radarServidos + 1,
       radarAciertosRecientes: [...s.radarAciertosRecientes, acierto].slice(-VENTANA_TASA_ACIERTO),
     }));
+    const state = get();
+    await radarProgressRepo.save(progressFromState(state.radarSelState, state.radarAciertosRecientes));
+    await radarAttemptRepo.save({
+      id: crypto.randomUUID(),
+      itemId: item.id,
+      tipo: item.tipo,
+      rating: item.rating,
+      acierto,
+      fecha: new Date().toISOString(),
+    });
     if (!acierto) {
       const card = buildErrorCard({
         fen: item.fen,

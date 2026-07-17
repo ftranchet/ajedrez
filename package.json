@@ -10,6 +10,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/copy-engine.mjs",
+    "build:radar-dataset": "node scripts/build-radar-dataset.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
