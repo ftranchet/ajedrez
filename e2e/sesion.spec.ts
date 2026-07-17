@@ -78,6 +78,26 @@ async function seedCurriculumAutomatizado(page: Page) {
   }, seedCurriculumItems.map((item) => item.id));
 }
 
+// Sin perfil diagnosticado (RF-11.4, su propio spec en diagnostico.spec.ts),
+// Hoy antepone esa pantalla a "Tu sesión de hoy". Sembrarlo como completado
+// evita que se interponga en specs que no lo están probando.
+async function seedProfileDiagnosticado(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('elomax');
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('profile', 'readwrite');
+          tx.objectStore('profile').put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: new Date().toISOString() });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        request.onerror = () => reject(request.error);
+      }),
+  );
+}
+
 // El tablero se orienta según quién mueve (RF-5.2, convención tipo Lichess:
 // la posición se ve siempre desde la perspectiva de quien tiene que jugar).
 // chessground no pone listeners en cada <piece> (tienen pointer-events
@@ -105,6 +125,9 @@ test.describe('sesión simple: Radar', () => {
     await page.getByText('Tu sesión de hoy').waitFor();
     await seedRadarFixture(page);
     await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page);
+    await page.reload();
+    await page.getByText('Tu sesión de hoy').waitFor();
     await page.getByRole('button', { name: 'Empezar sesión' }).click();
 
     const board = page.locator('cg-board');
@@ -184,6 +207,7 @@ test.describe('sesión simple: Cola', () => {
       });
     });
     await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page);
     await page.reload();
     await page.getByText('Tenés 1 repaso vencido.').waitFor();
 

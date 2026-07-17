@@ -9,15 +9,19 @@ import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { useSessionStore } from '../state/sessionStore';
+import { useDiagnosticoStore } from '../state/diagnosticoStore';
+import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
   const s = useSessionStore();
+  const diagnosticoPhase = useDiagnosticoStore((d) => d.phase);
 
   useEffect(() => {
     if (s.phase === 'sinEmpezar' && s.dueCount === null) void s.loadSummary();
   }, [s]);
 
+  if (diagnosticoPhase !== 'inactivo') return <DiagnosticoScreen />;
   if (s.phase === 'sinEmpezar' || s.phase === 'cargando') return <Portada />;
   if (s.phase === 'fin') return <Fin />;
   return <SesionActiva />;
@@ -58,6 +62,18 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
 
 function Portada() {
   const s = useSessionStore();
+
+  if (s.dueCount === null) {
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+        <p className="m-0 text-secondary">{t.sesion.cargando}</p>
+      </div>
+    );
+  }
+
+  if (!s.profile.diagnosticoCompletadoEn) return <DiagnosticoPrompt />;
+
   const bloques = bloquesDeLaSesion(s);
   const vencidas = s.dueCount ?? 0;
   const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
@@ -89,6 +105,25 @@ function Portada() {
           className="btn-primary"
         >
           {s.phase === 'cargando' ? t.sesion.cargando : t.sesion.empezar}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticoPrompt() {
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+      <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
+        <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.diagnostico.titulo}</span>
+        <p className="m-0 text-sm text-secondary">{t.diagnostico.introTexto}</p>
+        <p className="m-0 text-xs text-tertiary">{t.diagnostico.introNota}</p>
+        <button onClick={() => void useDiagnosticoStore.getState().empezarJuego1()} className="btn-primary">
+          {t.diagnostico.empezar}
+        </button>
+        <button onClick={() => void useSessionStore.getState().start()} className="btn-secondary">
+          {t.diagnostico.saltear}
         </button>
       </div>
     </div>

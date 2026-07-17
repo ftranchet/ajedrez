@@ -10,6 +10,27 @@ import { expect, test, type Page } from '@playwright/test';
 // 4. Ba6?? entrega el alfil sin compensación (bxa6 lo captura gratis).
 const PGN_CON_BLUNDER = '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. Ba6 bxa6 *';
 
+// Este spec prueba el análisis en dos fases, no el diagnóstico inicial
+// (RF-11.4, su propio spec en diagnostico.spec.ts). Sin perfil diagnosticado,
+// Hoy antepone la pantalla de diagnóstico a "Tu sesión de hoy" — sembrarlo
+// como completado evita que se interponga.
+async function seedProfileDiagnosticado(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('elomax');
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('profile', 'readwrite');
+          tx.objectStore('profile').put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: new Date().toISOString() });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        request.onerror = () => reject(request.error);
+      }),
+  );
+}
+
 async function seedGame(page: Page) {
   await page.evaluate(
     (pgn) =>
@@ -41,6 +62,7 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await seedGame(page);
+  await seedProfileDiagnosticado(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 

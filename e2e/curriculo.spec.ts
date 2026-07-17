@@ -31,7 +31,9 @@ async function clickSquare(page: Page, board: ReturnType<Page['locator']>, file:
 test('currículo: sin repasos vencidos, la sesión sirve un patrón antes que el Radar', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
-  await page.getByRole('button', { name: 'Empezar sesión' }).click();
+  // Sin diagnóstico previo (RF-11.4, su propio spec en diagnostico.spec.ts),
+  // Hoy antepone esa pantalla; "saltear" arranca la sesión igual.
+  await page.getByRole('button', { name: 'Empezar sin diagnóstico' }).click();
 
   await page.getByText(`Patrón 1 de ${CURRICULUM_MAX}`).waitFor({ timeout: 15_000 });
   const nombre = await page.locator('aside .font-display.text-xl').first().innerText();
