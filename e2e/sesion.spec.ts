@@ -1,0 +1,148 @@
+// E2E del criterio de salida de Fase 1 (roadmap): la sesión simple (Cola
+// vencida + Radar) funciona de punta a punta — evaluación, jugada,
+// calibración muestreada, feedback con porqué, y exportación de datos.
+// El detalle de "la sesión completa termina tras 8 posiciones" y "un fallo
+// espacia distinto que un acierto" ya está cubierto exhaustivamente por
+// src/ui/state/sessionStore.test.ts (Vitest, contra Dexie real) — acá se
+// verifica que la UI está bien conectada a esa lógica, no se reprueba la
+// lógica misma.
+import { expect, test, type Page } from '@playwright/test';
+
+// El tablero se orienta según quién mueve (RF-5.2, convención tipo Lichess:
+// la posición se ve siempre desde la perspectiva de quien tiene que jugar).
+// chessground no pone listeners en cada <piece> (tienen pointer-events
+// deshabilitado a propósito: el click lo captura <cg-board> y calcula la
+// casilla por coordenadas), así que hay que clickear por píxeles, no sobre
+// los elementos de pieza.
+async function clickSquare(page: Page, board: ReturnType<Page['locator']>, file: string, rank: number) {
+  const flipped = (await page.locator('.cg-wrap').first().getAttribute('class'))?.includes('orientation-black') ?? false;
+  const box = await board.boundingBox();
+  if (!box) throw new Error('Tablero sin bounding box');
+  const files = 'abcdefgh';
+  const col = flipped ? 7 - files.indexOf(file) : files.indexOf(file);
+  const row = flipped ? rank - 1 : 8 - rank;
+  await page.mouse.click(box.x + ((col + 0.5) * box.width) / 8, box.y + ((row + 0.5) * box.height) / 8);
+}
+
+test.describe('sesión simple: Radar', () => {
+  test('evaluación → jugada → calibración muestreada → feedback con porqué → siguiente', async ({ page }) => {
+    // Forzar que siempre se muestree confianza (RF-10.1 usa Math.random()),
+    // para ejercitar el ConfidenceSlider de forma determinística.
+    await page.addInitScript(() => {
+      Math.random = () => 0;
+    });
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await page.getByRole('button', { name: 'Empezar sesión' }).click();
+
+    const board = page.locator('cg-board');
+    await board.waitFor({ timeout: 15_000 });
+    await page.getByText('¿Cómo está la posición?').waitFor();
+
+    // Las piezas del Radar también cargan con la CSS inyectada en runtime.
+    const pieceImage = await page
+      .locator('piece.pawn.black, piece.pawn.white')
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(pieceImage).toContain('piece/staunty/');
+
+    await page.getByRole('button', { name: 'Igual' }).click();
+    await page.getByText('Ahora jugá tu respuesta').waitFor();
+
+    // Con Math.random forzado a 0, el selector del Radar sirve siempre la
+    // primera posición dentro de la banda de rating inicial: seed-04
+    // (envenenada, dama negra en d5, solución d5→h5). Verificado a mano
+    // contra el pool sembrado antes de fijar este test.
+    await clickSquare(page, board, 'd', 5);
+    await clickSquare(page, board, 'h', 5);
+
+    // Con Math.random forzado a 0, shouldSampleConfidence() da true siempre.
+    await page.getByText('¿Qué tan seguro estás').waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Confirmar' }).click();
+
+    // d5h5 es la solución registrada: acierta.
+    await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
+    // El feedback siempre explica el porqué (RF-5.3), también sin táctica.
+    const explicacion = await page.locator('p.text-primary').first().innerText();
+    expect(explicacion.length).toBeGreaterThan(10);
+
+    await page.getByRole('button', { name: 'Siguiente' }).click();
+    await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 10_000 });
+    await expect(page.getByText('Posición 2 de')).toBeVisible();
+  });
+});
+
+test.describe('sesión simple: Cola', () => {
+  test('un repaso vencido aparece antes que el Radar y respeta su prioridad (RF-4.4)', async ({ page }) => {
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+
+    // Sembrar una tarjeta vencida directamente en IndexedDB, como lo dejaría
+    // un fallo real de partida o del Radar en un día anterior.
+    await page.evaluate(() => {
+      return new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('errorCards', 'readwrite');
+          tx.objectStore('errorCards').put({
+            id: 'e2e-due-1',
+            fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+            ladoAMover: 'b',
+            jugadaUsuario: 'e7e6',
+            jugadaCorrecta: 'e7e5',
+            categoria: 'tactico',
+            origen: 'partida',
+            fsrs: {
+              due: '2026-01-01T00:00:00.000Z',
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              learningSteps: 0,
+              state: 'new',
+              lastReview: null,
+            },
+            creadaEn: '2026-01-01T00:00:00.000Z',
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    });
+    await page.reload();
+    await page.getByText('Tenés 1 repaso vencido.').waitFor();
+
+    await page.getByRole('button', { name: 'Empezar sesión' }).click();
+    await page.getByText('Cola de repasos').waitFor({ timeout: 15_000 });
+
+    const board = page.locator('cg-board');
+    await board.waitFor();
+    await clickSquare(page, board, 'e', 7);
+    await clickSquare(page, board, 'e', 5);
+
+    await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
+    // Tras responder la única vencida, sigue directo al Radar.
+    await page.getByRole('button', { name: 'Siguiente' }).click();
+    await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 10_000 });
+  });
+});
+
+test.describe('exportación e importación (E14)', () => {
+  test('exportar mis datos descarga un .zip, alcanzable en 2 toques desde Hoy', async ({ page }) => {
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+
+    // Toque 1: Panel. Toque 2: Exportar mis datos.
+    await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+    await page.getByText('Tus datos').waitFor();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Exportar mis datos' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^elomax-export-.*\.zip$/);
+  });
+});

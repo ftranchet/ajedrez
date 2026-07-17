@@ -1,0 +1,66 @@
+// Exportación e importación de datos (E14): lógica pura de armado y
+// validación del paquete. La mecánica de archivo (.zip) vive en
+// services/export — acá no hay File, Blob ni fetch (CONTRIBUTING regla 4).
+import type { CalibrationRecord, ErrorCard, GameRecord } from './types';
+import { SCHEMA_VERSION } from '../services/storage/db';
+
+export interface ExportManifest {
+  esquema: number;
+  exportadoEn: string; // ISO 8601
+  app: 'elomax';
+}
+
+export interface ExportBundle {
+  manifest: ExportManifest;
+  games: GameRecord[];
+  errorCards: ErrorCard[];
+  calibrationRecords: CalibrationRecord[];
+}
+
+export interface ExportSourceData {
+  games: GameRecord[];
+  errorCards: ErrorCard[];
+  calibrationRecords: CalibrationRecord[];
+}
+
+/** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
+export function buildExportBundle(data: ExportSourceData, now: Date = new Date()): ExportBundle {
+  return {
+    manifest: { esquema: SCHEMA_VERSION, exportadoEn: now.toISOString(), app: 'elomax' },
+    games: data.games,
+    errorCards: data.errorCards,
+    calibrationRecords: data.calibrationRecords,
+  };
+}
+
+export type ImportResult = { ok: true; bundle: ExportBundle } | { ok: false; error: string };
+
+/**
+ * Valida la forma de un paquete importado antes de tocar la base de datos
+ * (RF-14.2). No migra todavía versiones de esquema anteriores a la actual:
+ * con un solo esquema publicado hasta ahora, el único caso a futuro es
+ * `esquema < SCHEMA_VERSION`, que queda como punto de extensión documentado.
+ */
+export function validateImportBundle(raw: unknown): ImportResult {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, error: 'El archivo no contiene un paquete válido.' };
+  const obj = raw as Record<string, unknown>;
+  const manifest = obj.manifest as Partial<ExportManifest> | undefined;
+  if (!manifest || typeof manifest.esquema !== 'number') {
+    return { ok: false, error: 'Falta el manifiesto o no indica versión de esquema.' };
+  }
+  if (manifest.esquema > SCHEMA_VERSION) {
+    return { ok: false, error: `El archivo es de una versión más nueva (esquema ${manifest.esquema}) que esta app (${SCHEMA_VERSION}). Actualizá la app antes de restaurar.` };
+  }
+  if (!Array.isArray(obj.games) || !Array.isArray(obj.errorCards) || !Array.isArray(obj.calibrationRecords)) {
+    return { ok: false, error: 'El paquete no tiene la forma esperada (faltan partidas, tarjetas o calibración).' };
+  }
+  return {
+    ok: true,
+    bundle: {
+      manifest: manifest as ExportManifest,
+      games: obj.games as GameRecord[],
+      errorCards: obj.errorCards as ErrorCard[],
+      calibrationRecords: obj.calibrationRecords as CalibrationRecord[],
+    },
+  };
+}

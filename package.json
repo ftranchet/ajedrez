@@ -25,9 +25,11 @@
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
     "dexie": "^4.4.4",
+    "fflate": "^0.8.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "stockfish": "^18.0.8",
+    "ts-fsrs": "^5.4.1",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

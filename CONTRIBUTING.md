@@ -48,11 +48,12 @@ La CI (GitHub Actions) corre lint + typecheck + test + build en cada push; no se
 
 ## Estrategia de tests
 1. **Unitarios de dominio** (`src/**/*.test.ts`, Vitest): obligatorios para todo módulo de `core/` (regla 5) y para toda migración de esquema (regla 3). Corren en milisegundos; son la primera línea.
-2. **E2E del flujo crítico** (`e2e/*.spec.ts`, Playwright): el criterio de salida de cada fase se codifica como spec e2e que corre en CI sobre el build de producción, en viewport de celular y de escritorio, y contra ambas bases de despliegue. Fase 0: jugar contra el motor, guardar, sobrevivir a la recarga.
+2. **E2E del flujo crítico** (`e2e/*.spec.ts`, Playwright): el criterio de salida de cada fase se codifica como spec e2e que corre en CI sobre el build de producción, en viewport de celular y de escritorio, y contra ambas bases de despliegue. Fase 0: jugar contra el motor, guardar, sobrevivir a la recarga. Fase 1: Radar (evaluación → jugada → calibración muestreada → feedback), Cola (prioridad de vencidas), exportación.
+   - **Nota sobre pixel-clicking del tablero:** chessground no pone listeners en los elementos `<piece>` (tienen `pointer-events` deshabilitado a propósito; el click lo captura `<cg-board>` y calcula la casilla por coordenadas) y el tablero se reorienta según quién mueve (RF-5.2, convención tipo Lichess). Todo spec que clickee el tablero debe calcular coordenadas por píxel leyendo la clase `orientation-white`/`orientation-black` del `.cg-wrap`, nunca asumir una orientación fija ni clickear elementos de pieza directamente.
 3. **Regla al agregar una épica**: la épica no está "hecha" sin (a) unitarios de su lógica en `core/`, (b) un spec e2e de su flujo principal si tiene interfaz, y (c) migración probada si toca el modelo de datos (RNF-5, definición de "hecho").
 
 ## Despliegue
 `main` se publica automáticamente en GitHub Pages (workflow `deploy-pages.yml`, build con `BASE_PATH=/ajedrez/`). La fuente de Pages en la configuración del repo debe ser **GitHub Actions**, no una rama: publicar la rama sirve el código sin compilar y la página queda en blanco. Toda ruta a assets en el código usa `import.meta.env.BASE_URL` (nunca `/` absoluto), para que la app funcione en cualquier base.
 
 ## Estado actual
-Fase 0 — Fundaciones. Ver `docs/roadmap.md` para el criterio de salida de la fase.
+Fase 1 — Radar + Cola Universal. Ver `docs/roadmap.md` para el criterio de salida de la fase.

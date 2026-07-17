@@ -55,4 +55,34 @@ describe('migración de esquema Dexie', () => {
     expect(await database.games.get('g2')).toEqual(record);
     database.close();
   });
+
+  it('migra de v2 a v3: las partidas existentes sobreviven y las tablas nuevas quedan disponibles (Fase 1)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    // 1. Escribir con el esquema v2 tal como existía antes de Fase 1.
+    const v2 = new Dexie(name);
+    v2.version(1).stores({ games: 'id, fecha' });
+    v2.version(2).stores({ games: 'id, fecha, fuente' });
+    await v2.table('games').add({
+      id: 'g3',
+      pgn: '1. c4 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-17T00:00:00.000Z',
+    });
+    v2.close();
+
+    // 2. Abrir con el esquema actual (v3).
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g3')).toMatchObject({ id: 'g3', pgn: '1. c4 *' });
+
+    // 3. Las tablas nuevas de Fase 1 existen y son consultables desde cero.
+    expect(await current.errorCards.count()).toBe(0);
+    expect(await current.radarItems.count()).toBe(0);
+    expect(await current.calibrationRecords.count()).toBe(0);
+    current.close();
+  });
 });

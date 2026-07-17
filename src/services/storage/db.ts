@@ -2,12 +2,17 @@
 // Toda versión que cambie el modelo de datos agrega un bloque version(n)
 // nuevo con su upgrade; nunca se edita una versión ya publicada.
 import Dexie, { type Table } from 'dexie';
-import type { GameRecord } from '../../core/types';
+import type { CalibrationRecord, ErrorCard, GameRecord, RadarItem } from '../../core/types';
 
 export const DB_NAME = 'elomax';
+/** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
+export const SCHEMA_VERSION = 3;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
+  errorCards!: Table<ErrorCard, string>;
+  radarItems!: Table<RadarItem, string>;
+  calibrationRecords!: Table<CalibrationRecord, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -33,6 +38,16 @@ export class ElomaxDB extends Dexie {
             if (g.analizada === undefined) g.analizada = false;
           });
       });
+
+    // v3 — Fase 1 (E4/E5/E10): Cola Universal de errores, catálogo del
+    // Radar y registros de calibración. Puramente aditivo: `games` no
+    // cambia, no hace falta transformar datos existentes.
+    this.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
   }
 }
 

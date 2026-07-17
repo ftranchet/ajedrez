@@ -1,15 +1,155 @@
-// Pantalla principal. En Fase 0 es un estado vacío honesto: el Prescriptor
-// llega en Fase 3 (roadmap). Los estados vacíos explican qué hacer (§6 voz).
+// Pantalla principal: "Tu sesión de hoy" (RF-11.1, layout héroe validado en
+// docs/prototipos/sesion-de-hoy.dc.html). Fase 1 implementa la sesión
+// simple: Cola vencida primero, después el Radar (E4 + E5 + E10). El
+// Prescriptor completo (composición por duración, ajuste por fugas) llega
+// en Fase 3 — acá el "porqué" es fijo, no personalizado todavía.
+import { useEffect } from 'react';
+import type { Square } from 'chess.js';
+import { Board } from '../components/Board';
+import { EvalPicker } from '../components/EvalPicker';
+import { ConfidenceSlider } from '../components/ConfidenceSlider';
+import { FeedbackPanel } from '../components/FeedbackPanel';
+import { RADAR_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { t } from '../i18n/es';
 
-export function HoyScreen({ onGoPlay }: { onGoPlay: () => void }) {
+export function HoyScreen() {
+  const s = useSessionStore();
+
+  useEffect(() => {
+    if (s.phase === 'sinEmpezar' && s.dueCount === null) void s.loadSummary();
+  }, [s]);
+
+  if (s.phase === 'sinEmpezar' || s.phase === 'cargando') return <Portada />;
+  if (s.phase === 'fin') return <Fin />;
+  return <SesionActiva />;
+}
+
+function Portada() {
+  const s = useSessionStore();
+  const vencidas = s.dueCount ?? 0;
+  const porque =
+    vencidas > 0
+      ? vencidas === 1
+        ? t.sesion.cardsVencidas_uno
+        : t.sesion.cardsVencidas_otro.replace('{n}', String(vencidas))
+      : 'El Radar mezcla táctica, defensa y posiciones tranquilas sin avisar cuál es cuál.';
+
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-      <p className="m-0 text-secondary">{t.hoy.vacio}</p>
-      <button onClick={onGoPlay} className="btn-primary">
-        {t.hoy.accion}
+      {/* Bloque héroe (design system §4.1): tarjeta destacada, un solo botón primario */}
+      <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.sesion.subtitulo}</span>
+        </div>
+        <p className="m-0 text-sm text-secondary">{porque}</p>
+        <button
+          onClick={() => void useSessionStore.getState().start()}
+          disabled={s.phase === 'cargando'}
+          className="btn-primary"
+        >
+          {s.phase === 'cargando' ? t.sesion.cargando : t.sesion.empezar}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Fin() {
+  const s = useSessionStore();
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
+      <h1 className="m-0 font-display text-3xl font-medium">{t.sesion.fin}</h1>
+      <p className="m-0 text-secondary">{t.sesion.finTexto}</p>
+      <button onClick={() => s.volver()} className="btn-primary">
+        {t.sesion.volverAHoy}
       </button>
+    </div>
+  );
+}
+
+function SesionActiva() {
+  const s = useSessionStore();
+  const enCola = s.phase === 'cola';
+
+  return (
+    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <Board
+          fen={s.fen}
+          orientation={s.turn}
+          turn={s.turn}
+          lastMove={s.lastMove}
+          check={s.check}
+          dests={s.dests}
+          movableColor={
+            (enCola && s.colaSubPhase === 'jugando') || (!enCola && s.radarSubPhase === 'jugando') ? s.turn : null
+          }
+          onMove={(from, to) =>
+            enCola ? void s.colaUserMove(from as Square, to as Square) : void s.radarUserMove(from as Square, to as Square)
+          }
+        />
+      </div>
+
+      <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
+        {enCola ? <ColaPanel /> : <RadarPanel />}
+      </aside>
+    </div>
+  );
+}
+
+function ColaPanel() {
+  const s = useSessionStore();
+  const total = s.colaCards.length;
+  const actual = Math.min(s.colaIndex + 1, total);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-subtle bg-surface p-4">
+        <p className="m-0 font-mono text-xs text-tertiary">
+          {t.cola.progreso.replace('{actual}', String(actual)).replace('{total}', String(total))}
+        </p>
+        <p className="m-0 mt-1 font-display text-xl">{t.cola.titulo}</p>
+      </div>
+      {s.colaSubPhase === 'jugando' && <p className="m-0 text-sm text-secondary">{t.cola.consigna}</p>}
+      {s.colaSubPhase === 'feedback' && (
+        <FeedbackPanel
+          acierto={s.colaUltimoAcierto ?? false}
+          texto={s.colaUltimoAcierto ? '' : `${t.radar.jugadaCorrecta}: ${s.colaJugadaCorrecta}`}
+          jugadaCorrecta={s.colaJugadaCorrecta ?? ''}
+          onContinuar={() => s.colaContinuar()}
+        />
+      )}
+    </div>
+  );
+}
+
+function RadarPanel() {
+  const s = useSessionStore();
+  const actual = Math.min(s.radarServidos + 1, RADAR_SESSION_SIZE);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-subtle bg-surface p-4">
+        <p className="m-0 font-mono text-xs text-tertiary">
+          {t.radar.progreso.replace('{actual}', String(actual)).replace('{total}', String(RADAR_SESSION_SIZE))}
+        </p>
+        <p className="m-0 mt-1 font-display text-xl">{t.radar.titulo}</p>
+      </div>
+
+      {s.radarSubPhase === 'evaluando' && (
+        <EvalPicker selected={s.radarEvalGuess} onSelect={(v) => s.radarEval(v)} />
+      )}
+      {s.radarSubPhase === 'jugando' && <p className="m-0 text-sm text-secondary">{t.radar.consignaJugada}</p>}
+      {s.radarSubPhase === 'confianza' && <ConfidenceSlider onConfirm={(v) => void s.radarConfirmarConfianza(v)} />}
+      {s.radarSubPhase === 'feedback' && (
+        <FeedbackPanel
+          acierto={s.radarUltimoAcierto ?? false}
+          texto={s.radarFeedbackTexto}
+          jugadaCorrecta={s.radarJugadaCorrecta ?? ''}
+          onContinuar={() => void s.radarContinuar()}
+        />
+      )}
     </div>
   );
 }

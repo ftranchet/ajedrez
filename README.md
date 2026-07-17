@@ -28,4 +28,4 @@ Más comandos (build, test, lint, typecheck) en `CONTRIBUTING.md`.
 **GPLv3** (ver `LICENSE` y ADR-0006). El archivo `LICENSE` contiene el texto oficial, sin modificaciones, tomado de gnu.org/licenses/gpl-3.0.txt.
 
 ## Estado
-Base documental completa. Fase 0 (Fundaciones) implementada: partida local contra el motor, persistencia y CI — criterio de salida verificado en emulación, pendiente de validar en un dispositivo real (ver `docs/roadmap.md`).
+Base documental completa. Fase 0 (Fundaciones) y Fase 1 (Radar + Cola Universal) implementadas — criterios de salida verificados en emulación, pendiente de validar en un dispositivo real (ver `docs/roadmap.md`).

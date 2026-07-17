@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
+import { Chip } from '../components/Chip';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import type { Color } from '../../core/types';
@@ -177,18 +178,3 @@ function Setup() {
   );
 }
 
-function Chip({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`min-h-11 rounded-sm border px-3 py-2 text-left text-sm transition-colors duration-[120ms] ${
-        selected
-          ? 'border-accent bg-accent-subtle text-primary'
-          : 'border-subtle bg-surface text-secondary hover:border-strong hover:bg-elevated'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}

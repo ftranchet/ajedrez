@@ -8,6 +8,7 @@ import { buildGameRecord, deriveResult } from '../../core/game';
 import { engine } from '../../services/engine/stockfishEngine';
 import { gameRepo } from '../../services/storage/gameRepo';
 import levelsConfig from '../../config/engine-levels.json';
+import { computeDests } from './chessBoardUtils';
 
 export const ENGINE_LEVELS: EngineLevel[] = levelsConfig.levels;
 
@@ -46,16 +47,6 @@ interface GameState {
 const chess = new Chess();
 let moveTimesMs: number[] = [];
 let turnStartedAt = 0;
-
-function computeDests(c: Chess): Map<string, string[]> {
-  const dests = new Map<string, string[]>();
-  for (const m of c.moves({ verbose: true })) {
-    const list = dests.get(m.from) ?? [];
-    list.push(m.to);
-    dests.set(m.from, list);
-  }
-  return dests;
-}
 
 function levelById(id: string): EngineLevel {
   return ENGINE_LEVELS.find((l) => l.id === id) ?? ENGINE_LEVELS[0];
