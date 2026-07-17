@@ -1,5 +1,6 @@
 // Selector de promoción (RF-1.1). Overlay sobre el tablero.
 import type { Color } from '../../core/types';
+import { pieceUrl } from '../styles/pieceTheme';
 import { t } from '../i18n/es';
 
 interface Props {
@@ -33,7 +34,7 @@ export function PromotionDialog({ color, onPick, onCancel }: Props) {
             aria-label={p.code}
             onClick={() => onPick(p.code)}
             className="h-16 w-16 min-h-11 min-w-11 rounded-md bg-surface bg-[length:90%] bg-center bg-no-repeat hover:bg-elevated"
-            style={{ backgroundImage: `url(/piece/staunty/${color}${p.file}.svg)` }}
+            style={{ backgroundImage: `url(${pieceUrl(color, p.file)})` }}
           />
         ))}
       </div>

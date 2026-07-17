@@ -4,3 +4,5 @@ dev-dist/
 coverage/
 public/engine/
 *.local
+test-results/
+playwright-report/

@@ -2,6 +2,8 @@
 
 Aplicación web progresiva (PWA) que prescribe tu entrenamiento de ajedrez para maximizar Elo por hora invertida. Local-first: tus datos viven en tu dispositivo y son exportables siempre, de forma clara y en formatos abiertos.
 
+**App en vivo:** https://ftranchet.github.io/ajedrez/ (se despliega automáticamente desde `main`).
+
 ## Mapa de la documentación
 - **`docs/PRD.md`** — requisitos de producto: la fuente de verdad. Empezar por acá.
 - **`CONTRIBUTING.md`** — reglas de trabajo para cualquier colaborador, persona o agente de IA.

@@ -13,10 +13,13 @@ export class StockfishEngine implements EnginePort {
   }
 
   private async boot(): Promise<void> {
-    const res = await fetch('/engine/manifest.json');
+    // Rutas relativas a la base: la app puede servirse desde un subpath
+    // (p. ej. GitHub Pages en /ajedrez/).
+    const base = import.meta.env.BASE_URL;
+    const res = await fetch(`${base}engine/manifest.json`);
     if (!res.ok) throw new Error('No se encontró el manifest del motor');
     const { file } = (await res.json()) as { file: string };
-    this.worker = new Worker(`/engine/${file}`);
+    this.worker = new Worker(`${base}engine/${file}`);
     this.send('uci');
     await this.waitFor(/^uciok$/m);
     this.send('isready');

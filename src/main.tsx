@@ -9,7 +9,10 @@ import '@fontsource/ibm-plex-mono/600.css';
 import 'chessground/assets/chessground.base.css';
 import './ui/styles/tokens.css';
 import './ui/styles/board.css';
+import { injectPieceTheme } from './ui/styles/pieceTheme';
 import App from './App';
+
+injectPieceTheme();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -16,6 +16,8 @@ Formato: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versionado se
 - Estructura de capas `ui / core / services / config` con dominio puro en `core` y puertos para motor y almacenamiento (ADR-0001); tests de dominio (resultado de partida) y de migración.
 - Interfaz en español rioplatense con textos en archivo de i18n (RNF-7); pantallas Hoy y Panel con estados vacíos honestos que explican qué llega en cada fase.
 - CI en GitHub Actions: lint + typecheck + test + build en cada push (RNF-5).
+- Tests e2e (Playwright) del criterio de salida de Fase 0: partida contra el motor, guardado y persistencia tras recarga, en celular y escritorio, sobre el build de producción y contra las bases `/` y `/ajedrez/`; corren en CI en cada push.
+- Despliegue automático a GitHub Pages desde `main` (workflow `deploy-pages.yml`); estrategia de tests y regla de despliegue documentadas en CONTRIBUTING.
 ### Cambiado
 - docs(design-system): v2 — jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía Newsreader + Instrument Sans + IBM Plex Mono, layout héroe validado para "Tu sesión de hoy" (§4.1) y flujo del Radar (§4.2).
 - El proyecto pasa a llamarse **ELOmax** (antes FORGE); nombre actualizado en README, PRD (v0.2.1), CONTRIBUTING y design system. Los documentos de `docs/evidence/` conservan sus nombres de archivo originales por trazabilidad.
@@ -24,6 +26,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versionado se
 - Flujo de trabajo generalizado para cualquier persona o agente de IA: CONTRIBUTING.md como única fuente de verdad de proceso, con patrón puntero para archivos de contexto específicos de herramientas.
 - CONTRIBUTING.md: sección Comandos completada (entregable de Fase 0); README con instrucciones para correr la app.
 ### Corregido
+- GitHub Pages en blanco: la página publicaba el repo sin compilar (fuente "rama") y la app usaba rutas absolutas que se rompen bajo el subpath `/ajedrez/`. Ahora todas las rutas a assets (motor, piezas, íconos, manifest) son relativas a `import.meta.env.BASE_URL`, y el despliegue compila con `BASE_PATH=/ajedrez/`. Requiere fuente de Pages = GitHub Actions.
 - README: eliminada la instrucción ya cumplida de agregar `LICENSE` y la guía de volcado inicial del paquete documental (pasos ya ejecutados); queda como pendiente solo copiar los documentos de evidencia.
 - Changelog: el enlace de Keep a Changelog apunta a la versión canónica en inglés (la variante `es-AR` no está publicada).
 - Licencia del set Staunty precisada como **CC BY-NC-SA 4.0**, verificada en `lichess-org/lila/COPYING.md` (antes decía "licencia libre", impreciso: la cláusula NC restringe el uso comercial). Corregido en design system §3.1 y en el README del set.

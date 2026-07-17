@@ -19,3 +19,24 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: E2E (base /)
+        run: |
+          npm run build
+          npm run e2e
+      - name: E2E (base /ajedrez/, como GitHub Pages)
+        run: |
+          npm run build
+          npm run e2e
+        env:
+          BASE_PATH: /ajedrez/

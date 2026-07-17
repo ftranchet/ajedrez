@@ -40,7 +40,19 @@ npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit (TypeScript estricto)
 ```
 
-La CI (GitHub Actions) corre lint + typecheck + test + build en cada push; no se mergea en rojo (RNF-5).
+```
+npm run e2e        # tests de punta a punta (Playwright) sobre el build de producción
+```
+
+La CI (GitHub Actions) corre lint + typecheck + test + build en cada push; no se mergea en rojo (RNF-5). El job `e2e` además juega una partida real contra el motor sobre el build de producción, dos veces: con base `/` y con base `/ajedrez/` (el subpath de GitHub Pages).
+
+## Estrategia de tests
+1. **Unitarios de dominio** (`src/**/*.test.ts`, Vitest): obligatorios para todo módulo de `core/` (regla 5) y para toda migración de esquema (regla 3). Corren en milisegundos; son la primera línea.
+2. **E2E del flujo crítico** (`e2e/*.spec.ts`, Playwright): el criterio de salida de cada fase se codifica como spec e2e que corre en CI sobre el build de producción, en viewport de celular y de escritorio, y contra ambas bases de despliegue. Fase 0: jugar contra el motor, guardar, sobrevivir a la recarga.
+3. **Regla al agregar una épica**: la épica no está "hecha" sin (a) unitarios de su lógica en `core/`, (b) un spec e2e de su flujo principal si tiene interfaz, y (c) migración probada si toca el modelo de datos (RNF-5, definición de "hecho").
+
+## Despliegue
+`main` se publica automáticamente en GitHub Pages (workflow `deploy-pages.yml`, build con `BASE_PATH=/ajedrez/`). La fuente de Pages en la configuración del repo debe ser **GitHub Actions**, no una rama: publicar la rama sirve el código sin compilar y la página queda en blanco. Toda ruta a assets en el código usa `import.meta.env.BASE_URL` (nunca `/` absoluto), para que la app funcione en cualquier base.
 
 ## Estado actual
 Fase 0 — Fundaciones. Ver `docs/roadmap.md` para el criterio de salida de la fase.
