@@ -64,6 +64,37 @@ export interface RadarItem {
   fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'seed-dev';
 }
 
+/**
+ * Estado persistente del selector del Radar. A diferencia del catálogo de
+ * posiciones, esto sí es dato del usuario: conserva la dificultad y la tasa
+ * de acierto entre sesiones para que RF-5.5 pueda adaptarse de verdad.
+ */
+export interface RadarProgress {
+  id: 'principal';
+  historialTipos: TipoRadar[];
+  historialIds: string[];
+  ratingCentro: number;
+  aciertosRecientes: boolean[];
+  updatedAt: string; // ISO 8601
+}
+
+/** Resultado de una posición del Radar, para medir la banda 60–80% (RF-5.5). */
+export interface RadarAttempt {
+  id: string;
+  itemId: string;
+  tipo: TipoRadar;
+  rating: number;
+  acierto: boolean;
+  fecha: string; // ISO 8601
+}
+
+/** Versión del catálogo embebido, separada de los datos personales. */
+export interface RadarDatasetMeta {
+  id: 'catalogo';
+  version: string;
+  seededAt: string; // ISO 8601
+}
+
 /** Contexto en el que se pidió una confianza declarada (RF-10.1). */
 export type ContextoCalibracion = 'radar' | 'analisis' | 'stoyko';
 

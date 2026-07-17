@@ -16,4 +16,4 @@ Usar el **dataset abierto de puzzles de Lichess** (licencia CC0, CSV descargable
 - **Datasets comerciales (Chess.com, CT-ART)** — licencias incompatibles con un proyecto abierto.
 
 ## Consecuencias
-Contenido de calidad, gratis y redistribuible; el costo es mantener el pipeline (un script reproducible en el repo) y validar el generador de posiciones tranquilas, cuyo riesgo de falsos positivos está registrado en el PRD §11 con mitigación (umbrales conservadores + verificación a mayor profundidad + reporte de usuario).
+Contenido de calidad, gratis y redistribuible; el costo es mantener el pipeline reproducible (`scripts/build-radar-dataset.mjs`) y validar el generador de posiciones tranquilas, cuyo riesgo de falsos positivos está registrado en el PRD §11 con mitigación (umbrales conservadores + verificación a mayor profundidad + reporte de usuario). El procedimiento, los umbrales y la versión del lote publicado viven en `docs/radar-dataset.md`.

@@ -13,6 +13,8 @@ beforeEach(async () => {
   await db.games.clear();
   await db.errorCards.clear();
   await db.calibrationRecords.clear();
+  await db.radarProgress.clear();
+  await db.radarAttempts.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -43,6 +45,22 @@ describe('exportAllData / importAllData', () => {
       acierto: true,
       fecha: new Date().toISOString(),
     });
+    await db.radarProgress.put({
+      id: 'principal',
+      historialTipos: ['tranquila'],
+      historialIds: ['radar-1'],
+      ratingCentro: 1160,
+      aciertosRecientes: [true, false],
+      updatedAt: new Date().toISOString(),
+    });
+    await db.radarAttempts.put({
+      id: 'r1',
+      itemId: 'radar-1',
+      tipo: 'tranquila',
+      rating: 1200,
+      acierto: true,
+      fecha: new Date().toISOString(),
+    });
 
     const zip = await exportAllData();
     expect(zip.byteLength).toBeGreaterThan(0);
@@ -51,12 +69,14 @@ describe('exportAllData / importAllData', () => {
     await db.games.clear();
     await db.errorCards.clear();
     await db.calibrationRecords.clear();
+    await db.radarProgress.clear();
+    await db.radarAttempts.clear();
     expect(await db.games.count()).toBe(0);
 
     const outcome = await importAllData(zip);
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.resumen).toEqual({ partidas: 1, tarjetas: 1, calibraciones: 1 });
+    expect(outcome.resumen).toEqual({ partidas: 1, tarjetas: 1, calibraciones: 1, respuestasRadar: 1 });
 
     const restoredGame = await db.games.get(game.id);
     expect(restoredGame).toEqual(game);
@@ -64,6 +84,8 @@ describe('exportAllData / importAllData', () => {
     expect(restoredCard).toEqual(card);
     const restoredCalibration = await db.calibrationRecords.get('c1');
     expect(restoredCalibration?.confianzaDeclarada).toBe(80);
+    expect((await db.radarProgress.get('principal'))?.ratingCentro).toBe(1160);
+    expect((await db.radarAttempts.get('r1'))?.acierto).toBe(true);
   });
 
   it('rechaza un archivo que no es un zip de ELOmax', async () => {

@@ -27,6 +27,11 @@ Formato: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versionado se
   - Esquema Dexie v3 (tablas `errorCards`, `radarItems`, `calibrationRecords`), puramente aditiva, con test de migración desde v2.
   - Dataset semilla de **desarrollo** para el Radar (`scripts/build-seed-puzzles.mjs`): 7 posiciones construidas a mano (no recordadas de partidas reales) y verificadas con chess.js + Stockfish antes de incluirse — **no** es el dataset real de Lichess CC0 de ADR-0005: este entorno de desarrollo no tiene acceso de red a `database.lichess.org`. `scripts/import-puzzles.mjs` documenta el pipeline real para correr con el CSV oficial en un entorno con acceso a internet.
   - 33 tests nuevos de dominio (scheduler, Cola, calibración, selector del Radar, exportación) + 6 tests de integración del store de sesión contra Dexie real + 3 tests e2e (Playwright) del flujo Radar/Cola/exportación.
+  - Lote offline versionado `radar-84639d96e9b3`: 100 posiciones reales y balanceadas (20 por tipo), obtenido del dataset CC0 de Lichess y de partidas reales verificadas con Stockfish (RF-5.6, ADR-0005). El generador reproducible `build:radar-dataset` admite CSV/PGN comprimidos con zstd y aborta si falta una cuota o hay duplicados.
+  - Progreso adaptativo del Radar e historial de respuestas persistentes entre sesiones: la tasa de las últimas 50 posiciones queda visible en el Panel y exportable junto con tarjetas, calibración y progreso (RF-5.5, RF-14.1).
+  - Migración Dexie v4, aditiva y probada, para catálogo versionado, progreso y respuestas del Radar (RNF-5).
+### Eliminado
+- Los generadores provisionales `import-puzzles.mjs` y `build-seed-puzzles.mjs`, reemplazados por el único pipeline reproducible `build-radar-dataset.mjs`.
 ### Cambiado
 - docs(design-system): v2 — jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía Newsreader + Instrument Sans + IBM Plex Mono, layout héroe validado para "Tu sesión de hoy" (§4.1) y flujo del Radar (§4.2).
 - El proyecto pasa a llamarse **ELOmax** (antes FORGE); nombre actualizado en README, PRD (v0.2.1), CONTRIBUTING y design system. Los documentos de `docs/evidence/` conservan sus nombres de archivo originales por trazabilidad.

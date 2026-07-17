@@ -2,17 +2,20 @@
 // Toda versión que cambie el modelo de datos agrega un bloque version(n)
 // nuevo con su upgrade; nunca se edita una versión ya publicada.
 import Dexie, { type Table } from 'dexie';
-import type { CalibrationRecord, ErrorCard, GameRecord, RadarItem } from '../../core/types';
+import type { CalibrationRecord, ErrorCard, GameRecord, RadarAttempt, RadarDatasetMeta, RadarItem, RadarProgress } from '../../core/types';
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
   errorCards!: Table<ErrorCard, string>;
   radarItems!: Table<RadarItem, string>;
   calibrationRecords!: Table<CalibrationRecord, string>;
+  radarProgress!: Table<RadarProgress, string>;
+  radarDatasetMeta!: Table<RadarDatasetMeta, string>;
+  radarAttempts!: Table<RadarAttempt, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -47,6 +50,20 @@ export class ElomaxDB extends Dexie {
       errorCards: 'id, fsrs.due, origen, categoria',
       radarItems: 'id, tipo, rating',
       calibrationRecords: 'id, contexto, fecha',
+    });
+
+    // v4 — Fase 1: el selector del Radar deja de reiniciarse en cada sesión,
+    // las respuestas quedan medibles y el catálogo embebido queda versionado.
+    // Es una migración aditiva: no modifica datos personales existentes
+    // (RNF-5, RF-5.5).
+    this.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
     });
   }
 }

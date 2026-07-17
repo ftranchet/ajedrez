@@ -56,7 +56,7 @@ describe('migración de esquema Dexie', () => {
     database.close();
   });
 
-  it('migra de v2 a v3: las partidas existentes sobreviven y las tablas nuevas quedan disponibles (Fase 1)', async () => {
+  it('migra de v2 a v3: las partidas existentes sobreviven y las tablas nuevas de Fase 1 quedan disponibles', async () => {
     const name = `elomax-test-${crypto.randomUUID()}`;
 
     // 1. Escribir con el esquema v2 tal como existía antes de Fase 1.
@@ -75,7 +75,7 @@ describe('migración de esquema Dexie', () => {
     });
     v2.close();
 
-    // 2. Abrir con el esquema actual (v3).
+    // 2. Abrir con el esquema actual (v4).
     const current = new ElomaxDB(name);
     expect(await current.games.get('g3')).toMatchObject({ id: 'g3', pgn: '1. c4 *' });
 
@@ -83,6 +83,37 @@ describe('migración de esquema Dexie', () => {
     expect(await current.errorCards.count()).toBe(0);
     expect(await current.radarItems.count()).toBe(0);
     expect(await current.calibrationRecords.count()).toBe(0);
+    current.close();
+  });
+
+  it('migra de v3 a v4 sin perder el catálogo ni las tarjetas (progreso adaptativo del Radar)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v3 = new Dexie(name);
+    v3.version(1).stores({ games: 'id, fecha' });
+    v3.version(2).stores({ games: 'id, fecha, fuente' });
+    v3.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    await v3.table('radarItems').add({
+      id: 'legacy-radar',
+      fen: '8/8/8/8/8/8/8/8 w - - 0 1',
+      tipo: 'tranquila',
+      temas: [],
+      rating: 1200,
+      solucion: ['a1a2'],
+      fuente: 'seed-dev',
+    });
+    v3.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.radarItems.get('legacy-radar')).toMatchObject({ id: 'legacy-radar' });
+    expect(await current.radarProgress.count()).toBe(0);
+    expect(await current.radarDatasetMeta.count()).toBe(0);
+    expect(await current.radarAttempts.count()).toBe(0);
     current.close();
   });
 });
