@@ -11,11 +11,18 @@ Formato: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versionado se
 - Set de piezas **Staunty** (autor sadsnake1, tomado de lichess-org/lila) en `public/piece/staunty/`, licencia CC BY-NC-SA 4.0 con atribución (ver README del set).
 - Prototipos de validación del design system v2 en `docs/prototipos/` con README propio: referencia visual (`design-system.dc.html`), prototipo interactivo del flujo sesión → Radar (`sesion-de-hoy.dc.html`) y sus archivos de soporte (`support.js`, `ios-frame.jsx`).
 - Los tres documentos de evidencia en `docs/evidence/` (informe científico, tier list y documento de diseño): la base documental queda completa, sin pendientes.
+- Fase 0 — Fundaciones: aplicación inicial con Vite + React + TypeScript estricto + Tailwind (tokens del design system v2) + PWA instalable y usable sin conexión (RNF-1, RNF-2, RNF-3). Tablero chessground con piezas Staunty, movimiento por arrastre y toque-toque, promoción con selector, validación completa de legalidad (RF-1.1, RF-1.2); partida local contra Stockfish 18 WASM lite single-thread en Web Worker, 5 niveles de fuerza limitada (RF-1.3, ADR-0002); partidas persistidas con PGN, tiempos por jugada, fuente, resultado y fecha (RF-1.5).
+- Persistencia Dexie con esquema v1 y migración v2 probada con test que migra datos de la versión anterior (RNF-5, CONTRIBUTING regla 3).
+- Estructura de capas `ui / core / services / config` con dominio puro en `core` y puertos para motor y almacenamiento (ADR-0001); tests de dominio (resultado de partida) y de migración.
+- Interfaz en español rioplatense con textos en archivo de i18n (RNF-7); pantallas Hoy y Panel con estados vacíos honestos que explican qué llega en cada fase.
+- CI en GitHub Actions: lint + typecheck + test + build en cada push (RNF-5).
 ### Cambiado
 - docs(design-system): v2 — jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía Newsreader + Instrument Sans + IBM Plex Mono, layout héroe validado para "Tu sesión de hoy" (§4.1) y flujo del Radar (§4.2).
 - El proyecto pasa a llamarse **ELOmax** (antes FORGE); nombre actualizado en README, PRD (v0.2.1), CONTRIBUTING y design system. Los documentos de `docs/evidence/` conservan sus nombres de archivo originales por trazabilidad.
 - PRD v0.2.3: el árbol del repo (§10) incluye `public/` y `docs/prototipos/`; el inventario de licencias de RNF-8 registra el set de piezas.
+- PRD v0.2.4: §6.2 lista explícitamente como fuera de alcance v1.0 los tres módulos del documento de diseño que el PRD no adopta ("Adiviná la jugada", aperturas dosificadas, Maia selectora de posiciones), como candidatos post-v1.0.
 - Flujo de trabajo generalizado para cualquier persona o agente de IA: CONTRIBUTING.md como única fuente de verdad de proceso, con patrón puntero para archivos de contexto específicos de herramientas.
+- CONTRIBUTING.md: sección Comandos completada (entregable de Fase 0); README con instrucciones para correr la app.
 ### Corregido
 - README: eliminada la instrucción ya cumplida de agregar `LICENSE` y la guía de volcado inicial del paquete documental (pasos ya ejecutados); queda como pendiente solo copiar los documentos de evidencia.
 - Changelog: el enlace de Keep a Changelog apunta a la versión canónica en inglés (la variante `es-AR` no está publicada).

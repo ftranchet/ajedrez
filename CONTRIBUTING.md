@@ -28,7 +28,19 @@ Si una herramienta de IA requiere su propio archivo de contexto (`CLAUDE.md`, `A
 Nunca duplicar reglas en esos archivos: la duplicación diverge, y la divergencia rompe la robustez del proceso.
 
 ## Comandos
-(Completar en Fase 0 al inicializar el proyecto: dev, build, test, lint, typecheck.)
+Requiere Node 20+.
+
+```
+npm install        # instala dependencias y copia el motor a public/engine/
+npm run dev        # servidor de desarrollo (Vite)
+npm run build      # typecheck + build de producción (dist/)
+npm run preview    # sirve el build de producción
+npm test           # tests (Vitest): dominio y migraciones
+npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit (TypeScript estricto)
+```
+
+La CI (GitHub Actions) corre lint + typecheck + test + build en cada push; no se mergea en rojo (RNF-5).
 
 ## Estado actual
 Fase 0 — Fundaciones. Ver `docs/roadmap.md` para el criterio de salida de la fase.

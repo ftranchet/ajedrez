@@ -1,0 +1,67 @@
+// Textos de interfaz en español rioplatense (RNF-7). Nunca hardcodeados en
+// componentes (CONTRIBUTING regla 7).
+export const es = {
+  app: {
+    nombre: 'ELOmax',
+  },
+  nav: {
+    hoy: 'Hoy',
+    jugar: 'Jugar',
+    panel: 'Panel',
+  },
+  hoy: {
+    titulo: 'Tu sesión de hoy',
+    vacio: 'El Prescriptor llega en la Fase 3. Por ahora, entrená lo que más rinde: jugá una partida lenta contra el motor y prestá atención a tus decisiones.',
+    accion: 'Ir a jugar',
+  },
+  jugar: {
+    titulo: 'Jugar',
+    subtitulo: 'Partida local contra el motor',
+    notaMotor: 'Motor local con fuerza limitada. Su resistencia no es humana: en la Fase 2 llegan los bots Maia, que se equivocan como personas.',
+    nivel: 'Nivel del motor',
+    color: 'Tu color',
+    blancas: 'Blancas',
+    negras: 'Negras',
+    aleatorio: 'Al azar',
+    empezar: 'Empezar partida',
+    cargandoMotor: 'Cargando el motor…',
+    errorMotor: 'El motor no pudo cargar. Revisá tu conexión la primera vez; después funciona sin internet.',
+    teToca: 'Te toca',
+    pensando: 'El motor piensa…',
+    jaque: 'Jaque',
+    rendirse: 'Rendirse',
+    confirmarRendirse: '¿Abandonar la partida?',
+    confirmarSi: 'Sí, abandonar',
+    confirmarNo: 'Seguir jugando',
+    nuevaPartida: 'Otra partida',
+    partidaGuardada: 'Partida guardada en tu dispositivo',
+    promocion: 'Elegí la pieza de promoción',
+    jugadas: 'Jugadas',
+    resultado: {
+      ganaste: 'Ganaste',
+      perdiste: 'Perdiste',
+      tablas: 'Tablas',
+      porMate: 'por jaque mate',
+      porAbandono: 'por abandono',
+      porAhogado: 'por ahogado',
+      porRegla: 'por regla de tablas',
+    },
+    niveles: {
+      'nivel-1': 'Nivel 1 — da sus primeros pasos',
+      'nivel-2': 'Nivel 2 — comete errores gruesos',
+      'nivel-3': 'Nivel 3 — juega razonable',
+      'nivel-4': 'Nivel 4 — exige precisión',
+      'nivel-5': 'Nivel 5 — muy fuerte',
+    } as Record<string, string>,
+  },
+  panel: {
+    titulo: 'Panel',
+    vacioMetricas: 'El panel de verdad (rating de partidas, errores graves, calibración) llega en la Fase 5. Acá no va a haber confeti: solo métricas que importan.',
+    partidas: 'Partidas guardadas',
+    sinPartidas: 'Todavía no jugaste ninguna partida. Cuando termines una, queda guardada acá, en tu dispositivo.',
+    jugadaCorta: 'jugada',
+    jugadasCortas: 'jugadas',
+  },
+} as const;
+
+export const t = es;

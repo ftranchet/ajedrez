@@ -1,0 +1,9 @@
+{
+  "levels": [
+    { "id": "nivel-1", "skill": 0, "movetimeMs": 250 },
+    { "id": "nivel-2", "skill": 3, "movetimeMs": 350 },
+    { "id": "nivel-3", "skill": 6, "movetimeMs": 500 },
+    { "id": "nivel-4", "skill": 10, "movetimeMs": 700 },
+    { "id": "nivel-5", "skill": 16, "movetimeMs": 1000 }
+  ]
+}

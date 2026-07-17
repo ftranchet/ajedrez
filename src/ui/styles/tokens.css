@@ -1,0 +1,110 @@
+/* Tokens del design system v2 (docs/design-system.md §2). Única fuente de
+   estilos: ningún componente usa valores sueltos (proceso §7). */
+@import 'tailwindcss';
+
+@theme {
+  /* Fondos y bordes */
+  --color-base: #171310;
+  --color-surface: #211c17;
+  --color-elevated: #2b241d;
+  --color-subtle: #3a3128;
+  --color-strong: #544636;
+
+  /* Texto (jerarquía de 4 niveles) */
+  --color-primary: #ece5da;
+  --color-secondary: #a89c8c;
+  --color-tertiary: #6f6353;
+  --color-on-accent: #1a1105;
+
+  /* Acento y semánticos */
+  --color-accent: #d9a441;
+  --color-accent-hover: #e2b356;
+  --color-accent-pressed: #b8862f;
+  --color-accent-subtle: rgba(217, 164, 65, 0.12);
+  --color-success: #7fa66a;
+  --color-success-subtle: rgba(127, 166, 106, 0.1);
+  --color-error: #c2604f;
+  --color-error-subtle: rgba(194, 96, 79, 0.1);
+  --color-info: #6f8fa6;
+  --color-info-subtle: rgba(111, 143, 166, 0.1);
+  --color-focus: #e2b356;
+
+  /* Tipografía */
+  --font-display: 'Newsreader Variable', Georgia, serif;
+  --font-ui: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Forma */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-base);
+    color: var(--color-primary);
+    font-family: var(--font-ui);
+    font-size: 16px; /* cuerpo mínimo en celular (§2.2) */
+  }
+
+  /* Foco visible: nunca se suprime (§2.1 reglas de estado). */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Botones según §5 (Button): primario accent pleno (único por pantalla),
+     secundario con borde, peligro con fondo -subtle. Targets ≥44 px. */
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    min-height: 44px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font: 600 16px var(--font-ui);
+    cursor: pointer;
+    transition: background-color 120ms ease-out, border-color 120ms ease-out;
+  }
+
+  .btn-primary {
+    border: none;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+  .btn-primary:hover { background: var(--color-accent-hover); }
+  .btn-primary:active { background: var(--color-accent-pressed); }
+  .btn-primary:disabled {
+    background: var(--color-elevated);
+    color: var(--color-tertiary);
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    border: 1px solid var(--color-subtle);
+    background: var(--color-surface);
+    color: var(--color-primary);
+  }
+  .btn-secondary:hover {
+    border-color: var(--color-strong);
+    background: var(--color-elevated);
+  }
+
+  .btn-danger {
+    border: 1px solid color-mix(in srgb, var(--color-error) 35%, transparent);
+    background: var(--color-error-subtle);
+    color: var(--color-primary);
+  }
+  .btn-danger:hover {
+    border-color: var(--color-error);
+  }
+}

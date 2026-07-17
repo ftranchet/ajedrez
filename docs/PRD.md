@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.3 |
+| Versión | 0.2.4 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
 | Última actualización | 2026-07-17 |
@@ -61,6 +61,8 @@ Jugar partidas (contra bots Maia vía Lichess y motor local), importar historial
 
 ### 6.2 Fuera de alcance (explícito)
 Funciones sociales, chat, torneos, cursos en video, monetización, apps nativas (iOS/Android compiladas), multijugador propio, cuentas en la nube (hasta fase 6), explicaciones automáticas del motor en lenguaje natural, modo niños.
+
+También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evidence/forge-diseno-app-ajedrez.md`) que este PRD no adopta como épicas: **"Adiviná la jugada"** (§4.7 del diseño), **aperturas dosificadas con candado de rentabilidad** (§4.8) y **Maia como selectora de posiciones** (§5). Son candidatos a épicas posteriores a v1.0; incorporarlos requiere actualizar este PRD.
 
 ---
 

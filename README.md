@@ -12,8 +12,18 @@ Aplicación web progresiva (PWA) que prescribe tu entrenamiento de ajedrez para 
 - **`docs/evidence/`** — la investigación que justifica el producto.
 - **`CHANGELOG.md`** — historia de cambios.
 
+## Cómo correr
+Requiere Node 20+.
+
+```
+npm install    # instala dependencias y copia el motor a public/engine/
+npm run dev    # servidor de desarrollo
+```
+
+Más comandos (build, test, lint, typecheck) en `CONTRIBUTING.md`.
+
 ## Licencia
 **GPLv3** (ver `LICENSE` y ADR-0006). El archivo `LICENSE` contiene el texto oficial, sin modificaciones, tomado de gnu.org/licenses/gpl-3.0.txt.
 
 ## Estado
-Base documental completa. Pre-código: Fase 0 en curso (ver `docs/roadmap.md`).
+Base documental completa. Fase 0 (Fundaciones) implementada: partida local contra el motor, persistencia y CI — criterio de salida verificado en emulación, pendiente de validar en un dispositivo real (ver `docs/roadmap.md`).
