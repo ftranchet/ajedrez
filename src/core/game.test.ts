@@ -45,6 +45,29 @@ describe('buildGameRecord', () => {
     expect(new Date(g.fecha).toString()).not.toBe('Invalid Date');
     expect(g.tiemposPorJugadaMs).toEqual([1200, 800]);
   });
+
+  it('guarda jugadorColor cuando se conoce (partida local, RF-9.1)', () => {
+    const g = buildGameRecord({
+      pgn: '1. e4 e5 *',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      jugadorColor: 'b',
+    });
+    expect(g.jugadorColor).toBe('b');
+  });
+
+  it('no agrega jugadorColor cuando no se pasa (partida importada)', () => {
+    const g = buildGameRecord({
+      pgn: '1. e4 e5 *',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      fuente: 'manual',
+      ritmo: 'rapida',
+    });
+    expect(g.jugadorColor).toBeUndefined();
+  });
 });
 
 describe('plyCountFromPgn', () => {

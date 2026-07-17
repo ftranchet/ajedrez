@@ -98,6 +98,7 @@ export const useGameStore = create<GameState>((set, get) => {
       tiemposPorJugadaMs: moveTimesMs,
       fuente: 'local',
       ritmo: 'sin-reloj',
+      jugadorColor: playerColor,
     });
     await gameRepo.save(record);
     snapshot({ phase: 'ended', resultado, endReason, saved: true, thinking: false });

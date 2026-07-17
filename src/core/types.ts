@@ -22,6 +22,14 @@ export interface GameRecord {
   fase1?: PhaseOneData;
   /** Resultado de la fase 2 (RF-3.2), corre después de completar la fase 1. */
   analisis?: GameAnalysis;
+  /**
+   * Lado que jugó el usuario, cuando se conoce (partidas locales contra el
+   * motor, RF-1.3). Sin esto no se puede separar "sus" tiempos por jugada de
+   * los del motor para el perfil de gestión de tiempo (E9, RF-9.1); las
+   * partidas importadas o previas a este campo simplemente no entran en ese
+   * perfil.
+   */
+  jugadorColor?: Color;
 }
 
 /**

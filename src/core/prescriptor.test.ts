@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { detectarFugaTactica, dietaPorBanda, estimarBandaElo } from './prescriptor';
-import type { ErrorCard } from './types';
+import type { ErrorCard, GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
 
 function cardTactica(creadaEn: string): ErrorCard {
   return {
@@ -67,7 +67,7 @@ describe('dietaPorBanda', () => {
   it('refuerza el Radar cuando hay fuga táctica', () => {
     const ahora = new Date('2026-07-17T00:00:00.000Z');
     const cards = [cardTactica('2026-07-10'), cardTactica('2026-07-11'), cardTactica('2026-07-12')];
-    const dieta = dietaPorBanda('intermedio', cards, ahora);
+    const dieta = dietaPorBanda('intermedio', cards, [], ahora);
     expect(dieta.radarCount).toBe(10); // 8 base + 2 de bonus
     expect(dieta.ajusteFugas.categoria).toBe('tactico');
   });
@@ -75,6 +75,46 @@ describe('dietaPorBanda', () => {
   it('cada banda tiene su propia dieta base', () => {
     expect(dietaPorBanda('principiante', []).curriculumMax).toBe(6);
     expect(dietaPorBanda('experto', []).curriculumMax).toBe(2);
+  });
+
+  it('sin partidas con perfil de tiempo, triageActivo es falso', () => {
+    expect(dietaPorBanda('intermedio', []).triageActivo).toBe(false);
+  });
+
+  it('suma Triage cuando el perfil de tiempo muestra una fuga (RF-11.2, ejemplo literal del PRD)', () => {
+    // Dos jugadas del usuario (blancas): 50ms y 500ms, mediana 275. La de
+    // 50ms es "rápida" (≤0.5×mediana) y salió grave → infragasto = 1.
+    const jugada = (ply: number, lado: 'w' | 'b', clasificacion: MoveAnalysisEntry['clasificacion']): MoveAnalysisEntry => ({
+      ply,
+      san: 'e4',
+      fenAntes: 'startpos',
+      ladoQueMueve: lado,
+      jugadaUsuario: 'e2e4',
+      jugadaMotor: 'e2e4',
+      cpAntes: 0,
+      cpDespues: 0,
+      cpPerdidos: 0,
+      clasificacion,
+    });
+    const analisis: GameAnalysis = {
+      jugadas: [jugada(0, 'w', 'grave'), jugada(1, 'b', 'buena'), jugada(2, 'w', 'buena'), jugada(3, 'b', 'buena')],
+      comparacionEvaluaciones: [],
+      analizadaEn: '2026-01-01',
+    };
+    const gameConFuga: GameRecord = {
+      id: 'g1',
+      pgn: '1. e4 e5 2. Nf3 Nc6 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [50, 500, 500, 500],
+      analizada: true,
+      fecha: '2026-01-01T00:00:00.000Z',
+      jugadorColor: 'w',
+      analisis,
+    };
+    const dieta = dietaPorBanda('intermedio', [], [gameConFuga]);
+    expect(dieta.triageActivo).toBe(true);
   });
 });
 

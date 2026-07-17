@@ -1,11 +1,12 @@
 // Prescriptor (E11): compone "Tu sesión de hoy" en el orden de RF-11.2 —
 // (1) repasos vencidos de la Cola, ya resueltos por core/errorCard.ts;
 // (2) dieta base por banda de Elo, tabla versionada en config/ (RF-11.6),
-// no hardcodeada; (3) ajuste por fugas del último mes. Sin Cálculo
-// comprometido/Conversión de ventajas/Triage todavía (Fase 4), el único
-// ajuste de fugas disponible hoy es reforzar el Radar cuando dominan los
-// errores tácticos — se amplía cuando existan más módulos que absorberlas.
-import type { BandaElo, CategoriaError, ErrorCard, Profile } from './types';
+// no hardcodeada; (3) ajuste por fugas del último mes: refuerza el Radar
+// cuando dominan los errores tácticos, y suma un bloque de Triage de reloj
+// (E9) cuando el perfil de tiempo muestra apuro o desperdicio — el ejemplo
+// literal de RF-11.2 ("si >35% de las derrotas son por reloj, sube Triage").
+import type { BandaElo, CategoriaError, ErrorCard, GameRecord, Profile } from './types';
+import { hayFugaDeTiempo, perfilDeTiempo } from './triage';
 import dietaConfig from '../config/prescriptor-dieta.json' with { type: 'json' };
 
 export const PRESCRIPTOR_DIETA_VERSION: string = dietaConfig.version;
@@ -52,16 +53,20 @@ export interface DietaSesion {
   curriculumMax: number;
   radarCount: number;
   ajusteFugas: AjusteFugas;
+  /** RF-9.3/RF-11.2: se suma un bloque de Triage cuando el perfil de tiempo muestra una fuga. */
+  triageActivo: boolean;
 }
 
 /** Dieta base por banda de Elo (RF-11.2 punto 2) más el ajuste por fugas
- * (punto 3). Los repasos vencidos de la Cola (punto 1) no tienen tope: eso
+ * (punto 3): refuerza el Radar ante fuga táctica y agrega Triage ante fuga
+ * de tiempo. Los repasos vencidos de la Cola (punto 1) no tienen tope: eso
  * ya lo resuelve `dueErrorCards`. */
-export function dietaPorBanda(banda: BandaElo, cardsRecientes: ErrorCard[], now: Date = new Date()): DietaSesion {
+export function dietaPorBanda(banda: BandaElo, cardsRecientes: ErrorCard[], games: GameRecord[] = [], now: Date = new Date()): DietaSesion {
   const base = DIETA_POR_BANDA[banda];
   const ajusteFugas = detectarFugaTactica(cardsRecientes, now);
   const radarCount = ajusteFugas.categoria === 'tactico' ? base.radarCount + BONUS_RADAR_POR_FUGA : base.radarCount;
-  return { curriculumMax: base.curriculumMax, radarCount, ajusteFugas };
+  const triageActivo = hayFugaDeTiempo(perfilDeTiempo(games));
+  return { curriculumMax: base.curriculumMax, radarCount, ajusteFugas, triageActivo };
 }
 
 // --- Diagnóstico inicial (RF-11.4) ---

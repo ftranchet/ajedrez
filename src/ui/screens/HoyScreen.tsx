@@ -8,7 +8,7 @@ import { Board } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
-import { useSessionStore } from '../state/sessionStore';
+import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { t } from '../i18n/es';
@@ -52,6 +52,12 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
   const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
   if (curriculo > 0) {
     bloques.push({ texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)), porque: t.sesion.bloqueCurriculoPorque });
+  }
+  if (s.dieta.triageActivo) {
+    bloques.push({
+      texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),
+      porque: t.sesion.bloqueTriagePorque,
+    });
   }
   bloques.push({
     texto: t.sesion.bloqueRadar.replace('{n}', String(s.dieta.radarCount)),
@@ -147,16 +153,19 @@ function SesionActiva() {
   const s = useSessionStore();
   const enCola = s.phase === 'cola';
   const enCurriculo = s.phase === 'curriculo';
+  const enTriage = s.phase === 'triage';
   const jugando = enCola
     ? s.colaSubPhase === 'jugando'
     : enCurriculo
       ? s.curriculumSubPhase === 'jugando'
-      : s.radarSubPhase === 'jugando';
+      : enTriage
+        ? false // Triage es una decisión (RF-9.2), no una jugada en el tablero.
+        : s.radarSubPhase === 'jugando';
 
   function onMove(from: string, to: string) {
     if (enCola) void s.colaUserMove(from as Square, to as Square);
     else if (enCurriculo) void s.curriculumUserMove(from as Square, to as Square);
-    else void s.radarUserMove(from as Square, to as Square);
+    else if (!enTriage) void s.radarUserMove(from as Square, to as Square);
   }
 
   return (
@@ -175,7 +184,7 @@ function SesionActiva() {
       </div>
 
       <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
-        {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : <RadarPanel />}
+        {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : enTriage ? <TriagePanel /> : <RadarPanel />}
       </aside>
     </div>
   );
@@ -228,6 +237,44 @@ function CurriculumPanel() {
           texto={s.curriculumUltimaLimpia ? '' : `${t.radar.jugadaCorrecta}: ${s.curriculumJugadaCorrecta}`}
           jugadaCorrecta={s.curriculumJugadaCorrecta ?? ''}
           onContinuar={() => s.curriculumContinuar()}
+        />
+      )}
+    </div>
+  );
+}
+
+function TriagePanel() {
+  const s = useSessionStore();
+  const total = s.triageQueue.length;
+  const actual = Math.min(s.triageIndex + 1, total);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-subtle bg-surface p-4">
+        <p className="m-0 font-mono text-xs text-tertiary">
+          {t.triage.progreso.replace('{actual}', String(actual)).replace('{total}', String(total))}
+        </p>
+        <p className="m-0 mt-1 font-display text-xl">{t.triage.titulo}</p>
+      </div>
+      {s.triageSubPhase === 'decidiendo' && (
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-sm text-secondary">{t.triage.consigna}</p>
+          <div className="flex flex-col gap-2">
+            <button onClick={() => s.triageDecidir('calcular')} className="btn-secondary">
+              {t.triage.calcular}
+            </button>
+            <button onClick={() => s.triageDecidir('alcanza')} className="btn-secondary">
+              {t.triage.alcanza}
+            </button>
+          </div>
+        </div>
+      )}
+      {s.triageSubPhase === 'feedback' && (
+        <FeedbackPanel
+          acierto={s.triageUltimaCorrecta ?? false}
+          texto={s.triageDecisionCorrecta === 'calcular' ? t.triage.respuestaCalcular : t.triage.respuestaAlcanza}
+          jugadaCorrecta={s.triageDecisionCorrecta === 'calcular' ? t.triage.calcular : t.triage.alcanza}
+          onContinuar={() => s.triageContinuar()}
         />
       )}
     </div>

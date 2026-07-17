@@ -18,6 +18,7 @@ import {
 } from '../../core/radar';
 import { dueCurriculumItems, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
 import { DEFAULT_PROFILE, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
+import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
@@ -28,15 +29,19 @@ import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
+import { gameRepo } from '../../services/storage/gameRepo';
 import { computeDests } from './chessBoardUtils';
 
 /** Ventana para la tasa de acierto reciente que ajusta la dificultad (RF-5.5). */
 const VENTANA_TASA_ACIERTO = 8;
+/** Cuántas posiciones sirve el bloque de Triage cuando la dieta lo activa (RF-9.2/9.3). */
+export const TRIAGE_SESSION_SIZE = 5;
 
 export type EvalGuess = 'blancas' | 'igual' | 'negras';
-type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'curriculo' | 'radar' | 'fin';
+type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'curriculo' | 'triage' | 'radar' | 'fin';
 type ColaSubPhase = 'jugando' | 'feedback';
 type CurriculumSubPhase = 'jugando' | 'feedback';
+type TriageSubPhase = 'decidiendo' | 'feedback';
 type RadarSubPhase = 'evaluando' | 'jugando' | 'confianza' | 'feedback';
 
 interface SessionState {
@@ -65,6 +70,14 @@ interface SessionState {
   curriculumSubPhase: CurriculumSubPhase;
   curriculumUltimaLimpia: boolean | null;
   curriculumJugadaCorrecta: string | null;
+
+  // Triage de reloj (E9): bloque agregado solo si la dieta detecta una fuga
+  // de tiempo (RF-9.2/9.3), entre el currículo y el Radar.
+  triageQueue: RadarItem[];
+  triageIndex: number;
+  triageSubPhase: TriageSubPhase;
+  triageUltimaCorrecta: boolean | null;
+  triageDecisionCorrecta: DecisionTriage | null;
 
   // Radar (E5)
   radarPool: RadarItem[];
@@ -96,6 +109,9 @@ interface SessionState {
 
   curriculumUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
   curriculumContinuar(): void;
+
+  triageDecidir(decision: DecisionTriage): void;
+  triageContinuar(): void;
 
   radarEval(guess: EvalGuess): void;
   radarUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
@@ -178,8 +194,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   function loadCurriculumItem(item: CurriculumItem | null) {
     if (!item) {
-      // Currículo del día terminado (o sin elementos vencidos): pasar al Radar.
-      void beginRadar();
+      // Currículo del día terminado (o sin elementos vencidos): pasar al
+      // Triage si la dieta lo activó, si no directo al Radar.
+      void beginTriage();
       return;
     }
     chess = new Chess(item.fen);
@@ -190,6 +207,34 @@ export const useSessionStore = create<SessionState>((set, get) => {
       ...boardSnapshot(),
       lastMove: null,
     });
+  }
+
+  function loadTriageItem(item: RadarItem | null) {
+    if (!item) {
+      void beginRadar();
+      return;
+    }
+    chess = new Chess(item.fen);
+    set({
+      triageSubPhase: 'decidiendo',
+      triageUltimaCorrecta: null,
+      triageDecisionCorrecta: null,
+      ...boardSnapshot(),
+      lastMove: null,
+    });
+  }
+
+  // Mismo patrón sincrónico que `beginCurriculum`: si la dieta no activó
+  // Triage (o no hay pool todavía), devuelve la promesa de `beginRadar()`
+  // en vez de dispararla sin esperar.
+  function beginTriage(): Promise<void> | void {
+    const s = get();
+    if (!s.dieta.triageActivo || s.radarPool.length === 0) {
+      return beginRadar();
+    }
+    const queue = [...s.radarPool].sort(() => Math.random() - 0.5).slice(0, TRIAGE_SESSION_SIZE);
+    set({ phase: 'triage', triageQueue: queue, triageIndex: 0 });
+    loadTriageItem(queue[0]);
   }
 
   // El cambio de fase es sincrónico a propósito (como el arranque de
@@ -207,7 +252,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     // cupo monotemático.
     const queue = due.slice(0, s.dieta.curriculumMax);
     if (queue.length === 0) {
-      return beginRadar();
+      return beginTriage();
     }
     set({ phase: 'curriculo', curriculumQueue: queue, curriculumIndex: 0 });
     loadCurriculumItem(queue[0]);
@@ -243,6 +288,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
     curriculumUltimaLimpia: null,
     curriculumJugadaCorrecta: null,
 
+    triageQueue: [],
+    triageIndex: 0,
+    triageSubPhase: 'decidiendo',
+    triageUltimaCorrecta: null,
+    triageDecisionCorrecta: null,
+
     radarPool: [],
     radarSelState: RADAR_INITIAL_STATE,
     radarItem: null,
@@ -264,36 +315,38 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     async loadSummary() {
       await curriculumItemRepo.ensureSeeded();
-      const [allCards, curriculumItems, curriculumProgressList, profile] = await Promise.all([
+      const [allCards, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
         errorCardRepo.list(),
         curriculumItemRepo.list(),
         curriculumProgressRepo.list(),
         profileRepo.get(),
+        gameRepo.list(),
       ]);
       const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
       set({
         dueCount: dueErrorCards(allCards).length,
         curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).length,
         profile,
-        dieta: dietaPorBanda(profile.bandaElo, allCards),
+        dieta: dietaPorBanda(profile.bandaElo, allCards, games),
       });
     },
 
     async start() {
       set({ phase: 'cargando' });
       await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
-      const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile] = await Promise.all([
+      const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
         errorCardRepo.list(),
         radarItemRepo.list(),
         radarProgressRepo.get(),
         curriculumItemRepo.list(),
         curriculumProgressRepo.list(),
         profileRepo.get(),
+        gameRepo.list(),
       ]);
       const due = dueErrorCards(allCards);
       set({
         profile,
-        dieta: dietaPorBanda(profile.bandaElo, allCards),
+        dieta: dietaPorBanda(profile.bandaElo, allCards, games),
         radarPool: pool,
         colaCards: due,
         colaIndex: 0,
@@ -326,6 +379,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
         curriculumQueue: [],
         curriculumIndex: 0,
         curriculumProgressById: new Map(),
+        triageQueue: [],
+        triageIndex: 0,
         radarItem: null,
         radarServidos: 0,
         radarAciertosRecientes: [],
@@ -402,6 +457,21 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const nextIndex = s.curriculumIndex + 1;
       set({ curriculumIndex: nextIndex });
       loadCurriculumItem(s.curriculumQueue[nextIndex] ?? null);
+    },
+
+    triageDecidir(decision) {
+      const s = get();
+      if (s.phase !== 'triage' || s.triageSubPhase !== 'decidiendo') return;
+      const item = s.triageQueue[s.triageIndex];
+      const correcta = decisionCorrecta(item.tipo);
+      set({ triageSubPhase: 'feedback', triageUltimaCorrecta: decision === correcta, triageDecisionCorrecta: correcta });
+    },
+
+    triageContinuar() {
+      const s = get();
+      const nextIndex = s.triageIndex + 1;
+      set({ triageIndex: nextIndex });
+      loadTriageItem(s.triageQueue[nextIndex] ?? null);
     },
 
     radarEval(guess) {

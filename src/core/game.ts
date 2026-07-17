@@ -26,6 +26,8 @@ export interface BuildGameArgs {
   ritmo: GameRecord['ritmo'];
   fecha?: string;
   id?: string;
+  /** Lado que jugó el usuario (partidas locales contra el motor, RF-9.1). */
+  jugadorColor?: Color;
 }
 
 export function buildGameRecord(args: BuildGameArgs): GameRecord {
@@ -38,6 +40,7 @@ export function buildGameRecord(args: BuildGameArgs): GameRecord {
     tiemposPorJugadaMs: args.tiemposPorJugadaMs,
     analizada: false,
     fecha: args.fecha ?? new Date().toISOString(),
+    ...(args.jugadorColor ? { jugadorColor: args.jugadorColor } : {}),
   };
 }
 
