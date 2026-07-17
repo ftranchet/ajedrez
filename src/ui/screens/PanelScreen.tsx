@@ -4,10 +4,15 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { GameRecord, RadarAttempt } from '../../core/types';
+import type { GameRecord, RadarAttempt, Ritmo } from '../../core/types';
+import { buildGameRecord } from '../../core/game';
+import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
+import { useAnalysisStore } from '../state/analysisStore';
+import { Chip } from '../components/Chip';
+import { AnalizarScreen } from './AnalizarScreen';
 import { t } from '../i18n/es';
 
 function formatJugadas(n: number): string {
@@ -15,8 +20,10 @@ function formatJugadas(n: number): string {
 }
 
 export function PanelScreen() {
+  const analysisPhase = useAnalysisStore((s) => s.phase);
   const [games, setGames] = useState<GameRecord[] | null>(null);
   const [radarAttempts, setRadarAttempts] = useState<RadarAttempt[] | null>(null);
+  const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -29,7 +36,9 @@ export function PanelScreen() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [analysisPhase, importVersion]); // recarga la lista al volver de un análisis (E3) o importar un PGN (RF-2.2)
+
+  if (analysisPhase !== 'inactivo') return <AnalizarScreen />;
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -43,19 +52,30 @@ export function PanelScreen() {
         ) : (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {games.map((g) => (
-              <li key={g.id} className="flex items-baseline justify-between rounded-lg border border-subtle bg-surface px-4 py-3">
-                <span className="font-mono text-sm text-secondary">
-                  {new Date(g.fecha).toLocaleDateString('es-AR')}
-                </span>
-                <span className="text-sm text-tertiary">
-                  {formatJugadas(Math.ceil(g.tiemposPorJugadaMs.length / 2))}
-                </span>
-                <span className="font-mono text-sm text-primary">{g.resultado}</span>
+              <li key={g.id} className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface px-4 py-3">
+                <div className="flex items-baseline justify-between">
+                  <span className="font-mono text-sm text-secondary">
+                    {new Date(g.fecha).toLocaleDateString('es-AR')}
+                  </span>
+                  <span className="text-sm text-tertiary">
+                    {formatJugadas(Math.ceil(g.tiemposPorJugadaMs.length / 2))}
+                  </span>
+                  <span className="font-mono text-sm text-primary">{g.resultado}</span>
+                </div>
+                {g.analizada ? (
+                  <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
+                ) : (
+                  <button onClick={() => void useAnalysisStore.getState().iniciar(g.id)} className="btn-secondary">
+                    {t.analisis.analizar}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <ImportarPartidaSection onImported={() => setImportVersion((v) => v + 1)} />
 
       <RadarSummary attempts={radarAttempts} />
 
@@ -83,6 +103,73 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
         {t.panel.radarTasa.replace('{n}', String(recent.length)).replace('{porcentaje}', String(porcentaje))}
       </p>
       <p className="m-0 mt-1 text-sm text-secondary">{t.panel.radarMeta}</p>
+    </section>
+  );
+}
+
+const RITMOS: Ritmo[] = ['rapida', 'clasica', 'blitz', 'bullet', 'sin-reloj'];
+
+function errorMensaje(error: PgnParseError): string {
+  if (error === 'vacio') return t.panel.importarPgnErrorVacio;
+  if (error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
+  return t.panel.importarPgnErrorInvalido;
+}
+
+function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
+  const [pgn, setPgn] = useState('');
+  const [ritmo, setRitmo] = useState<Ritmo>('rapida');
+  const [mensaje, setMensaje] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function handleImportar() {
+    const resultado = parsePastedPgn(pgn);
+    if (!resultado.ok) {
+      setMensaje(errorMensaje(resultado.error));
+      return;
+    }
+    setGuardando(true);
+    try {
+      const game = buildGameRecord({
+        pgn: resultado.pgn,
+        resultado: resultado.resultado,
+        tiemposPorJugadaMs: [],
+        fuente: 'manual',
+        ritmo,
+      });
+      await gameRepo.save(game);
+      setPgn('');
+      setMensaje(t.panel.importarPgnOk);
+      onImported();
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="m-0 mb-1 text-sm tracking-wider text-tertiary uppercase">{t.panel.importarPgnTitulo}</h2>
+      <p className="m-0 text-sm text-secondary">{t.panel.importarPgnConsigna}</p>
+      <textarea
+        value={pgn}
+        onChange={(e) => setPgn(e.target.value)}
+        placeholder={t.panel.importarPgnPlaceholder}
+        rows={4}
+        className="w-full resize-none rounded-lg border border-subtle bg-surface p-3 font-mono text-sm text-primary placeholder:text-tertiary focus-visible:border-accent"
+      />
+      <fieldset className="m-0 border-0 p-0">
+        <legend className="mb-2 p-0 text-sm text-secondary">{t.panel.importarPgnRitmo}</legend>
+        <div className="flex flex-wrap gap-2">
+          {RITMOS.map((r) => (
+            <Chip key={r} selected={ritmo === r} onClick={() => setRitmo(r)}>
+              {t.panel.ritmos[r]}
+            </Chip>
+          ))}
+        </div>
+      </fieldset>
+      <button onClick={() => void handleImportar()} disabled={guardando || pgn.trim() === ''} className="btn-secondary">
+        {t.panel.importarPgnBoton}
+      </button>
+      {mensaje && <p className="m-0 text-sm text-secondary">{mensaje}</p>}
     </section>
   );
 }

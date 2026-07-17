@@ -18,6 +18,68 @@ export interface GameRecord {
   analizada: boolean;
   /** Fecha de la partida en ISO 8601. */
   fecha: string;
+  /** Respuestas de la fase 1 del análisis en dos fases (RF-3.1), si ya se completó. */
+  fase1?: PhaseOneData;
+  /** Resultado de la fase 2 (RF-3.2), corre después de completar la fase 1. */
+  analisis?: GameAnalysis;
+}
+
+/**
+ * Escala de evaluación rápida de una posición (RF-3.1c, design system §5
+ * EvalPicker): "quién está mejor y cuánto", cinco valores fijos.
+ */
+export type EvalSymbol = '+-' | '±' | '=' | '∓' | '-+';
+
+/** Una de las tres evaluaciones que el usuario declara en la fase 1. */
+export interface PhaseOneEvaluacion {
+  ply: number;
+  valorUsuario: EvalSymbol;
+}
+
+/** Respuestas de la fase 1 del análisis en dos fases: el motor sigue bloqueado hasta completarlas (RF-3.1). */
+export interface PhaseOneData {
+  /** Media jugada (0-based) que el usuario marca como el momento crítico de la partida. */
+  momentoCriticoPly: number;
+  /** Plan del usuario en ese momento, texto corto (RF-3.1b). */
+  plan: string;
+  evaluaciones: PhaseOneEvaluacion[];
+  completadaEn: string; // ISO 8601
+}
+
+/** Clasificación de una jugada por pérdida de centipeones (RF-3.2). */
+export type MoveClassification = 'grave' | 'error' | 'imprecision' | 'buena';
+
+/** Análisis de una jugada de la partida, producido por el motor en la fase 2. */
+export interface MoveAnalysisEntry {
+  ply: number;
+  san: string;
+  fenAntes: string;
+  ladoQueMueve: Color;
+  /** Jugada realmente jugada, en UCI. */
+  jugadaUsuario: string;
+  /** Mejor jugada del motor en esa posición, en UCI. */
+  jugadaMotor: string;
+  /** Evaluación en centipeones, perspectiva blancas, antes/después de la jugada. */
+  cpAntes: number;
+  cpDespues: number;
+  /** Pérdida de centipeones desde la perspectiva de quien movió, siempre ≥0. */
+  cpPerdidos: number;
+  clasificacion: MoveClassification;
+}
+
+/** Comparación de una evaluación declarada por el usuario contra la del motor. */
+export interface ComparacionEvaluacion {
+  ply: number;
+  valorUsuario: EvalSymbol;
+  valorMotor: EvalSymbol;
+  coincide: boolean;
+}
+
+/** Resultado completo de la fase 2 del análisis en dos fases (RF-3.2). */
+export interface GameAnalysis {
+  jugadas: MoveAnalysisEntry[];
+  comparacionEvaluaciones: ComparacionEvaluacion[];
+  analizadaEn: string; // ISO 8601
 }
 
 /** Categoría de error elegida por el usuario en un toque (RF-3.3, E4). */
