@@ -41,6 +41,8 @@ export const es = {
     titulo: 'Currículo',
     progreso: 'Patrón {actual} de {total}',
     consigna: 'Resolvé el patrón en el tablero.',
+    ciegasFantasma: 'Piezas fantasma: venís acertando limpio, así que ahora cuesta un poco más ver el tablero.',
+    ciegasCoordenadas: 'Solo coordenadas: seguís acertando limpio, así que ahora jugás de memoria.',
   },
   diagnostico: {
     titulo: 'Diagnóstico inicial',

@@ -15,6 +15,12 @@ export interface BoardProps {
   /** Color que puede mover; null = tablero de solo lectura. */
   movableColor: Color | null;
   onMove: (from: string, to: string) => void;
+  /**
+   * Modificador a ciegas progresivo del currículo (RF-6.5): 'fantasma' baja
+   * la opacidad de las piezas, 'coordenadas' las oculta del todo. Las piezas
+   * siguen ahí (arrastrables/clicables) — solo cambia lo que se ve.
+   */
+  blindMode?: 'normal' | 'fantasma' | 'coordenadas';
 }
 
 const toCgColor = (c: Color) => (c === 'w' ? 'white' : 'black');
@@ -61,5 +67,8 @@ export function Board(props: BoardProps) {
     });
   }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor]);
 
-  return <div ref={el} className="aspect-square h-full w-full" />;
+  const blindClass =
+    props.blindMode === 'coordenadas' ? '[&_piece]:opacity-0' : props.blindMode === 'fantasma' ? '[&_piece]:opacity-20' : '';
+
+  return <div ref={el} className={`aspect-square h-full w-full ${blindClass}`} />;
 }

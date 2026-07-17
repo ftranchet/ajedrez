@@ -11,6 +11,7 @@ import { FeedbackPanel } from '../components/FeedbackPanel';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
+import { nivelCiegas } from '../../core/curriculum';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
@@ -168,6 +169,15 @@ function SesionActiva() {
     else if (!enTriage) void s.radarUserMove(from as Square, to as Square);
   }
 
+  // Modificador a ciegas (RF-6.5): solo mientras se está jugando un patrón
+  // del currículo con acierto sostenido por encima del 80%; en feedback se
+  // ve la posición entera, para poder revisarla.
+  const curriculumItemActual = enCurriculo ? s.curriculumQueue[s.curriculumIndex] : null;
+  const blindMode =
+    enCurriculo && s.curriculumSubPhase === 'jugando' && curriculumItemActual
+      ? nivelCiegas(s.curriculumProgressById.get(curriculumItemActual.id))
+      : 'normal';
+
   return (
     <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
       <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
@@ -180,6 +190,7 @@ function SesionActiva() {
           dests={s.dests}
           movableColor={jugando ? s.turn : null}
           onMove={onMove}
+          blindMode={blindMode}
         />
       </div>
 
@@ -221,6 +232,7 @@ function CurriculumPanel() {
   const total = s.curriculumQueue.length;
   const actual = Math.min(s.curriculumIndex + 1, total);
   const item = s.curriculumQueue[s.curriculumIndex];
+  const nivel = s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(s.curriculumProgressById.get(item.id)) : 'normal';
 
   return (
     <div className="flex flex-col gap-3">
@@ -231,6 +243,8 @@ function CurriculumPanel() {
         <p className="m-0 mt-1 font-display text-xl">{item?.nombre ?? t.curriculo.titulo}</p>
       </div>
       {s.curriculumSubPhase === 'jugando' && <p className="m-0 text-sm text-secondary">{t.curriculo.consigna}</p>}
+      {nivel === 'fantasma' && <p className="m-0 text-xs text-tertiary">{t.curriculo.ciegasFantasma}</p>}
+      {nivel === 'coordenadas' && <p className="m-0 text-xs text-tertiary">{t.curriculo.ciegasCoordenadas}</p>}
       {s.curriculumSubPhase === 'feedback' && (
         <FeedbackPanel
           acierto={s.curriculumUltimaLimpia ?? false}

@@ -52,6 +52,27 @@ export function dueCurriculumItems(
   });
 }
 
+const UMBRAL_CIEGAS = 0.8;
+// No activar el modificador con una racha corta y casual: unas pocas
+// repeticiones alcanzan para que el 80% de acierto signifique algo.
+const REPS_MINIMAS_CIEGAS = 3;
+
+export type NivelCiegas = 'normal' | 'fantasma' | 'coordenadas';
+
+/**
+ * Modificador a ciegas progresivo (RF-6.5): sobre un patrón con más de 80%
+ * de acierto histórico (y unas pocas repeticiones, para no activarlo con una
+ * sola casualidad), sube la dificultad deseable (Bjork) ocultando primero
+ * las piezas ("fantasma") y, si el usuario sigue acertando limpio camino a
+ * la automatización (RF-6.3), también las coordenadas de las piezas.
+ */
+export function nivelCiegas(progress: CurriculumProgress | undefined): NivelCiegas {
+  if (!progress || progress.fsrs.reps < REPS_MINIMAS_CIEGAS) return 'normal';
+  const tasaAcierto = (progress.fsrs.reps - progress.fsrs.lapses) / progress.fsrs.reps;
+  if (tasaAcierto <= UMBRAL_CIEGAS) return 'normal';
+  return progress.demostracionesLimpias >= 2 ? 'coordenadas' : 'fantasma';
+}
+
 /**
  * Reordena una lista de elementos vencidos para que ningún patrón se sirva
  * en bloque (RF-6.1: "el sistema nunca sirve bloques monotemáticos"),

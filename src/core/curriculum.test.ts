@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CurriculumItem, CurriculumProgress } from './types';
-import { dueCurriculumItems, interleaveByPattern, isAutomatizado, newCurriculumProgress, reviewCurriculumProgress } from './curriculum';
+import { dueCurriculumItems, interleaveByPattern, isAutomatizado, newCurriculumProgress, nivelCiegas, reviewCurriculumProgress } from './curriculum';
 
 function item(id: string, patternKey: CurriculumItem['patternKey'] = 'clavada'): CurriculumItem {
   return { id, tipo: 'patron', patternKey, nombre: id, fen: 'startpos', solucion: ['e2e4'] };
@@ -64,6 +64,45 @@ describe('dueCurriculumItems', () => {
   it('incluye vencidos no automatizados y excluye automatizados y no vencidos', () => {
     const due = dueCurriculumItems([vencidoNoAutomatizado, automatizado, noVencidoTodavia], progressById, now);
     expect(due.map((i) => i.id)).toEqual(['vencido']);
+  });
+});
+
+describe('nivelCiegas', () => {
+  function progresoCon(reps: number, lapses: number, demostracionesLimpias: number): CurriculumProgress {
+    return {
+      id: 'p1',
+      fsrs: {
+        due: '2026-01-01T00:00:00.000Z',
+        stability: 5,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps,
+        lapses,
+        learningSteps: 0,
+        state: 'review',
+        lastReview: '2026-01-01T00:00:00.000Z',
+      },
+      demostracionesLimpias,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+  }
+
+  it('sin progreso, o con menos repeticiones que el mínimo, nivel normal', () => {
+    expect(nivelCiegas(undefined)).toBe('normal');
+    expect(nivelCiegas(progresoCon(2, 0, 2))).toBe('normal');
+  });
+
+  it('con acierto de 80% exacto o menos, nivel normal (el umbral es "más de 80%")', () => {
+    expect(nivelCiegas(progresoCon(5, 1, 1))).toBe('normal'); // 4/5 = 80%
+  });
+
+  it('por encima de 80% de acierto, con pocas demostraciones limpias seguidas: piezas fantasma', () => {
+    expect(nivelCiegas(progresoCon(6, 1, 1))).toBe('fantasma'); // 5/6 ≈ 83%
+  });
+
+  it('por encima de 80% de acierto, con 2+ demostraciones limpias seguidas (camino a automatizar): solo coordenadas', () => {
+    expect(nivelCiegas(progresoCon(6, 1, 2))).toBe('coordenadas');
   });
 });
 
