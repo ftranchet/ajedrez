@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#171310;font-family:'Instrument Sans',system-ui,sans-serif;color:#ece5da}a{color:#d9a441}a:hover{color:#e2b356}</style>
+</helmet>
+<div style="max-width:1060px;margin:0 auto;padding:56px 40px 96px;display:flex;flex-direction:column;gap:64px">
+
+<header style="display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #3a3128;padding-bottom:36px">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;color:#d9a441;text-transform:uppercase">Design System · v2 · documento vivo</div>
+  <h1 style="font-family:'Newsreader',serif;font-size:52px;font-weight:500;margin:0;line-height:1.05">ELOmax — Sala de estudio</h1>
+  <p style="margin:0;max-width:640px;color:#a89c8c;font-size:16px;line-height:1.55">El escritorio de un club de ajedrez de noche. Oscuro cálido, materiales nobles, cero confeti. El tablero manda; una acción primaria por pantalla; el feedback es sobrio y las celebraciones se reservan para las métricas de verdad.</p>
+</header>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <h2 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">1 · Color</h2>
+  <p style="margin:0;color:#a89c8c;font-size:14px;max-width:620px">Tokens semánticos: los componentes nunca usan hex sueltos. Nuevos en v2: jerarquía de texto de 4 niveles, variantes <span style="font-family:'IBM Plex Mono',monospace;font-size:13px">-hover</span> y <span style="font-family:'IBM Plex Mono',monospace;font-size:13px">-subtle</span>, y anillo de foco.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+    <sc-for list="{{ colorTokens }}" as="t" hint-placeholder-count="12">
+      <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;overflow:hidden">
+        <div data-swatch style="height:56px;border-bottom:1px solid #3a3128;{{ t.swatchStyle }}"></div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:3px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:#ece5da">{{ t.name }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6353">{{ t.value }}</div>
+          <div style="font-size:11.5px;color:#a89c8c;line-height:1.4">{{ t.use }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <h2 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">2 · Tipografía</h2>
+  <p style="margin:0;color:#a89c8c;font-size:14px;max-width:620px">Propuesta v2 con más carácter que Fraunces/Inter: <strong style="color:#ece5da">Newsreader</strong> (serif editorial, óptico variable) para display, <strong style="color:#ece5da">Instrument Sans</strong> para interfaz, <strong style="color:#ece5da">IBM Plex Mono</strong> para notación.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:10px;grid-column:1/-1">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">FONT-DISPLAY · NEWSREADER</div>
+      <div style="font-family:'Newsreader',serif;font-size:44px;font-weight:500;line-height:1.05">Tus errores graves bajaron 30% este mes.</div>
+      <div style="font-family:'Newsreader',serif;font-size:24px;font-weight:400;font-style:italic;color:#a89c8c">Números grandes del panel de verdad, títulos de pantalla.</div>
+    </div>
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">FONT-UI · INSTRUMENT SANS</div>
+      <div style="font-size:16px;line-height:1.55">Radar 12 min — tus errores graves en posiciones tranquilas duplican tu promedio. Cuerpo mínimo en celular: 16.</div>
+      <div style="font-size:13px;color:#a89c8c">Texto secundario 13–14: porqués del Prescriptor, metadatos.</div>
+    </div>
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">FONT-MONO · IBM PLEX MONO</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;line-height:1.6">1. e4 c5 2. Cf3 d6 3. d4 cxd4<br>r1bqkbnr/pp2pppp/2np4/8/3NP3/8</div>
+      <div style="font-size:13px;color:#a89c8c">Notación, PGN, FEN, relojes, evaluaciones.</div>
+    </div>
+  </div>
+  <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:18px 24px;display:flex;gap:28px;flex-wrap:wrap;align-items:baseline">
+    <sc-for list="{{ typeScale }}" as="s" hint-placeholder-count="7">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span data-sz style="font-family:'Newsreader',serif;font-weight:500;line-height:1;{{ s.style }}">Ag</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6f6353">{{ s.label }}</span>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <h2 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">3 · Tablero y piezas</h2>
+  <p style="margin:0;color:#a89c8c;font-size:14px;max-width:620px">Set <strong style="color:#ece5da">Staunty</strong> (Lichess, libre): siluetas rotundas, relleno sólido con contorno, legibles desde 320 px. Casillas crema/nogal del sistema. Todos los estados del tablero, especificados.</p>
+  <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="position:relative;width:416px;background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:14px">
+        <div style="position:relative;width:388px;height:388px;border-radius:4px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:repeat(8,1fr);width:388px;height:388px">
+            <sc-for list="{{ squares }}" as="sq" hint-placeholder-count="0">
+              <div data-sq style="position:relative;{{ sq.style }}">
+                <sc-if value="{{ sq.piece }}" hint-placeholder-val="{{ false }}">
+                  <img src="{{ sq.piece }}" style="position:absolute;inset:5%;width:90%;height:90%" alt="">
+                </sc-if>
+                <sc-if value="{{ sq.dot }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:26%;height:26%;border-radius:50%;background:rgba(23,19,16,.28)"></div></div>
+                </sc-if>
+                <sc-if value="{{ sq.coordFile }}" hint-placeholder-val="{{ false }}">
+                  <span data-cf style="position:absolute;right:3px;bottom:1px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;{{ sq.coordFileStyle }}">{{ sq.coordFile }}</span>
+                </sc-if>
+                <sc-if value="{{ sq.coordRank }}" hint-placeholder-val="{{ false }}">
+                  <span data-cr style="position:absolute;left:3px;top:2px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;{{ sq.coordRankStyle }}">{{ sq.coordRank }}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <svg viewBox="0 0 8 8" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
+            <defs><marker id="ah" markerWidth="3.2" markerHeight="3.2" refX="1.9" refY="1.25" orient="auto"><path d="M0,0 L2.5,1.25 L0,2.5 Z" fill="#d9a441"></path></marker></defs>
+            <line x1="6.5" y1="7.5" x2="5.55" y2="5.62" stroke="#d9a441" stroke-width="0.24" opacity="0.85" stroke-linecap="round" marker-end="url(#ah)"></line>
+          </svg>
+        </div>
+      </div>
+      <div style="font-size:12.5px;color:#6f6353;max-width:416px;line-height:1.5">Última jugada e2–e4 (velo ámbar 34%) · caballo g1 seleccionado (velo 46%) · destinos legales con punto 28% · flecha de análisis en <span style="font-family:'IBM Plex Mono',monospace">accent</span> 85%.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;flex:1;min-width:320px">
+      <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">SET STAUNTY · SOBRE AMBAS CASILLAS</div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);border-radius:4px;overflow:hidden">
+          <sc-for list="{{ pieceGrid }}" as="p" hint-placeholder-count="0">
+            <div data-pc style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;{{ p.bg }}"><sc-if value="{{ p.src }}" hint-placeholder-val="{{ false }}"><img src="{{ p.src }}" style="width:84%;height:84%" alt=""></sc-if></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">ESTADOS DE CASILLA</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <sc-for list="{{ squareStates }}" as="st" hint-placeholder-count="0">
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+              <div data-st style="width:64px;height:64px;border-radius:4px;position:relative;overflow:hidden;{{ st.style }}">
+                <sc-if value="{{ st.piece }}" hint-placeholder-val="{{ false }}"><img src="{{ st.piece }}" style="position:absolute;inset:6%;width:88%;height:88%" alt=""></sc-if>
+                <sc-if value="{{ st.dot }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:26%;height:26%;border-radius:50%;background:rgba(23,19,16,.28)"></div></div></sc-if>
+              </div>
+              <span style="font-size:11px;color:#a89c8c">{{ st.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:12px;color:#6f6353;line-height:1.5">El jaque usa velo radial ladrillo (nunca rojo puro). Los resaltados funcionan sin depender solo del color: selección agrega borde interior 2px.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <h2 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">4 · Componentes</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">BOTONES</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;color:#1a1105;background:#d9a441;border:none;border-radius:10px;padding:12px 22px;cursor:pointer;min-height:44px" style-hover="background:#e2b356" style-active="background:#b8862f">Empezar sesión</button>
+        <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;color:#ece5da;background:transparent;border:1px solid #3a3128;border-radius:10px;padding:12px 22px;cursor:pointer;min-height:44px" style-hover="background:#2b241d;border-color:#544636" style-active="background:#171310">Saltear bloque</button>
+        <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:500;color:#a89c8c;background:transparent;border:none;border-radius:10px;padding:12px 14px;cursor:pointer;min-height:44px" style-hover="color:#ece5da;background:#211c17">Ver porqué</button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;color:#6f6353;background:#2b241d;border:none;border-radius:10px;padding:12px 22px;min-height:44px;cursor:not-allowed">Deshabilitado</button>
+        <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;color:#1a1105;background:#d9a441;border:none;border-radius:10px;padding:12px 22px;min-height:44px;outline:2px solid #e2b356;outline-offset:2px;cursor:pointer">Foco visible</button>
+      </div>
+      <div style="font-size:12px;color:#6f6353;line-height:1.5">Primario / secundario / fantasma. Target mínimo 44px. Una acción primaria por pantalla.</div>
+    </div>
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">EVALPICKER · +− / ± / = / ∓ / −+</div>
+      <div style="display:flex;gap:8px">
+        <sc-for list="{{ evalChips }}" as="c" hint-placeholder-count="5">
+          <div data-ch style="flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;border-radius:8px;cursor:pointer;{{ c.style }}">{{ c.label }}</div>
+        </sc-for>
+      </div>
+      <div style="font-size:12px;color:#6f6353;line-height:1.5">Selección única, táctil. El seleccionado usa accent-subtle + borde accent, no relleno pleno.</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em;margin-top:6px">CONFIDENCESLIDER · 0–100</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#a89c8c"><span>¿Qué tan segura/o estás?</span><span style="font-family:'IBM Plex Mono',monospace;color:#d9a441;font-weight:600">70</span></div>
+        <div style="position:relative;height:28px;display:flex;align-items:center">
+          <div style="width:100%;height:6px;border-radius:3px;background:#2b241d"></div>
+          <div style="position:absolute;left:0;width:70%;height:6px;border-radius:3px;background:#d9a441"></div>
+          <div style="position:absolute;left:calc(70% - 11px);width:22px;height:22px;border-radius:50%;background:#ece5da;border:2px solid #d9a441"></div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">SESSIONCARD · 4 ESTADOS</div>
+      <sc-for list="{{ sessionCards }}" as="sc" hint-placeholder-count="4">
+        <div data-sc style="border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;{{ sc.style }}">
+          <div data-scb style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;flex:none;{{ sc.badgeStyle }}">{{ sc.badge }}</div>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <div style="font-size:14.5px;font-weight:600;display:flex;gap:8px;align-items:baseline"><span data-sct style="{{ sc.titleStyle }}">{{ sc.title }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#6f6353;font-weight:400">{{ sc.meta }}</span></div>
+            <div style="font-size:12.5px;color:#a89c8c;line-height:1.4">{{ sc.why }}</div>
+          </div>
+        </div>
+      </sc-for>
+      <div style="font-size:12px;color:#6f6353;line-height:1.5">Siempre con su porqué en text-secondary. El estado vive en el badge y el borde, no en confeti.</div>
+    </div>
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">FEEDBACKPANEL Y TOAST</div>
+      <div style="border-radius:10px;padding:14px 16px;background:rgba(127,166,106,.1);border:1px solid rgba(127,166,106,.35);display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:14.5px;font-weight:600;color:#9fbf8c">Correcto · Dxh5 era la única</div>
+        <div style="font-size:13px;color:#a89c8c;line-height:1.5">La dama no puede ser capturada: el peón g está clavado por la torre de e1.</div>
+      </div>
+      <div style="border-radius:10px;padding:14px 16px;background:rgba(194,96,79,.1);border:1px solid rgba(194,96,79,.35);display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:14.5px;font-weight:600;color:#d98a79">Fallo · jugaste Cxe5</div>
+        <div style="font-size:13px;color:#a89c8c;line-height:1.5">La oferta estaba envenenada: tras Cxe5, Da5+ gana la pieza. Entra a tu Cola.</div>
+      </div>
+      <div style="border-radius:10px;padding:14px 16px;background:rgba(111,143,166,.1);border:1px solid rgba(111,143,166,.35);display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:14.5px;font-weight:600;color:#93b0c7">No había táctica</div>
+        <div style="font-size:13px;color:#a89c8c;line-height:1.5">La captura era sana: no existe la descubierta en la columna e. Tu Td8 mantiene la igualdad.</div>
+      </div>
+      <div style="border-radius:10px;padding:12px 16px;background:#2b241d;border:1px solid #3a3128;display:flex;align-items:center;gap:10px;font-size:13.5px"><span style="width:8px;height:8px;border-radius:50%;background:#6f8fa6;flex:none"></span>Sin conexión — el Radar y tu Cola siguen funcionando.</div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px">
+  <h2 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">5 · Espaciado, forma y movimiento</h2>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:20px;display:flex;gap:10px;align-items:flex-end;flex:1;min-width:300px">
+      <sc-for list="{{ spacing }}" as="sp" hint-placeholder-count="7">
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+          <div data-spb style="width:22px;background:#d9a441;border-radius:3px;opacity:.85;{{ sp.style }}"></div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6f6353">{{ sp.label }}</span>
+        </div>
+      </sc-for>
+      <div style="margin-left:auto;display:flex;gap:12px;align-items:center">
+        <div style="width:56px;height:56px;background:#2b241d;border:1px solid #3a3128;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f6353">r-sm</div>
+        <div style="width:56px;height:56px;background:#2b241d;border:1px solid #3a3128;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f6353">r-md</div>
+        <div style="width:56px;height:56px;background:#2b241d;border:1px solid #3a3128;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f6353">r-lg</div>
+      </div>
+    </div>
+    <div style="background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:20px;flex:1;min-width:300px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#a89c8c;line-height:1.6">
+      <div><strong style="color:#ece5da">120 ms</strong> micro (hover, chips) · <strong style="color:#ece5da">200 ms</strong> paneles · curva <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">ease-out</span>.</div>
+      <div>La elevación se comunica con <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">bg-elevated</span> + borde, no con sombras dramáticas.</div>
+      <div>Nada anima más de 200 ms salvo el deslizamiento de piezas. Sin celebraciones por ítem.</div>
+    </div>
+  </div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const P = (c) => `pieces/${c}.svg`;
+    const colorTokens = [
+      {name:'bg-base', value:'#171310', use:'Fondo de la app', swatchStyle:'background:#171310'},
+      {name:'bg-surface', value:'#211c17', use:'Tarjetas, paneles', swatchStyle:'background:#211c17'},
+      {name:'bg-elevated', value:'#2b241d', use:'Modales, menús, hover', swatchStyle:'background:#2b241d'},
+      {name:'border-subtle', value:'#3a3128', use:'Bordes y divisores', swatchStyle:'background:#3a3128'},
+      {name:'border-strong', value:'#544636', use:'Nuevo · borde hover/activo', swatchStyle:'background:#544636'},
+      {name:'text-primary', value:'#ece5da', use:'Texto principal', swatchStyle:'background:#ece5da'},
+      {name:'text-secondary', value:'#a89c8c', use:'Apoyo, porqués', swatchStyle:'background:#a89c8c'},
+      {name:'text-tertiary', value:'#6f6353', use:'Nuevo · metadatos, deshabilitado', swatchStyle:'background:#6f6353'},
+      {name:'text-on-accent', value:'#1a1105', use:'Nuevo · texto sobre accent', swatchStyle:'background:#1a1105'},
+      {name:'accent', value:'#d9a441', use:'Acción primaria, foco, latón', swatchStyle:'background:#d9a441'},
+      {name:'accent-hover', value:'#e2b356', use:'Nuevo · hover del primario', swatchStyle:'background:#e2b356'},
+      {name:'accent-pressed', value:'#b8862f', use:'Estado presionado', swatchStyle:'background:#b8862f'},
+      {name:'accent-subtle', value:'#d9a4411f', use:'Nuevo · fondos de selección', swatchStyle:'background:#171310;background-image:linear-gradient(rgba(217,164,65,.12),rgba(217,164,65,.12))'},
+      {name:'success', value:'#7fa66a', use:'Acierto, salvia', swatchStyle:'background:#7fa66a'},
+      {name:'error', value:'#c2604f', use:'Fallo, ladrillo', swatchStyle:'background:#c2604f'},
+      {name:'info', value:'#6f8fa6', use:'Neutro, igualdad', swatchStyle:'background:#6f8fa6'},
+      {name:'board-light', value:'#e8d9b7', use:'Casilla clara, crema', swatchStyle:'background:#e8d9b7'},
+      {name:'board-dark', value:'#a67c52', use:'Casilla oscura, nogal', swatchStyle:'background:#a67c52'},
+      {name:'board-lastmove', value:'#d9a44157', use:'Última jugada (velo 34%)', swatchStyle:'background:#e8d9b7;background-image:linear-gradient(rgba(217,164,65,.34),rgba(217,164,65,.34))'},
+      {name:'board-check', value:'#c2604f80', use:'Jaque, velo radial', swatchStyle:'background:radial-gradient(circle,rgba(194,96,79,.85) 0%,rgba(194,96,79,.25) 70%),#e8d9b7'},
+    ];
+    const typeScale = [12,14,16,20,24,32,44].map(n=>({label:String(n), style:`font-size:${n}px`}));
+    // Board after 1.e4, Ng1 selected, dots f3/h3/e2, arrow g1->f3
+    const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPPPPPP/RNBQKBNR';
+    const map = {p:'bP',r:'bR',n:'bN',b:'bB',q:'bQ',k:'bK',P:'wP',R:'wR',N:'wN',B:'wB',Q:'wQ',K:'wK'};
+    const grid = [];
+    fen.split('/').forEach(row=>{ for(const ch of row){ if(/\d/.test(ch)) for(let i=0;i<+ch;i++) grid.push(null); else grid.push(map[ch]); }});
+    const idx = (file,rank)=> (8-rank)*8 + file; // file 0=a
+    const last = [idx(4,2), idx(4,4)], sel = idx(6,1), dots=[idx(5,3),idx(7,3),idx(4,2)];
+    const squares = grid.map((pc,i)=>{
+      const r = Math.floor(i/8), c = i%8, light = (r+c)%2===0;
+      let bg = light ? '#e8d9b7' : '#a67c52';
+      let style = `background:${bg}`;
+      if(last.includes(i)) style += ';background-image:linear-gradient(rgba(217,164,65,.34),rgba(217,164,65,.34))';
+      if(i===sel) style = `background:${bg};background-image:linear-gradient(rgba(217,164,65,.46),rgba(217,164,65,.46));box-shadow:inset 0 0 0 2px #b8862f`;
+      const coordColor = light ? '#a67c52' : '#e8d9b7';
+      return {
+        style, piece: pc?P(pc):null, dot: dots.includes(i)&&!pc,
+        coordFile: r===7 ? 'abcdefgh'[c] : null, coordFileStyle:`color:${coordColor}`,
+        coordRank: c===0 ? String(8-r) : null, coordRankStyle:`color:${coordColor}`,
+      };
+    });
+    const order = ['K','Q','R','B','N','P'];
+    const pieceGrid = [
+      ...order.map((t,i)=>({src:P('w'+t), bg:`background:${i%2===0?'#e8d9b7':'#a67c52'}`})),
+      ...order.map((t,i)=>({src:P('b'+t), bg:`background:${i%2===0?'#a67c52':'#e8d9b7'}`})),
+    ];
+    const squareStates = [
+      {label:'Clara', style:'background:#e8d9b7'},
+      {label:'Oscura', style:'background:#a67c52'},
+      {label:'Última jugada', style:'background:#e8d9b7;background-image:linear-gradient(rgba(217,164,65,.34),rgba(217,164,65,.34))'},
+      {label:'Selección', style:'background:#a67c52;background-image:linear-gradient(rgba(217,164,65,.46),rgba(217,164,65,.46));box-shadow:inset 0 0 0 2px #b8862f', piece:P('wN')},
+      {label:'Destino legal', style:'background:#e8d9b7', dot:true},
+      {label:'Jaque', style:'background:#e8d9b7;background-image:radial-gradient(circle,rgba(194,96,79,.85) 0%,rgba(194,96,79,.3) 62%,rgba(194,96,79,0) 82%)', piece:P('bK')},
+    ];
+    const evalChips = ['+−','±','=','∓','−+'].map((label,i)=>({
+      label,
+      style: i===2
+        ? 'background:rgba(217,164,65,.12);border:1.5px solid #d9a441;color:#d9a441'
+        : 'background:#2b241d;border:1.5px solid #3a3128;color:#a89c8c',
+    }));
+    const sessionCards = [
+      {badge:'12′', title:'Radar', meta:'pendiente', why:'Tus errores graves en posiciones tranquilas duplican tu promedio.', style:'background:#2b241d;border:1px solid #3a3128', badgeStyle:'background:#171310;color:#a89c8c', titleStyle:'color:#ece5da'},
+      {badge:'▶', title:'Cola de repaso', meta:'en curso · 4/9', why:'9 tarjetas vencidas. Los repasos vencidos van primero, siempre.', style:'background:#2b241d;border:1px solid #d9a441', badgeStyle:'background:rgba(217,164,65,.15);color:#d9a441', titleStyle:'color:#ece5da'},
+      {badge:'✓', title:'Finales: oposición', meta:'completado', why:'Tercera demostración limpia: pasa a intervalo de 21 días.', style:'background:#211c17;border:1px solid #3a3128;opacity:.75', badgeStyle:'background:rgba(127,166,106,.15);color:#7fa66a', titleStyle:'color:#a89c8c;text-decoration:line-through'},
+      {badge:'→', title:'Triage de reloj', meta:'salteado', why:'Se registra el salteo; la prioridad de la Cola no se reordena.', style:'background:#211c17;border:1px dashed #3a3128;opacity:.75', badgeStyle:'background:#171310;color:#6f6353', titleStyle:'color:#6f6353'},
+    ];
+    const spacing = [4,8,12,16,24,32,48].map(n=>({label:String(n), style:`height:${n}px`}));
+    return { colorTokens, typeScale, squares, pieceGrid, squareStates, evalChips, sessionCards, spacing };
+  }
+}
+</script>
+</body>
+</html>

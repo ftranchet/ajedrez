@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#100d0a;font-family:'Instrument Sans',system-ui,sans-serif;color:#ece5da}a{color:#d9a441}a:hover{color:#e2b356}input[type=range]{accent-color:#d9a441}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:20px;padding:36px 20px 64px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#d9a441;text-transform:uppercase">ELOmax · prototipo interactivo</div>
+    <h1 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">Tu sesión de hoy → Radar</h1>
+    <p style="margin:0;color:#a89c8c;font-size:13.5px;max-width:520px;text-align:center">Tocá <strong style="color:#ece5da">Empezar sesión</strong> y resolvé las 3 posiciones del Radar: primero evaluás, después movés (toque-toque en el tablero).</p>
+  </div>
+  <div style="display:flex;gap:6px;background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:5px">
+    <button style="font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:7px;padding:8px 16px;cursor:pointer;{{ heroBtnStyle }}" onClick="{{ pickHero }}" data-v>A · Bloque héroe</button>
+    <button style="font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:7px;padding:8px 16px;cursor:pointer;{{ timelineBtnStyle }}" onClick="{{ pickTimeline }}" data-v>B · Línea de tiempo</button>
+  </div>
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="420px,860px">
+    <div style="height:100%;display:flex;flex-direction:column;padding-top:56px;box-sizing:border-box;background:#171310;color:#ece5da;font-family:'Instrument Sans',system-ui,sans-serif">
+
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:18px 20px 6px;display:flex;flex-direction:column;gap:4px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#6f6353;letter-spacing:.08em">JUEVES 16 DE JULIO</div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 style="font-family:'Newsreader',serif;font-size:30px;font-weight:500;margin:0">Tu sesión de hoy</h2>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#a89c8c">25 min</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ isHeroVariant }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;overflow-y:auto;padding:12px 20px 16px;display:flex;flex-direction:column;gap:10px">
+              <div style="background:#211c17;border:1px solid #d9a441;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.12em">SIGUIENTE · 12 MIN</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6353">3 posiciones</span>
+                </div>
+                <div style="font-family:'Newsreader',serif;font-size:24px;font-weight:500;line-height:1.1">El Radar</div>
+                <div style="font-size:13.5px;color:#a89c8c;line-height:1.5">Tus errores graves en posiciones tranquilas duplican tu promedio. Nadie te va a avisar si hay táctica.</div>
+                <button style="font-family:'Instrument Sans',sans-serif;font-size:16px;font-weight:600;color:#1a1105;background:#d9a441;border:none;border-radius:10px;padding:14px;min-height:48px;cursor:pointer" style-hover="background:#e2b356" style-active="background:#b8862f" onClick="{{ startRadar }}">Empezar sesión</button>
+              </div>
+              <sc-for list="{{ homeBlocks }}" as="b" hint-placeholder-count="2">
+                <div style="background:#211c17;border:1px solid #3a3128;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+                  <div style="width:36px;height:36px;border-radius:8px;background:#171310;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#a89c8c;flex:none">{{ b.dur }}</div>
+                  <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                    <div style="font-size:15px;font-weight:600">{{ b.title }}</div>
+                    <div style="font-size:12.5px;color:#a89c8c;line-height:1.4">{{ b.why }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isTimelineVariant }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column">
+              <sc-for list="{{ timelineBlocks }}" as="b" hint-placeholder-count="3">
+                <div style="display:flex;gap:14px">
+                  <div style="display:flex;flex-direction:column;align-items:center;width:44px;flex:none">
+                    <div data-tb style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;flex:none;{{ b.dotStyle }}">{{ b.dur }}</div>
+                    <sc-if value="{{ b.line }}" hint-placeholder-val="{{ true }}"><div style="width:2px;flex:1;background:#3a3128;min-height:18px"></div></sc-if>
+                  </div>
+                  <div style="padding:4px 0 22px;display:flex;flex-direction:column;gap:3px">
+                    <div data-tt style="font-size:15.5px;font-weight:600;{{ b.titleStyle }}">{{ b.title }}</div>
+                    <div style="font-size:12.5px;color:#a89c8c;line-height:1.45;max-width:270px">{{ b.why }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding:0 20px 14px">
+              <button style="width:100%;font-family:'Instrument Sans',sans-serif;font-size:16px;font-weight:600;color:#1a1105;background:#d9a441;border:none;border-radius:10px;padding:14px;min-height:48px;cursor:pointer" style-hover="background:#e2b356" style-active="background:#b8862f" onClick="{{ startRadar }}">Empezar sesión · 25 min</button>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;border-top:1px solid #3a3128;background:#171310;padding:8px 10px 6px">
+            <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="3">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;cursor:pointer">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-ni style="{{ n.iconStyle }}"><path d="{{ n.icon }}"></path></svg>
+                <span data-nl style="font-size:10.5px;font-weight:600;{{ n.labelStyle }}">{{ n.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isRadar }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 16px 8px">
+            <button style="background:transparent;border:none;color:#a89c8c;font-size:20px;cursor:pointer;padding:6px 8px;min-width:44px;min-height:44px" onClick="{{ goHome }}">←</button>
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:15px;font-weight:600">El Radar</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6353">posición {{ progress }} · juegan blancas</span>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:4px">
+              <sc-for list="{{ progressDots }}" as="d" hint-placeholder-count="3">
+                <div data-pd style="width:8px;height:8px;border-radius:50%;{{ d.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="padding:0 12px">
+            <div style="position:relative;width:100%;aspect-ratio:1;border-radius:6px;overflow:hidden">
+              <div style="display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;height:100%">
+                <sc-for list="{{ squares }}" as="sq" hint-placeholder-count="0">
+                  <div data-sq style="position:relative;{{ sq.style }}" onClick="{{ sq.onTap }}">
+                    <sc-if value="{{ sq.dot }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="width:26%;height:26%;border-radius:50%;background:rgba(23,19,16,.28)"></div></div></sc-if>
+                    <sc-if value="{{ sq.ring }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:6%;border-radius:50%;border:3px solid rgba(23,19,16,.3);pointer-events:none"></div></sc-if>
+                    <sc-if value="{{ sq.coord }}" hint-placeholder-val="{{ false }}"><span data-cq style="position:absolute;right:3px;bottom:1px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;pointer-events:none;{{ sq.coordStyle }}">{{ sq.coord }}</span></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px">
+
+            <sc-if value="{{ isEvalPhase }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:15.5px;font-weight:600">¿Cómo está la posición?</div>
+              <div style="display:flex;gap:7px">
+                <sc-for list="{{ evalChips }}" as="c" hint-placeholder-count="5">
+                  <button data-ec style="flex:1;min-height:46px;font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;border-radius:8px;cursor:pointer;{{ c.style }}" onClick="{{ c.onPick }}">{{ c.label }}</button>
+                </sc-for>
+              </div>
+              <div style="font-size:12.5px;color:#6f6353;line-height:1.5">Primero tu evaluación, después tu jugada. Nadie te avisa si hay táctica.</div>
+            </sc-if>
+
+            <sc-if value="{{ isMovePhase }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#d9a441;background:rgba(217,164,65,.12);border:1px solid rgba(217,164,65,.4);border-radius:6px;padding:3px 8px">{{ evalPicked }}</span>
+                <span style="font-size:13px;color:#a89c8c">tu evaluación</span>
+              </div>
+              <div style="font-size:15.5px;font-weight:600">Ahora, tu jugada.</div>
+              <div style="font-size:12.5px;color:#6f6353;line-height:1.5">Tocá una pieza blanca y después su casilla de destino.</div>
+            </sc-if>
+
+            <sc-if value="{{ isConfPhase }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:15.5px;font-weight:600">Antes de ver el resultado —</div>
+              <div style="display:flex;justify-content:space-between;font-size:13.5px;color:#a89c8c"><span>¿Qué tan segura/o estás de tu jugada?</span><span style="font-family:'IBM Plex Mono',monospace;color:#d9a441;font-weight:600">{{ conf }}%</span></div>
+              <input type="range" min="0" max="100" value="{{ conf }}" onChange="{{ setConf }}" style="width:100%;height:28px">
+              <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;color:#1a1105;background:#d9a441;border:none;border-radius:10px;padding:13px;min-height:46px;cursor:pointer" style-hover="background:#e2b356" onClick="{{ confirmConf }}">Confirmar</button>
+              <div style="font-size:12px;color:#6f6353;line-height:1.5">Muestreo de calibración: 1 de cada 4–5 respuestas. Alimenta tu puntuación de Brier.</div>
+            </sc-if>
+
+            <sc-if value="{{ isFeedbackPhase }}" hint-placeholder-val="{{ false }}">
+              <div data-fb style="border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:5px;{{ fb.boxStyle }}">
+                <div data-fbt style="font-size:15px;font-weight:600;{{ fb.titleStyle }}">{{ fb.title }}</div>
+                <div style="font-size:13.5px;color:#a89c8c;line-height:1.5">{{ fb.body }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#6f6353">
+                <span data-fbe style="width:7px;height:7px;border-radius:50%;flex:none;{{ fb.evalDotStyle }}"></span>{{ fb.evalLine }}
+              </div>
+              <sc-if value="{{ fb.queueNote }}" hint-placeholder-val="{{ false }}">
+                <div style="border-radius:10px;padding:11px 14px;background:#2b241d;border:1px solid #3a3128;font-size:12.5px;color:#a89c8c;display:flex;align-items:center;gap:9px"><span style="font-family:'IBM Plex Mono',monospace;color:#d9a441">＋</span>{{ fb.queueNote }}</div>
+              </sc-if>
+              <button style="font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;color:#1a1105;background:#d9a441;border:none;border-radius:10px;padding:13px;min-height:46px;cursor:pointer" style-hover="background:#e2b356" style-active="background:#b8862f" onClick="{{ nextPuzzle }}">{{ nextLabel }}</button>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:24px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#d9a441;letter-spacing:.14em">RADAR · COMPLETADO</div>
+          <div style="font-family:'Newsreader',serif;font-size:34px;font-weight:500;line-height:1.1">{{ doneHeadline }}</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ doneRows }}" as="r" hint-placeholder-count="3">
+              <div style="display:flex;justify-content:space-between;background:#211c17;border:1px solid #3a3128;border-radius:10px;padding:12px 14px;font-size:14px">
+                <span style="color:#a89c8c">{{ r.label }}</span><span data-dr style="font-family:'IBM Plex Mono',monospace;font-weight:600;{{ r.valStyle }}">{{ r.val }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:13px;color:#6f6353;line-height:1.55">Sin confeti: lo que importa aparece en tu panel de verdad a fin de mes.</div>
+          <button style="font-family:'Instrument Sans',sans-serif;font-size:16px;font-weight:600;color:#ece5da;background:transparent;border:1px solid #3a3128;border-radius:10px;padding:14px;min-height:48px;cursor:pointer" style-hover="background:#2b241d;border-color:#544636" onClick="{{ resetAll }}">Volver a tu sesión</button>
+        </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1000},&quot;layoutVariant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hero&quot;,&quot;timeline&quot;],&quot;default&quot;:&quot;hero&quot;,&quot;tsType&quot;:&quot;'hero' | 'timeline'&quot;,&quot;section&quot;:&quot;Pantalla Hoy&quot;},&quot;showCoords&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tablero&quot;},&quot;confidenceSampling&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Flujo&quot;}}">
+class Component extends DCLogic {
+  state = { variant:null, screen:'home', pi:0, phase:'eval', evalPick:null, sel:null, board:null, userMove:null, results:[], conf:70 };
+  puzzles() {
+    return [
+      { fen:'6k1/5ppp/8/8/8/8/5PPP/3R2K1', from:59, to:3, san:'Td8#', evalIdx:0, ask:false,
+        okTitle:'Correcto · Td8#', okBody:'Mate del pasillo: la torre entra a d8 y el rey negro no tiene escape en f8 ni luft en la séptima.',
+        okKind:'success',
+        failBody:'Había táctica: Td8 era mate inmediato — el rey no tiene luft y nada defiende la octava.' },
+      { fen:'r4rk1/pp2ppbp/2n3p1/8/3P4/2N1B3/PP3PPP/2R2RK1', from:42, to:27, san:'Cd5', evalIdx:2, ask:true,
+        okTitle:'Correcto · Cd5', okBody:'No había táctica. Cd5 mejora la pieza sin conceder nada: ninguna captura gana material y la evaluación se mantiene igualada.',
+        okKind:'info',
+        failBody:'No había táctica que justificara esa jugada. Cd5 era la mejora sólida: centraliza sin conceder nada.' },
+      { fen:'r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R', from:51, to:43, san:'d3', evalIdx:2, ask:false,
+        okTitle:'Correcto · d3', okBody:'La oferta en e5 estaba envenenada: tras Cxe5, dxe5 no recupera la pieza (Cxe5 Cxe5 y d6xe5 queda cubierto). d3 consolida sin morder el anzuelo.',
+        okKind:'success',
+        failBody:'La oferta estaba envenenada: tras Cxe5, dxe5 y la pieza no se recupera. d3 consolidaba el centro sin riesgo.' },
+    ];
+  }
+  parseFen(fen) {
+    const map={p:'bP',r:'bR',n:'bN',b:'bB',q:'bQ',k:'bK',P:'wP',R:'wR',N:'wN',B:'wB',Q:'wQ',K:'wK'};
+    const g=[]; fen.split('/').forEach(row=>{for(const ch of row){if(/\d/.test(ch)){for(let i=0;i<+ch;i++)g.push(null);}else g.push(map[ch]);}});
+    return g;
+  }
+  legalTargets(b,i) {
+    const pc=b[i]; if(!pc||pc[0]!=='w')return[];
+    const r=i>>3,c=i&7,t=pc[1],out=[];
+    const inb=(rr,cc)=>rr>=0&&rr<8&&cc>=0&&cc<8;
+    const push=(rr,cc)=>{const j=rr*8+cc,q=b[j];if(!q||q[0]==='b')out.push(j);return !q;};
+    if(t==='N'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{if(inb(r+dr,c+dc))push(r+dr,c+dc);});}
+    else if(t==='K'){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if((dr||dc)&&inb(r+dr,c+dc))push(r+dr,c+dc);}}
+    else if(t==='P'){
+      if(r>0&&!b[(r-1)*8+c]){out.push((r-1)*8+c); if(r===6&&!b[(r-2)*8+c])out.push((r-2)*8+c);}
+      [-1,1].forEach(dc=>{if(inb(r-1,c+dc)){const q=b[(r-1)*8+c+dc];if(q&&q[0]==='b')out.push((r-1)*8+c+dc);}});
+    } else {
+      const dirs=t==='R'?[[-1,0],[1,0],[0,-1],[0,1]]:t==='B'?[[-1,-1],[-1,1],[1,-1],[1,1]]:[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+      dirs.forEach(([dr,dc])=>{let rr=r+dr,cc=c+dc;while(inb(rr,cc)){if(!push(rr,cc))break;rr+=dr;cc+=dc;}});
+    }
+    return out;
+  }
+  san(b,from,to){const L={P:'',N:'C',B:'A',R:'T',Q:'D',K:'R'};const cap=b[to]?'x':'';return L[b[from][1]]+cap+'abcdefgh'[to&7]+(8-(to>>3));}
+  loadPuzzle(pi){this.setState({pi,phase:'eval',evalPick:null,sel:null,userMove:null,board:this.parseFen(this.puzzles()[pi].fen)});}
+  renderVals() {
+    const S=this.state, ps=this.puzzles(), p=ps[S.pi];
+    const variant = S.variant ?? (this.props.layoutVariant ?? 'hero');
+    const showCoords = this.props.showCoords ?? true;
+    const sampling = this.props.confidenceSampling ?? true;
+    const seg=(on)=>on?'background:#d9a441;color:#1a1105':'background:transparent;color:#a89c8c';
+    const board = S.board || this.parseFen(p.fen);
+    const targets = (S.phase==='move'&&S.sel!=null)?this.legalTargets(board,S.sel):[];
+    const evalLabels=['+−','±','=','∓','−+'];
+    const squares = board.map((pc,i)=>{
+      const r=i>>3,c=i&7,light=(r+c)%2===0;
+      const bg=light?'#e8d9b7':'#a67c52';
+      const imgs=[],sizes=[];
+      const veil=(col)=>{imgs.push(`linear-gradient(${col},${col})`);sizes.push('100% 100%');};
+      if(pc){imgs.push(`url('pieces/${pc}.svg')`);sizes.push('90% 90%');}
+      let extra='';
+      if(S.phase==='move'){ if(i===S.sel){veil('rgba(217,164,65,.46)');extra+=';box-shadow:inset 0 0 0 2px #b8862f';} extra+=';cursor:pointer'; }
+      if(S.phase==='feedback'&&S.userMove){
+        const ok=S.userMove.correct;
+        if(i===S.userMove.from||i===S.userMove.to)veil(ok?'rgba(127,166,106,.42)':'rgba(194,96,79,.42)');
+        if(!ok&&(i===p.from||i===p.to))veil('rgba(127,166,106,.42)');
+      }
+      let style=`background-color:${bg}`;
+      if(imgs.length)style+=`;background-image:${imgs.join(',')};background-size:${sizes.join(',')};background-position:center;background-repeat:no-repeat`;
+      style+=extra;
+      return {
+        style,
+        dot: targets.includes(i)&&!pc,
+        ring: targets.includes(i)&&!!pc,
+        coord: showCoords ? (r===7?'abcdefgh'[c]:(c===0?String(8-r):null)) : null,
+        coordStyle:`color:${light?'#a67c52':'#e8d9b7'}`,
+        onTap:()=>this.tap(i),
+      };
+    });
+    const evalChips = evalLabels.map((label,i)=>({
+      label,
+      style:'background:#2b241d;border:1.5px solid #3a3128;color:#a89c8c',
+      onPick:()=>this.setState({evalPick:i,phase:'move'}),
+    }));
+    const um=S.userMove;
+    let fb=null;
+    if(S.phase==='feedback'&&um){
+      const evalOk=S.evalPick===p.evalIdx;
+      const kinds={success:['rgba(127,166,106,.1)','rgba(127,166,106,.35)','#9fbf8c'],error:['rgba(194,96,79,.1)','rgba(194,96,79,.35)','#d98a79'],info:['rgba(111,143,166,.1)','rgba(111,143,166,.35)','#93b0c7']};
+      const kind=um.correct?p.okKind:'error';
+      const [kbg,kbd,kcl]=kinds[kind];
+      fb={
+        boxStyle:`background:${kbg};border:1px solid ${kbd}`,
+        titleStyle:`color:${kcl}`,
+        title: um.correct?p.okTitle:`Fallo · jugaste ${um.san}`,
+        body: um.correct?p.okBody:p.failBody,
+        evalLine:`Tu evaluación: ${evalLabels[S.evalPick]} · ${evalOk?'coincide con el motor':'el motor dice '+evalLabels[p.evalIdx]}`,
+        evalDotStyle:`background:${evalOk?'#7fa66a':'#c2604f'}`,
+        queueNote: um.correct?null:'Esta posición entra a tu Cola Universal. Reaparece mañana.',
+      };
+    }
+    const results=S.results;
+    const okCount=results.filter(x=>x.move).length;
+    const navIcons={Hoy:'M12 3l8 7v10h-5v-6h-6v6H4V10z',Jugar:'M8 5v14l11-7z',Panel:'M4 19V9m6 10V5m6 14v-8'};
+    return {
+      isHome:S.screen==='home', isRadar:S.screen==='radar', isDone:S.screen==='done',
+      isHeroVariant:variant==='hero', isTimelineVariant:variant==='timeline',
+      heroBtnStyle:seg(variant==='hero'), timelineBtnStyle:seg(variant==='timeline'),
+      pickHero:()=>this.setState({variant:'hero'}), pickTimeline:()=>this.setState({variant:'timeline'}),
+      startRadar:()=>{this.setState({screen:'radar',results:[]});this.loadPuzzle(0);},
+      goHome:()=>this.setState({screen:'home'}),
+      homeBlocks:[
+        {dur:'9′',title:'Cola de repaso',why:'9 tarjetas vencidas. Los repasos vencidos van primero, siempre.'},
+        {dur:'4′',title:'Finales: oposición',why:'Segunda demostración limpia; una más y pasa a 21 días.'},
+      ],
+      timelineBlocks:[
+        {dur:'9′',title:'Cola de repaso',why:'9 tarjetas vencidas. Los repasos vencidos van primero, siempre.',dotStyle:'background:rgba(217,164,65,.15);color:#d9a441;border:1px solid #d9a441',titleStyle:'color:#ece5da',line:true},
+        {dur:'12′',title:'El Radar · 3 posiciones',why:'Tus errores graves en posiciones tranquilas duplican tu promedio.',dotStyle:'background:#211c17;color:#a89c8c;border:1px solid #3a3128',titleStyle:'color:#ece5da',line:true},
+        {dur:'4′',title:'Finales: oposición',why:'Segunda demostración limpia; una más y pasa a 21 días.',dotStyle:'background:#211c17;color:#a89c8c;border:1px solid #3a3128',titleStyle:'color:#ece5da',line:false},
+      ],
+      navItems:['Hoy','Jugar','Panel'].map((label,i)=>({label,icon:navIcons[label],iconStyle:`stroke:${i===0?'#d9a441':'#6f6353'}`,labelStyle:`color:${i===0?'#d9a441':'#6f6353'}`})),
+      progress:`${S.pi+1}/3`,
+      progressDots:ps.map((_,i)=>{
+        const done=results[i];
+        let c='#3a3128';
+        if(done)c=done.move?'#7fa66a':'#c2604f'; else if(i===S.pi&&S.screen==='radar')c='#d9a441';
+        return {style:`background:${c}`};
+      }),
+      squares,
+      isEvalPhase:S.phase==='eval', isMovePhase:S.phase==='move', isConfPhase:S.phase==='conf', isFeedbackPhase:S.phase==='feedback',
+      evalChips, evalPicked:S.evalPick!=null?evalLabels[S.evalPick]:'',
+      conf:S.conf,
+      setConf:(e)=>this.setState({conf:+e.target.value}),
+      confirmConf:()=>this.setState({phase:'feedback'}),
+      fb, nextLabel:S.pi<2?'Siguiente posición':'Terminar bloque',
+      nextPuzzle:()=>{ if(S.pi<2)this.loadPuzzle(S.pi+1); else this.setState({screen:'done'}); },
+      doneHeadline: okCount===3?'Tres de tres.':okCount===2?'Dos de tres. Sólido.':'Día de siembra.',
+      doneRows:[
+        {label:'Jugadas correctas',val:`${okCount}/3`,valStyle:`color:${okCount>=2?'#7fa66a':'#c2604f'}`},
+        {label:'Evaluaciones acertadas',val:`${results.filter(x=>x.eval).length}/3`,valStyle:'color:#ece5da'},
+        {label:'Tarjetas nuevas en tu Cola',val:String(3-okCount),valStyle:`color:${okCount===3?'#ece5da':'#d9a441'}`},
+      ],
+      resetAll:()=>this.setState({screen:'home',results:[]}),
+      _sampling:sampling,
+    };
+  }
+  tap(i) {
+    const S=this.state; if(S.phase!=='move')return;
+    const p=this.puzzles()[S.pi], b=S.board||this.parseFen(p.fen);
+    if(S.sel!=null){
+      const targets=this.legalTargets(b,S.sel);
+      if(targets.includes(i)){
+        const san=this.san(b,S.sel,i);
+        const nb=b.slice(); nb[i]=nb[S.sel]; nb[S.sel]=null;
+        const correct=S.sel===p.from&&i===p.to;
+        const sampling=this.props.confidenceSampling ?? true;
+        const results=this.state.results.slice();
+        results[S.pi]={move:correct,eval:S.evalPick===p.evalIdx};
+        this.setState({board:nb,userMove:{from:S.sel,to:i,correct,san},sel:null,results,phase:(p.ask&&sampling)?'conf':'feedback'});
+        return;
+      }
+    }
+    if(b[i]&&b[i][0]==='w')this.setState({sel:i,board:b});
+    else this.setState({sel:null,board:b});
+  }
+}
+</script>
+</body>
+</html>
