@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.2 |
+| Versión | 0.2.3 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
 | Última actualización | 2026-07-17 |
@@ -276,7 +276,8 @@ Regla de dependencias: `ui → core → (interfaces de) services`. `core` no imp
 │   ├── adr/               ← decisiones de arquitectura, numeradas e inmutables
 │   │   ├── README.md      ← proceso + índice
 │   │   └── NNNN-*.md
-│   └── evidence/          ← informe científico, tier list, diseño de producto
+│   ├── evidence/          ← informe científico, tier list, diseño de producto
+│   └── prototipos/        ← referencia visual y prototipo interactivo del design system
 ├── public/                ← assets estáticos servidos tal cual (set de piezas, íconos)
 └── src/                   ← código (estructura en §9)
 ```

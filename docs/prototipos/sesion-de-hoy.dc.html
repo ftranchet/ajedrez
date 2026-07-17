@@ -238,7 +238,7 @@ class Component extends DCLogic {
       const bg=light?'#e8d9b7':'#a67c52';
       const imgs=[],sizes=[];
       const veil=(col)=>{imgs.push(`linear-gradient(${col},${col})`);sizes.push('100% 100%');};
-      if(pc){imgs.push(`url('pieces/${pc}.svg')`);sizes.push('90% 90%');}
+      if(pc){imgs.push(`url('../../public/piece/staunty/${pc}.svg')`);sizes.push('90% 90%');}
       let extra='';
       if(S.phase==='move'){ if(i===S.sel){veil('rgba(217,164,65,.46)');extra+=';box-shadow:inset 0 0 0 2px #b8862f';} extra+=';cursor:pointer'; }
       if(S.phase==='feedback'&&S.userMove){

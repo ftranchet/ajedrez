@@ -7,6 +7,7 @@ Aplicación web progresiva (PWA) que prescribe tu entrenamiento de ajedrez para 
 - **`CONTRIBUTING.md`** — reglas de trabajo para cualquier colaborador, persona o agente de IA.
 - **`docs/roadmap.md`** — fases de construcción con criterios de salida.
 - **`docs/design-system.md`** — identidad visual, tokens y componentes.
+- **`docs/prototipos/`** — referencia visual y prototipo interactivo del design system (abrir en navegador).
 - **`docs/adr/`** — decisiones de arquitectura (qué se decidió, por qué, qué se descartó).
 - **`docs/evidence/`** — la investigación que justifica el producto.
 - **`CHANGELOG.md`** — historia de cambios.

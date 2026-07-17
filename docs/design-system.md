@@ -2,7 +2,7 @@
 
 Documento vivo. Los tokens de esta página son la única fuente de estilos: se implementan en la configuración de Tailwind y ningún componente usa valores sueltos. Cambiar la estética = cambiar tokens acá, con entrada en el changelog.
 
-> **Cambios v2:** jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía con más carácter (Newsreader en lugar de Fraunces, Instrument Sans en lugar de Inter), y layout validado de la pantalla "Tu sesión de hoy" y flujo del Radar (§4.1–4.2). Las decisiones de layout se validaron con una referencia visual renderizada y un prototipo interactivo (no versionados en el repo).
+> **Cambios v2:** jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía con más carácter (Newsreader en lugar de Fraunces, Instrument Sans en lugar de Inter), y layout validado de la pantalla "Tu sesión de hoy" y flujo del Radar (§4.1–4.2). Las decisiones se validaron con una referencia visual renderizada y un prototipo interactivo, versionados en `docs/prototipos/` (ver su README).
 
 ## 1. Dirección estética: "Sala de estudio"
 
@@ -118,7 +118,7 @@ Coordenadas: `font-mono` 10–11 px, peso 600, dentro de la casilla (files abajo
 Rotación re-acomoda sin recargar (RNF-1); entrada por teclado en notación algebraica en escritorio.
 
 ### 4.1 Pantalla "Tu sesión de hoy" (decisión)
-Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque de la sesión es una tarjeta destacada con borde `accent`, su porqué y el único botón primario de la pantalla ("Empezar sesión"); los bloques restantes se listan debajo como tarjetas secundarias. Encabezado: fecha en `font-mono` tertiary + título en `font-display` + duración total. Alternativa "línea de tiempo" descartada como default; queda documentada en el prototipo como variante.
+Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque de la sesión es una tarjeta destacada con borde `accent`, su porqué y el único botón primario de la pantalla ("Empezar sesión"); los bloques restantes se listan debajo como tarjetas secundarias. Encabezado: fecha en `font-mono` tertiary + título en `font-display` + duración total. Alternativa "línea de tiempo" descartada como default; queda documentada como variante B en el prototipo (`docs/prototipos/sesion-de-hoy.dc.html`).
 
 ### 4.2 Flujo del Radar (validado en prototipo)
 1. Evaluación rápida (EvalPicker) con el tablero en solo lectura — "¿Cómo está la posición?".
