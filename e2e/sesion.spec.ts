@@ -149,6 +149,11 @@ test.describe('sesión simple: Radar', () => {
     await clickSquare(page, board, 'd', 5);
     await clickSquare(page, board, 'h', 5);
 
+    // Con Math.random forzado a 0, también se muestrea la regla de
+    // candidatas (RF-5.8): "no, mantener esta" resuelve con la misma jugada.
+    await page.getByText('¿Hay algo mejor?').waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'No, mantener esta' }).click();
+
     // Con Math.random forzado a 0, shouldSampleConfidence() da true siempre.
     await page.getByText('¿Qué tan seguro estás').waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Confirmar' }).click();

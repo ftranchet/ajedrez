@@ -10,6 +10,7 @@ import { radarProgressRepo } from '../storage/radarProgressRepo';
 import { radarAttemptRepo } from '../storage/radarAttemptRepo';
 import { curriculumProgressRepo } from '../storage/curriculumProgressRepo';
 import { profileRepo } from '../storage/profileRepo';
+import { candidataAttemptRepo } from '../storage/candidataAttemptRepo';
 import { db } from '../storage/db';
 
 function pgnFileName(gameId: string): string {
@@ -26,6 +27,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     radarAttempts: await radarAttemptRepo.list(),
     curriculumProgress: await curriculumProgressRepo.list(),
     profile: await profileRepo.get(),
+    candidataAttempts: await candidataAttemptRepo.list(),
   };
   const bundle = buildExportBundle(data);
 
@@ -38,6 +40,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     'radarAttempts.json': strToU8(JSON.stringify(bundle.radarAttempts, null, 2)),
     'curriculumProgress.json': strToU8(JSON.stringify(bundle.curriculumProgress, null, 2)),
     'profile.json': strToU8(JSON.stringify(bundle.profile, null, 2)),
+    'candidataAttempts.json': strToU8(JSON.stringify(bundle.candidataAttempts, null, 2)),
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
@@ -67,6 +70,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const radarAttemptsRaw = unzipped['radarAttempts.json'];
   const curriculumProgressRaw = unzipped['curriculumProgress.json'];
   const profileRaw = unzipped['profile.json'];
+  const candidataAttemptsRaw = unzipped['candidataAttempts.json'];
   if (!manifestRaw || !gamesRaw || !errorCardsRaw || !calibrationRaw) {
     return { ok: false, error: 'Faltan archivos dentro del .zip (¿es una exportación de ELOmax?).' };
   }
@@ -85,6 +89,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       radarAttempts: radarAttemptsRaw ? JSON.parse(strFromU8(radarAttemptsRaw)) : [],
       curriculumProgress: curriculumProgressRaw ? JSON.parse(strFromU8(curriculumProgressRaw)) : [],
       profile: profileRaw ? JSON.parse(strFromU8(profileRaw)) : undefined,
+      // Los respaldos de antes de Fase 4 no traen la regla de candidatas (RF-5.8).
+      candidataAttempts: candidataAttemptsRaw ? JSON.parse(strFromU8(candidataAttemptsRaw)) : [],
     };
   } catch {
     return { ok: false, error: 'Algún archivo dentro del .zip no es JSON válido.' };
@@ -96,7 +102,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const { bundle } = result;
   await db.transaction(
     'rw',
-    [db.games, db.errorCards, db.calibrationRecords, db.radarProgress, db.radarAttempts, db.curriculumProgress, db.profile],
+    [db.games, db.errorCards, db.calibrationRecords, db.radarProgress, db.radarAttempts, db.curriculumProgress, db.profile, db.candidataAttempts],
     async () => {
       if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
       if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
@@ -105,6 +111,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       if (bundle.radarAttempts.length > 0) await db.radarAttempts.bulkPut(bundle.radarAttempts);
       if (bundle.curriculumProgress.length > 0) await db.curriculumProgress.bulkPut(bundle.curriculumProgress);
       await db.profile.put(bundle.profile);
+      if (bundle.candidataAttempts.length > 0) await db.candidataAttempts.bulkPut(bundle.candidataAttempts);
     },
   );
 

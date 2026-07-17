@@ -158,6 +158,21 @@ export interface RadarAttempt {
   fecha: string; // ISO 8601
 }
 
+/**
+ * Registro de la regla de candidatas (RF-5.8): tras responder, en un
+ * subconjunto aleatorio de posiciones se pregunta "¿hay algo mejor?" antes
+ * de revelar. `cambio` indica si el usuario reemplazó su jugada original;
+ * `resultado` si ese cambio (o la falta de él) mejoró, empeoró o no alteró
+ * el acierto.
+ */
+export interface CandidataAttempt {
+  id: string;
+  itemId: string;
+  cambio: boolean;
+  resultado: 'mejoro' | 'empeoro' | 'sin-cambio';
+  fecha: string; // ISO 8601
+}
+
 /** Versión del catálogo embebido, separada de los datos personales. */
 export interface RadarDatasetMeta {
   id: 'catalogo';

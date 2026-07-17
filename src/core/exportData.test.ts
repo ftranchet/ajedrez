@@ -11,6 +11,7 @@ const empty = {
   radarAttempts: [],
   curriculumProgress: [],
   profile: DEFAULT_PROFILE,
+  candidataAttempts: [],
 };
 
 describe('buildExportBundle', () => {

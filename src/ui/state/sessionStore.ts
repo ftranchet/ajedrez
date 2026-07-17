@@ -20,10 +20,12 @@ import { dueCurriculumItems, interleaveByPattern, newCurriculumProgress, reviewC
 import { DEFAULT_PROFILE, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
+import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
+import { candidataAttemptRepo } from '../../services/storage/candidataAttemptRepo';
 import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/radarProgressRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
@@ -42,7 +44,7 @@ type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'curriculo' | 'triage' | 'rada
 type ColaSubPhase = 'jugando' | 'feedback';
 type CurriculumSubPhase = 'jugando' | 'feedback';
 type TriageSubPhase = 'decidiendo' | 'feedback';
-type RadarSubPhase = 'evaluando' | 'jugando' | 'confianza' | 'feedback';
+type RadarSubPhase = 'evaluando' | 'jugando' | 'candidata' | 'confianza' | 'feedback';
 
 interface SessionState {
   phase: Phase;
@@ -92,6 +94,10 @@ interface SessionState {
   radarFeedbackTexto: string;
   radarJugadaCorrecta: string | null;
   radarJugadaUsuario: string | null;
+  /** Regla de candidatas (RF-5.8): si este ítem fue muestreado para preguntar "¿hay algo mejor?" antes de revelar. */
+  radarCandidataActiva: boolean;
+  /** Primera jugada del usuario en un ítem muestreado, hasta que decide mantenerla o cambiarla. */
+  radarCandidataJugadaOriginal: string | null;
 
   // Tablero compartido entre Cola y Radar
   fen: string;
@@ -115,6 +121,7 @@ interface SessionState {
 
   radarEval(guess: EvalGuess): void;
   radarUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
+  radarCandidataDecidir(cambiar: boolean): void;
   radarConfirmarConfianza(valor: number): Promise<void>;
   radarContinuar(): Promise<void>;
 }
@@ -171,6 +178,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarFeedbackTexto: '',
       radarJugadaCorrecta: null,
       radarJugadaUsuario: null,
+      radarCandidataActiva: shouldSampleCandidata(),
+      radarCandidataJugadaOriginal: null,
       ...boardSnapshot(),
       lastMove: null,
     });
@@ -306,6 +315,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     radarFeedbackTexto: '',
     radarJugadaCorrecta: null,
     radarJugadaUsuario: null,
+    radarCandidataActiva: false,
+    radarCandidataJugadaOriginal: null,
 
     fen: chess.fen(),
     turn: 'w',
@@ -488,22 +499,35 @@ export const useSessionStore = create<SessionState>((set, get) => {
       }
       const jugadaUsuario = from + to + (promotion ?? '');
       const item = s.radarItem;
-      const acierto = jugadaUsuario === item.solucion[0];
       chess.move({ from, to, promotion });
 
-      const pedirConfianza = shouldSampleConfidence();
-      set({
-        ...boardSnapshot(),
-        lastMove: [from, to],
-        radarUltimoAcierto: acierto,
-        radarJugadaCorrecta: item.solucion[0],
-        radarJugadaUsuario: jugadaUsuario,
-        radarFeedbackTexto: explainFeedback(item, acierto),
-        radarPedirConfianza: pedirConfianza,
-        radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
-      });
+      // RF-5.8: en un ítem muestreado, la primera jugada no revela todavía —
+      // pregunta "¿hay algo mejor?" antes de resolver.
+      if (s.radarCandidataActiva && s.radarCandidataJugadaOriginal === null) {
+        set({ ...boardSnapshot(), lastMove: [from, to], radarCandidataJugadaOriginal: jugadaUsuario, radarSubPhase: 'candidata' });
+        return;
+      }
 
-      if (!pedirConfianza) await finalizeRadarAnswer(item, acierto, jugadaUsuario);
+      // Segunda jugada, tras elegir "cambiar": registra si mejoró o empeoró.
+      if (s.radarCandidataActiva && s.radarCandidataJugadaOriginal !== null) {
+        void registrarCandidataAttempt(item, s.radarCandidataJugadaOriginal, jugadaUsuario, true);
+      }
+
+      await resolverJugadaRadar(item, jugadaUsuario, [from, to]);
+    },
+
+    radarCandidataDecidir(cambiar) {
+      const s = get();
+      if (s.phase !== 'radar' || s.radarSubPhase !== 'candidata' || !s.radarItem || s.radarCandidataJugadaOriginal === null) return;
+      if (!cambiar) {
+        const jugadaFinal = s.radarCandidataJugadaOriginal;
+        void registrarCandidataAttempt(s.radarItem, jugadaFinal, jugadaFinal, false);
+        void resolverJugadaRadar(s.radarItem, jugadaFinal, s.lastMove ?? ['', '']);
+        return;
+      }
+      // "Sí, cambiar": deshace la jugada tentativa y deja jugar de nuevo.
+      chess.undo();
+      set({ ...boardSnapshot(), lastMove: null, radarSubPhase: 'jugando' });
     },
 
     async radarConfirmarConfianza(valor) {
@@ -567,5 +591,28 @@ export const useSessionStore = create<SessionState>((set, get) => {
       });
       await errorCardRepo.save(card);
     }
+  }
+
+  /** Resuelve la jugada final del usuario en el Radar: única salida, la use
+   * `radarUserMove` directo o `radarCandidataDecidir` tras "¿hay algo mejor?" (RF-5.8). */
+  async function resolverJugadaRadar(item: RadarItem, jugadaUsuario: string, lastMove: [string, string]) {
+    const acierto = jugadaUsuario === item.solucion[0];
+    const pedirConfianza = shouldSampleConfidence();
+    set({
+      ...boardSnapshot(),
+      lastMove,
+      radarUltimoAcierto: acierto,
+      radarJugadaCorrecta: item.solucion[0],
+      radarJugadaUsuario: jugadaUsuario,
+      radarFeedbackTexto: explainFeedback(item, acierto),
+      radarPedirConfianza: pedirConfianza,
+      radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
+    });
+    if (!pedirConfianza) await finalizeRadarAnswer(item, acierto, jugadaUsuario);
+  }
+
+  async function registrarCandidataAttempt(item: RadarItem, jugadaOriginal: string, jugadaFinal: string, cambio: boolean) {
+    const resultado = clasificarCambioCandidata(item, jugadaOriginal, jugadaFinal);
+    await candidataAttemptRepo.save({ id: crypto.randomUUID(), itemId: item.id, cambio, resultado, fecha: new Date().toISOString() });
   }
 });

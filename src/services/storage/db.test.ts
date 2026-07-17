@@ -208,4 +208,59 @@ describe('migración de esquema Dexie', () => {
     expect(await current.profile.count()).toBe(0);
     current.close();
   });
+
+  it('migra de v6 a v7 sin perder el perfil (regla de candidatas, Fase 4)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v6 = new Dexie(name);
+    v6.version(1).stores({ games: 'id, fecha' });
+    v6.version(2).stores({ games: 'id, fecha, fuente' });
+    v6.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    v6.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+    });
+    v6.version(5).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+    });
+    v6.version(6).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+    });
+    await v6.table('profile').add({ id: 'principal', bandaElo: 'intermedio', diagnosticoCompletadoEn: '2026-07-17T00:00:00.000Z' });
+    v6.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.profile.get('principal')).toMatchObject({ bandaElo: 'intermedio' });
+    expect(await current.candidataAttempts.count()).toBe(0);
+    current.close();
+  });
 });

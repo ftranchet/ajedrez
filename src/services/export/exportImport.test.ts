@@ -17,6 +17,7 @@ beforeEach(async () => {
   await db.radarAttempts.clear();
   await db.curriculumProgress.clear();
   await db.profile.clear();
+  await db.candidataAttempts.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -81,6 +82,7 @@ describe('exportAllData / importAllData', () => {
       updatedAt: new Date().toISOString(),
     });
     await db.profile.put({ id: 'principal', bandaElo: 'avanzado', diagnosticoCompletadoEn: new Date().toISOString() });
+    await db.candidataAttempts.put({ id: 'cand-1', itemId: 'radar-1', cambio: true, resultado: 'mejoro', fecha: new Date().toISOString() });
 
     const zip = await exportAllData();
     expect(zip.byteLength).toBeGreaterThan(0);
@@ -93,6 +95,7 @@ describe('exportAllData / importAllData', () => {
     await db.radarAttempts.clear();
     await db.curriculumProgress.clear();
     await db.profile.clear();
+    await db.candidataAttempts.clear();
     expect(await db.games.count()).toBe(0);
 
     const outcome = await importAllData(zip);
@@ -110,6 +113,7 @@ describe('exportAllData / importAllData', () => {
     expect((await db.radarAttempts.get('r1'))?.acierto).toBe(true);
     expect((await db.curriculumProgress.get('patron-mate-pasillo-1'))?.demostracionesLimpias).toBe(1);
     expect((await db.profile.get('principal'))?.bandaElo).toBe('avanzado');
+    expect((await db.candidataAttempts.get('cand-1'))?.resultado).toBe('mejoro');
   });
 
   it('rechaza un archivo que no es un zip de ELOmax', async () => {

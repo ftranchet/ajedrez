@@ -4,6 +4,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   CalibrationRecord,
+  CandidataAttempt,
   CurriculumDatasetMeta,
   CurriculumItem,
   CurriculumProgress,
@@ -18,7 +19,7 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -32,6 +33,7 @@ export class ElomaxDB extends Dexie {
   curriculumDatasetMeta!: Table<CurriculumDatasetMeta, string>;
   curriculumProgress!: Table<CurriculumProgress, string>;
   profile!: Table<Profile, string>;
+  candidataAttempts!: Table<CandidataAttempt, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -114,6 +116,23 @@ export class ElomaxDB extends Dexie {
       curriculumDatasetMeta: 'id',
       curriculumProgress: 'id, fsrs.due, updatedAt',
       profile: 'id',
+    });
+
+    // v7 — Fase 4 (E5): regla de candidatas (RF-5.8). Tabla nueva y chica;
+    // puramente aditiva.
+    this.version(7).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
     });
   }
 }

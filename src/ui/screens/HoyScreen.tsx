@@ -298,6 +298,19 @@ function RadarPanel() {
         <EvalPicker selected={s.radarEvalGuess} onSelect={(v) => s.radarEval(v)} />
       )}
       {s.radarSubPhase === 'jugando' && <p className="m-0 text-sm text-secondary">{t.radar.consignaJugada}</p>}
+      {s.radarSubPhase === 'candidata' && (
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-sm text-secondary">{t.radar.candidataPregunta}</p>
+          <div className="flex flex-col gap-2">
+            <button onClick={() => s.radarCandidataDecidir(true)} className="btn-secondary">
+              {t.radar.candidataSi}
+            </button>
+            <button onClick={() => s.radarCandidataDecidir(false)} className="btn-secondary">
+              {t.radar.candidataNo}
+            </button>
+          </div>
+        </div>
+      )}
       {s.radarSubPhase === 'confianza' && <ConfidenceSlider onConfirm={(v) => void s.radarConfirmarConfianza(v)} />}
       {s.radarSubPhase === 'feedback' && (
         <FeedbackPanel

@@ -48,6 +48,10 @@ describe('sessionStore — bloque Radar', () => {
   });
 
   it('un fallo en el Radar crea una ErrorCard con la jugada del usuario y el lado correcto', async () => {
+    // Forzar que no se muestree ni la regla de candidatas (RF-5.8) ni la
+    // confianza (RF-10.1), para llegar directo a feedback y poder verificar
+    // la ErrorCard sin depender del azar del muestreo.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
     let s = useSessionStore.getState();
     const item = s.radarItem!;
@@ -61,9 +65,6 @@ describe('sessionStore — bloque Radar', () => {
     const [from, destinos] = jugadaMala;
     const to = destinos.find((d) => from + d !== item.solucion[0]) ?? destinos[0];
 
-    // Forzar que no se muestree confianza, para llegar directo a feedback y
-    // poder verificar la ErrorCard sin depender del azar del muestreo.
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await s.radarUserMove(from as never, to as never);
     vi.restoreAllMocks();
 
@@ -84,6 +85,9 @@ describe('sessionStore — bloque Radar', () => {
   });
 
   it('con muestreo de confianza forzado, guarda el registro de calibración antes de crear la tarjeta', async () => {
+    // Candidatas (RF-5.8) apagada durante la carga del ítem, para no
+    // interponerse antes de llegar al paso de confianza que prueba este test.
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
     let s = useSessionStore.getState();
     const item = s.radarItem!;
@@ -92,7 +96,7 @@ describe('sessionStore — bloque Radar', () => {
     const [from, destinos] = s.dests.entries().next().value as [string, string[]];
     const to = destinos.find((d) => from + d !== item.solucion[0]) ?? destinos[0];
 
-    vi.spyOn(Math, 'random').mockReturnValue(0); // shouldSampleConfidence() → true
+    randomSpy.mockReturnValue(0); // shouldSampleConfidence() → true
     await s.radarUserMove(from as never, to as never);
     s = useSessionStore.getState();
     expect(s.radarSubPhase).toBe('confianza');
@@ -108,8 +112,9 @@ describe('sessionStore — bloque Radar', () => {
   });
 
   it('termina el bloque del Radar tras servir el tamaño de sesión configurado', async () => {
+    // Nunca muestrear candidatas (RF-5.8) ni confianza, avanzar rápido.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // nunca muestrear confianza, avanzar rápido
     let s = useSessionStore.getState();
     let guard = 0;
     while (s.phase === 'radar' && guard < 50) {
@@ -132,6 +137,8 @@ describe('sessionStore — bloque Radar', () => {
   });
 
   it('persiste la dificultad y los aciertos recientes para la sesión siguiente (RF-5.5)', async () => {
+    // Nunca muestrear candidatas (RF-5.8) ni confianza, para llegar directo a feedback.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
     const s = useSessionStore.getState();
     const ratingInicial = s.radarSelState.ratingCentro;
@@ -140,7 +147,6 @@ describe('sessionStore — bloque Radar', () => {
     s.radarEval('igual');
     const [from, destinos] = s.dests.entries().next().value as [string, string[]];
     const to = destinos.find((d) => from + d !== item.solucion[0]) ?? destinos[0];
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await s.radarUserMove(from as never, to as never);
     await s.radarContinuar();
     vi.restoreAllMocks();
@@ -156,8 +162,9 @@ describe('sessionStore — bloque Radar', () => {
   });
 
   it('persiste el ajuste de dificultad de la última posición de la sesión, no solo el de las anteriores', async () => {
+    // Nunca muestrear candidatas (RF-5.8) ni confianza.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // nunca muestrear confianza
     let s = useSessionStore.getState();
     // Historial de ratingCentro tras cada radarContinuar(), para detectar si
     // la última llamada (la que cierra la sesión) de verdad cambió algo:
