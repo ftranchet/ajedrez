@@ -1,12 +1,12 @@
-# PRD — FORGE: entrenador de ajedrez basado en evidencia
+# PRD — ELOmax: entrenador de ajedrez basado en evidencia
 
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.0 |
+| Versión | 0.2.1 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
-| Última actualización | 2026-07-16 |
+| Última actualización | 2026-07-17 |
 | Documentos hermanos | `CONTRIBUTING.md`, `roadmap.md`, `design-system.md`, `adr/`, `evidence/` |
 
 > **Cómo usar este documento.** Es la fuente de verdad de producto. Cada épica tiene requisitos numerados (RF = requisito funcional, RNF = no funcional) con criterios de aceptación. Al construirlo —sea una persona o un agente de IA—: implementar de a una épica, citando los números de requisito en los commits; las reglas de trabajo completas están en `CONTRIBUTING.md`. Si una decisión técnica contradice o excede lo escrito acá, se documenta en un ADR antes de codear. Este documento cambia por pull request y cada cambio se refleja en el changelog.
@@ -15,7 +15,7 @@
 
 ## 1. Visión
 
-FORGE es un entrenador personal de ajedrez, no una colección de minijuegos. Su función objetivo es **maximizar el Elo ganado por hora invertida** en usuarios adultos que quieren mejorar en serio. Se diferencia por tres apuestas: (1) **prescribe** la sesión en lugar de ofrecer un buffet de ejercicios; (2) cierra el ciclo completo *jugar → analizar → extraer errores → entrenar sobre ellos → volver a jugar*, que ninguna app cierra hoy; (3) **se mide a sí misma** con métricas independientes del instrumento de entrenamiento.
+ELOmax es un entrenador personal de ajedrez, no una colección de minijuegos. Su función objetivo es **maximizar el Elo ganado por hora invertida** en usuarios adultos que quieren mejorar en serio. Se diferencia por tres apuestas: (1) **prescribe** la sesión en lugar de ofrecer un buffet de ejercicios; (2) cierra el ciclo completo *jugar → analizar → extraer errores → entrenar sobre ellos → volver a jugar*, que ninguna app cierra hoy; (3) **se mide a sí misma** con métricas independientes del instrumento de entrenamiento.
 
 La justificación científica de cada decisión está en `docs/evidence/` (informe de investigación, tier list de ejercicios y documento de diseño). Este PRD no repite la evidencia: la referencia.
 
@@ -282,7 +282,7 @@ Regla de dependencias: `ui → core → (interfaces de) services`. `core` no imp
 
 **Convenciones:**
 - **ADRs**: se escriben ANTES de implementar cualquier decisión con costo de reversa alto (elección de librería estructural, formato de datos, dependencia externa, algoritmo del dominio). Son inmutables: para cambiar una decisión se escribe un ADR nuevo que declara al anterior "reemplazado". Formato en `adr/0000-plantilla.md`.
-- **Changelog**: formato Keep a Changelog, sección `[Sin publicar]` siempre abierta, versionado semántico 0.x.y durante el MVP (x = fase/épica completada, y = correcciones). Cada pull request toca el changelog.
+- **Changelog**: formato Keep a Changelog, sección `[Sin publicar]` siempre abierta, versionado semántico 0.x.y durante el MVP (x = fase del roadmap completada, y = correcciones y mejoras menores). Cada pull request toca el changelog.
 - **Commits**: convención `tipo(alcance): descripción` (feat/fix/docs/refactor/test/chore), referenciando requisitos (`feat(radar): RF-5.3 feedback en posiciones tranquilas`).
 - **Definición de "hecho"**: ver RNF-5.
 
@@ -311,7 +311,7 @@ Regla de dependencias: `ui → core → (interfaces de) services`. `core` no imp
 | Producción libre, nunca opción múltiple (RF-4.3) | Recuperación por producción > reconocimiento |
 | Análisis en dos fases (E3) | Consenso experto fuerte; preservar el pensamiento propio |
 | Maia como oponente/defensora (E1/E8) | Errores humano-plausibles (McIlroy-Young et al.) |
-| Métricas independientes del entrenamiento (E12) | Sobreajuste al instrumento; informe FORGE §medición |
+| Métricas independientes del entrenamiento (E12) | Sobreajuste al instrumento; informe de investigación §medición |
 | Banda de fallo 20–40% (RF-5.5) | Dificultad deseable (Bjork) |
 
 ## 13. Glosario

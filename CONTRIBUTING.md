@@ -3,7 +3,7 @@
 Este documento es la única fuente de verdad del proceso de trabajo. Aplica por igual a cualquier colaborador: una persona, un agente de IA, o una persona asistida por uno. Si algo acá contradice a una herramienta puntual, gana este documento.
 
 ## Qué es este proyecto
-FORGE: entrenador de ajedrez basado en evidencia. Aplicación web progresiva, local-first, en español, de código abierto bajo GPLv3. La fuente de verdad de producto es `docs/PRD.md`; las decisiones técnicas viven en `docs/adr/`; la justificación científica en `docs/evidence/`.
+ELOmax: entrenador de ajedrez basado en evidencia. Aplicación web progresiva, local-first, en español, de código abierto bajo GPLv3. La fuente de verdad de producto es `docs/PRD.md`; las decisiones técnicas viven en `docs/adr/`; la justificación científica en `docs/evidence/`.
 
 ## Contexto mínimo antes de trabajar
 Todo colaborador (humano o IA) carga antes de tocar código: (1) este documento, (2) la sección del PRD de la épica en curso, (3) los ADRs relacionados, (4) `docs/design-system.md` si el cambio toca interfaz.

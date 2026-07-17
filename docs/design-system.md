@@ -1,10 +1,10 @@
-# Design System — FORGE
+# Design System — ELOmax
 
 Documento vivo. Los tokens de esta página son la única fuente de estilos: se implementan en la configuración de Tailwind y ningún componente usa valores sueltos. Cambiar la estética = cambiar tokens acá, con entrada en el changelog.
 
 ## 1. Dirección estética: "Sala de estudio"
 
-FORGE no es un juguete ni un casino de puzzles: es el escritorio de un club de ajedrez de noche. Oscuro cálido, materiales nobles, tipografía con carácter, cero confeti. La estética comunica la promesa del producto: acá se viene a trabajar bien, no a farmear rachas.
+ELOmax no es un juguete ni un casino de puzzles: es el escritorio de un club de ajedrez de noche. Oscuro cálido, materiales nobles, tipografía con carácter, cero confeti. La estética comunica la promesa del producto: acá se viene a trabajar bien, no a farmear rachas.
 
 Principios visuales:
 1. **El tablero manda.** Es siempre el elemento de mayor jerarquía visual; nada compite en tamaño ni saturación.
