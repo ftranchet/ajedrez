@@ -29,8 +29,9 @@ Documento vivo. Sin fechas: cada fase tiene entregables y un **criterio de salid
 **Criterio de salida:** un usuario nuevo pasa por diagnóstico y recibe sesiones prescritas coherentes con su nivel sin tocar ningún menú. *Verificado end-to-end con Playwright: un perfil sin diagnosticar ve el diagnóstico antepuesto a Hoy sin navegar a ningún menú; completar las 2 partidas + 20 posiciones del Radar guarda una banda de Elo; "Tu sesión de hoy" queda compuesta por esa banda (RF-11.2) con el orden Cola → currículo → Radar y su porqué visible.*
 
 ## Fase 4 — Módulos avanzados
-**Entregables:** cálculo comprometido + Stoyko (E7); conversión de ventajas contra Maia (E8); triage de reloj (E9); doble solución y regla de candidatas (RF-5.7, 5.8); modificador a ciegas (RF-6.5).
-**Criterio de salida:** el Prescriptor incorpora los módulos nuevos a la dieta según fugas, y el subtipo doble solución registra la tasa de conformismo.
+**Estado:** 🟡 En progreso — triage de reloj (E9) completo e integrado al Prescriptor; el resto de los módulos no arrancó todavía.
+**Entregables:** cálculo comprometido + Stoyko (E7) ⬜️; conversión de ventajas contra Maia (E8) ⬜️ — **bloqueado por red**: depende de partidas contra Maia vía Lichess (RF-1.4), y `lichess.org` no es alcanzable desde este entorno (mismo límite documentado en Fase 2/3); triage de reloj (E9, RF-9.1/9.2/9.3) ✅ — perfil de gestión de tiempo a partir de las jugadas propias del usuario en partidas locales ya analizadas (mediana propia por partida, no un umbral fijo entre usuarios), con ejercicio "¿pide cálculo o alcanza?" que recicla los cinco tipos del Radar sin contenido nuevo; el Prescriptor agrega este bloque a la sesión cuando el perfil de tiempo supera el umbral de fuga — el ejemplo literal de RF-11.2 en el PRD; doble solución y regla de candidatas (RF-5.7, 5.8) ⬜️; modificador a ciegas (RF-6.5) ⬜️.
+**Criterio de salida:** el Prescriptor incorpora los módulos nuevos a la dieta según fugas ✅ (triage de reloj, verificado end-to-end con Playwright), y el subtipo doble solución registra la tasa de conformismo ⬜️ — pendiente, no cumplido todavía.
 
 ## Fase 5 — Medición completa
 **Entregables:** batería de transferencia (RF-12.2); detector de sobreajuste (RF-12.3); panel de calibración con lectura en lenguaje claro (RF-10.3); modo experimento n=1 (RF-12.4); adherencia honesta (E13).
