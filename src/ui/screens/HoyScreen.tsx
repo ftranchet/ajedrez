@@ -71,6 +71,18 @@ function Fin() {
 function SesionActiva() {
   const s = useSessionStore();
   const enCola = s.phase === 'cola';
+  const enCurriculo = s.phase === 'curriculo';
+  const jugando = enCola
+    ? s.colaSubPhase === 'jugando'
+    : enCurriculo
+      ? s.curriculumSubPhase === 'jugando'
+      : s.radarSubPhase === 'jugando';
+
+  function onMove(from: string, to: string) {
+    if (enCola) void s.colaUserMove(from as Square, to as Square);
+    else if (enCurriculo) void s.curriculumUserMove(from as Square, to as Square);
+    else void s.radarUserMove(from as Square, to as Square);
+  }
 
   return (
     <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
@@ -82,17 +94,13 @@ function SesionActiva() {
           lastMove={s.lastMove}
           check={s.check}
           dests={s.dests}
-          movableColor={
-            (enCola && s.colaSubPhase === 'jugando') || (!enCola && s.radarSubPhase === 'jugando') ? s.turn : null
-          }
-          onMove={(from, to) =>
-            enCola ? void s.colaUserMove(from as Square, to as Square) : void s.radarUserMove(from as Square, to as Square)
-          }
+          movableColor={jugando ? s.turn : null}
+          onMove={onMove}
         />
       </div>
 
       <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
-        {enCola ? <ColaPanel /> : <RadarPanel />}
+        {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : <RadarPanel />}
       </aside>
     </div>
   );
@@ -118,6 +126,33 @@ function ColaPanel() {
           texto={s.colaUltimoAcierto ? '' : `${t.radar.jugadaCorrecta}: ${s.colaJugadaCorrecta}`}
           jugadaCorrecta={s.colaJugadaCorrecta ?? ''}
           onContinuar={() => s.colaContinuar()}
+        />
+      )}
+    </div>
+  );
+}
+
+function CurriculumPanel() {
+  const s = useSessionStore();
+  const total = s.curriculumQueue.length;
+  const actual = Math.min(s.curriculumIndex + 1, total);
+  const item = s.curriculumQueue[s.curriculumIndex];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-subtle bg-surface p-4">
+        <p className="m-0 font-mono text-xs text-tertiary">
+          {t.curriculo.progreso.replace('{actual}', String(actual)).replace('{total}', String(total))}
+        </p>
+        <p className="m-0 mt-1 font-display text-xl">{item?.nombre ?? t.curriculo.titulo}</p>
+      </div>
+      {s.curriculumSubPhase === 'jugando' && <p className="m-0 text-sm text-secondary">{t.curriculo.consigna}</p>}
+      {s.curriculumSubPhase === 'feedback' && (
+        <FeedbackPanel
+          acierto={s.curriculumUltimaLimpia ?? false}
+          texto={s.curriculumUltimaLimpia ? '' : `${t.radar.jugadaCorrecta}: ${s.curriculumJugadaCorrecta}`}
+          jugadaCorrecta={s.curriculumJugadaCorrecta ?? ''}
+          onContinuar={() => s.curriculumContinuar()}
         />
       )}
     </div>

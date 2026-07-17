@@ -116,4 +116,45 @@ describe('migración de esquema Dexie', () => {
     expect(await current.radarAttempts.count()).toBe(0);
     current.close();
   });
+
+  it('migra de v4 a v5 sin perder partidas ni tarjetas (currículo base, Fase 3)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v4 = new Dexie(name);
+    v4.version(1).stores({ games: 'id, fecha' });
+    v4.version(2).stores({ games: 'id, fecha, fuente' });
+    v4.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    v4.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+    });
+    await v4.table('games').add({
+      id: 'g4',
+      pgn: '1. Nf3 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-17T00:00:00.000Z',
+    });
+    v4.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g4')).toMatchObject({ id: 'g4', pgn: '1. Nf3 *' });
+    expect(await current.curriculumItems.count()).toBe(0);
+    expect(await current.curriculumDatasetMeta.count()).toBe(0);
+    expect(await current.curriculumProgress.count()).toBe(0);
+    current.close();
+  });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildExportBundle, validateImportBundle } from './exportData';
 import { SCHEMA_VERSION } from '../services/storage/db';
 
-const empty = { games: [], errorCards: [], calibrationRecords: [], radarProgress: [], radarAttempts: [] };
+const empty = { games: [], errorCards: [], calibrationRecords: [], radarProgress: [], radarAttempts: [], curriculumProgress: [] };
 
 describe('buildExportBundle', () => {
   it('incluye la versión de esquema actual y la fecha de exportación', () => {
@@ -49,5 +49,16 @@ describe('validateImportBundle', () => {
       games: [],
     });
     expect(result.ok).toBe(false);
+  });
+
+  it('acepta un respaldo de antes de Fase 3, sin progreso del currículo', () => {
+    const result = validateImportBundle({
+      manifest: { esquema: SCHEMA_VERSION, exportadoEn: '2026-07-17T00:00:00.000Z', app: 'elomax' },
+      games: [],
+      errorCards: [],
+      calibrationRecords: [],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.bundle.curriculumProgress).toEqual([]);
   });
 });

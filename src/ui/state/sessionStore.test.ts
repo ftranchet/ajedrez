@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RADAR_SESSION_SIZE, useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedRadarItems } from '../../services/puzzles/seedData';
+import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
+import { newCurriculumProgress } from '../../core/curriculum';
 import { buildErrorCard } from '../../core/errorCard';
 
 beforeEach(async () => {
@@ -17,6 +19,16 @@ beforeEach(async () => {
   await db.radarProgress.clear();
   await db.radarDatasetMeta.clear();
   await db.radarAttempts.clear();
+  await db.curriculumItems.clear();
+  await db.curriculumDatasetMeta.clear();
+  await db.curriculumProgress.clear();
+  // Este archivo prueba Cola y Radar; el bloque de currículo (Fase 3) tiene
+  // sus propios tests en sessionStore.curriculum.test.ts. Marcarlo
+  // "automatizado" de entrada mantiene estos tests enfocados en lo que ya
+  // probaban, sin que el nuevo bloque intermedio los rompa.
+  await db.curriculumProgress.bulkPut(
+    seedCurriculumItems.map((item) => ({ ...newCurriculumProgress(item.id), demostracionesLimpias: 3 })),
+  );
 });
 
 describe('sessionStore — bloque Radar', () => {

@@ -157,6 +157,67 @@ export interface RadarDatasetMeta {
   seededAt: string; // ISO 8601
 }
 
+/** Tipo de contenido del currículo base (E6). */
+export type CurriculumTipo = 'patron' | 'final';
+
+/**
+ * Patrón o final concreto dentro de su tipo. Determina cómo se interleava
+ * (RF-6.1: "el sistema nunca sirve bloques monotemáticos") y, para finales,
+ * qué técnica se está demostrando.
+ */
+export type PatternKey =
+  | 'mate-pasillo'
+  | 'mate-escalera'
+  | 'mate-dama-rey'
+  | 'mate-coz'
+  | 'clavada'
+  | 'horquilla'
+  | 'descubierta'
+  | 'rayos-x'
+  | 'final-rey-peon'
+  | 'final-lucena'
+  | 'final-philidor'
+  | 'final-cuadrado';
+
+/**
+ * Elemento del catálogo del currículo base (E6): un patrón táctico/mate para
+ * resolver en el tablero (RF-6.1) o un final elemental para jugar contra el
+ * motor hasta demostrar la técnica (RF-6.2). Es catálogo reseedable, no dato
+ * personal — el progreso vive aparte en `CurriculumProgress`.
+ */
+export interface CurriculumItem {
+  id: string;
+  tipo: CurriculumTipo;
+  patternKey: PatternKey;
+  nombre: string;
+  fen: string;
+  /** Jugadas UCI que resuelven el ejercicio, recuperación activa (RF-6.1). Vacío en finales. */
+  solucion: string[];
+  /** Solo en finales: qué debe forzar el usuario jugando el lado indicado por `fen` (RF-6.2). */
+  resultadoEsperado?: 'gana' | 'tablas';
+}
+
+/** Versión del catálogo de currículo embebido (mismo patrón que `RadarDatasetMeta`). */
+export interface CurriculumDatasetMeta {
+  id: 'catalogo';
+  version: string;
+  seededAt: string; // ISO 8601
+}
+
+/**
+ * Progreso del usuario en un `CurriculumItem` (RF-6.3): estado FSRS propio
+ * más el contador de demostraciones limpias consecutivas que determina la
+ * automatización (3 demostraciones espaciadas sin error). Es dato personal,
+ * separado del catálogo para que una actualización de contenido no pise el
+ * progreso ya hecho.
+ */
+export interface CurriculumProgress {
+  id: string; // = CurriculumItem.id
+  fsrs: FsrsState;
+  demostracionesLimpias: number;
+  updatedAt: string; // ISO 8601
+}
+
 /** Contexto en el que se pidió una confianza declarada (RF-10.1). */
 export type ContextoCalibracion = 'radar' | 'analisis' | 'stoyko';
 

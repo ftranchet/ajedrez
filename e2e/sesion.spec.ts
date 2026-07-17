@@ -8,6 +8,7 @@
 // lógica misma.
 import { expect, test, type Page } from '@playwright/test';
 import { RADAR_DATASET_VERSION } from '../src/services/puzzles/seedData';
+import { seedCurriculumItems } from '../src/services/puzzles/curriculumSeedData';
 
 const radarFixture = {
   id: 'e2e-radar-envenenada',
@@ -39,6 +40,44 @@ async function seedRadarFixture(page: Page) {
   );
 }
 
+// Este archivo prueba Radar y Cola; el bloque de currículo (Fase 3) tiene su
+// propio spec (curriculo.spec.ts). Marcarlo "automatizado" de entrada evita
+// que el nuevo bloque intermedio (RF-11.2: Cola → currículo → Radar) se
+// interponga en specs que no lo están probando.
+async function seedCurriculumAutomatizado(page: Page) {
+  await page.evaluate((ids: string[]) => {
+    return new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('elomax');
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('curriculumProgress', 'readwrite');
+        for (const id of ids) {
+          tx.objectStore('curriculumProgress').put({
+            id,
+            fsrs: {
+              due: '2026-01-01T00:00:00.000Z',
+              stability: 5,
+              difficulty: 5,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 3,
+              lapses: 0,
+              learningSteps: 0,
+              state: 'review',
+              lastReview: '2026-01-01T00:00:00.000Z',
+            },
+            demostracionesLimpias: 3,
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          });
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }, seedCurriculumItems.map((item) => item.id));
+}
+
 // El tablero se orienta según quién mueve (RF-5.2, convención tipo Lichess:
 // la posición se ve siempre desde la perspectiva de quien tiene que jugar).
 // chessground no pone listeners en cada <piece> (tienen pointer-events
@@ -65,6 +104,7 @@ test.describe('sesión simple: Radar', () => {
     await page.goto('./');
     await page.getByText('Tu sesión de hoy').waitFor();
     await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
     await page.getByRole('button', { name: 'Empezar sesión' }).click();
 
     const board = page.locator('cg-board');
@@ -143,6 +183,7 @@ test.describe('sesión simple: Cola', () => {
         req.onerror = () => reject(req.error);
       });
     });
+    await seedCurriculumAutomatizado(page);
     await page.reload();
     await page.getByText('Tenés 1 repaso vencido.').waitFor();
 

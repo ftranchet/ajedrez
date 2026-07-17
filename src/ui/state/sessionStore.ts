@@ -4,7 +4,7 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, ErrorCard, RadarItem, RadarProgress } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, RadarItem, RadarProgress } from '../../core/types';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
@@ -15,6 +15,7 @@ import {
   selectNextRadarItem,
   type RadarSelectionState,
 } from '../../core/radar';
+import { dueCurriculumItems, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
@@ -22,6 +23,8 @@ import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
 import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/radarProgressRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
+import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
+import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { computeDests } from './chessBoardUtils';
 
 /** Cuántas posiciones sirve el bloque del Radar por sesión. Placeholder de
@@ -32,8 +35,9 @@ export const RADAR_SESSION_SIZE = 8;
 const VENTANA_TASA_ACIERTO = 8;
 
 export type EvalGuess = 'blancas' | 'igual' | 'negras';
-type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'radar' | 'fin';
+type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'curriculo' | 'radar' | 'fin';
 type ColaSubPhase = 'jugando' | 'feedback';
+type CurriculumSubPhase = 'jugando' | 'feedback';
 type RadarSubPhase = 'evaluando' | 'jugando' | 'confianza' | 'feedback';
 
 interface SessionState {
@@ -47,6 +51,15 @@ interface SessionState {
   colaSubPhase: ColaSubPhase;
   colaUltimoAcierto: boolean | null;
   colaJugadaCorrecta: string | null;
+
+  // Currículo (E6): patrones tácticos vencidos, entre la Cola y el Radar (RF-11.2).
+  curriculumItemsAll: CurriculumItem[];
+  curriculumQueue: CurriculumItem[];
+  curriculumIndex: number;
+  curriculumProgressById: Map<string, CurriculumProgress>;
+  curriculumSubPhase: CurriculumSubPhase;
+  curriculumUltimaLimpia: boolean | null;
+  curriculumJugadaCorrecta: string | null;
 
   // Radar (E5)
   radarPool: RadarItem[];
@@ -75,6 +88,9 @@ interface SessionState {
 
   colaUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
   colaContinuar(): void;
+
+  curriculumUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
+  curriculumContinuar(): void;
 
   radarEval(guess: EvalGuess): void;
   radarUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
@@ -141,8 +157,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   function loadColaCard(card: ErrorCard | null) {
     if (!card) {
-      // Cola terminada: pasar al Radar.
-      void beginRadar();
+      // Cola terminada: pasar al currículo (RF-11.2: repasos vencidos primero).
+      void beginCurriculum();
       return;
     }
     chess = new Chess(card.fen);
@@ -153,6 +169,39 @@ export const useSessionStore = create<SessionState>((set, get) => {
       ...boardSnapshot(),
       lastMove: null,
     });
+  }
+
+  function loadCurriculumItem(item: CurriculumItem | null) {
+    if (!item) {
+      // Currículo del día terminado (o sin elementos vencidos): pasar al Radar.
+      void beginRadar();
+      return;
+    }
+    chess = new Chess(item.fen);
+    set({
+      curriculumSubPhase: 'jugando',
+      curriculumUltimaLimpia: null,
+      curriculumJugadaCorrecta: null,
+      ...boardSnapshot(),
+      lastMove: null,
+    });
+  }
+
+  // El cambio de fase es sincrónico a propósito (como el arranque de
+  // `beginRadar`): el catálogo y el progreso ya están en memoria desde
+  // `start()`, así que `set({ phase: 'curriculo', ... })` corre antes de
+  // cualquier `await`. Cuando no hay elementos vencidos devuelve la promesa
+  // de `beginRadar()` en vez de dispararla sin esperar, para que `start()`
+  // pueda esperar la cadena completa (si no, `start()` resolvía antes de que
+  // `loadRadarItem` corriera y `radarItem` quedaba null un instante).
+  function beginCurriculum(): Promise<void> | void {
+    const s = get();
+    const queue = interleaveByPattern(dueCurriculumItems(s.curriculumItemsAll, s.curriculumProgressById));
+    if (queue.length === 0) {
+      return beginRadar();
+    }
+    set({ phase: 'curriculo', curriculumQueue: queue, curriculumIndex: 0 });
+    loadCurriculumItem(queue[0]);
   }
 
   async function beginRadar() {
@@ -173,6 +222,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
     colaSubPhase: 'jugando',
     colaUltimoAcierto: null,
     colaJugadaCorrecta: null,
+
+    curriculumItemsAll: [],
+    curriculumQueue: [],
+    curriculumIndex: 0,
+    curriculumProgressById: new Map(),
+    curriculumSubPhase: 'jugando',
+    curriculumUltimaLimpia: null,
+    curriculumJugadaCorrecta: null,
 
     radarPool: [],
     radarSelState: RADAR_INITIAL_STATE,
@@ -200,8 +257,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     async start() {
       set({ phase: 'cargando' });
-      await radarItemRepo.ensureSeeded();
-      const [allCards, pool, progress] = await Promise.all([errorCardRepo.list(), radarItemRepo.list(), radarProgressRepo.get()]);
+      await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
+      const [allCards, pool, progress, curriculumItems, curriculumProgressList] = await Promise.all([
+        errorCardRepo.list(),
+        radarItemRepo.list(),
+        radarProgressRepo.get(),
+        curriculumItemRepo.list(),
+        curriculumProgressRepo.list(),
+      ]);
       const due = dueErrorCards(allCards);
       set({
         radarPool: pool,
@@ -211,12 +274,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
         radarSelState: selectionFromProgress(progress),
         radarAciertosRecientes: progress?.aciertosRecientes ?? [],
         radarServidos: 0,
+        curriculumItemsAll: curriculumItems,
+        curriculumProgressById: new Map(curriculumProgressList.map((p) => [p.id, p] as const)),
       });
       if (due.length > 0) {
         set({ phase: 'cola' });
         loadColaCard(due[0]);
       } else {
-        await beginRadar();
+        await beginCurriculum();
       }
     },
 
@@ -230,6 +295,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
         dueCount: null,
         colaCards: [],
         colaIndex: 0,
+        curriculumQueue: [],
+        curriculumIndex: 0,
+        curriculumProgressById: new Map(),
         radarItem: null,
         radarServidos: 0,
         radarAciertosRecientes: [],
@@ -270,6 +338,42 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const nextIndex = s.colaIndex + 1;
       set({ colaIndex: nextIndex });
       loadColaCard(s.colaCards[nextIndex] ?? null);
+    },
+
+    async curriculumUserMove(from, to, promotion) {
+      const s = get();
+      if (s.phase !== 'curriculo' || s.curriculumSubPhase !== 'jugando') return;
+      const candidate = chess.moves({ verbose: true }).find((m) => m.from === from && m.to === to);
+      if (!candidate) {
+        set(boardSnapshot());
+        return;
+      }
+      const jugadaUsuario = from + to + (promotion ?? '');
+      const item = s.curriculumQueue[s.curriculumIndex];
+      const limpia = jugadaUsuario === item.solucion[0];
+      chess.move({ from, to, promotion });
+
+      const progresoPrevio = s.curriculumProgressById.get(item.id) ?? newCurriculumProgress(item.id);
+      const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia);
+      await curriculumProgressRepo.save(progresoNuevo);
+      const nuevoMapa = new Map(s.curriculumProgressById);
+      nuevoMapa.set(item.id, progresoNuevo);
+
+      set({
+        curriculumProgressById: nuevoMapa,
+        curriculumSubPhase: 'feedback',
+        curriculumUltimaLimpia: limpia,
+        curriculumJugadaCorrecta: item.solucion[0],
+        ...boardSnapshot(),
+        lastMove: [from, to],
+      });
+    },
+
+    curriculumContinuar() {
+      const s = get();
+      const nextIndex = s.curriculumIndex + 1;
+      set({ curriculumIndex: nextIndex });
+      loadCurriculumItem(s.curriculumQueue[nextIndex] ?? null);
     },
 
     radarEval(guess) {

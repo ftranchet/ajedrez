@@ -29,6 +29,11 @@ export const es = {
     progreso: 'Repaso {actual} de {total}',
     consigna: 'Jugá la respuesta correcta en el tablero.',
   },
+  curriculo: {
+    titulo: 'Currículo',
+    progreso: 'Patrón {actual} de {total}',
+    consigna: 'Resolvé el patrón en el tablero.',
+  },
   radar: {
     titulo: 'El Radar',
     progreso: 'Posición {actual} de {total}',
