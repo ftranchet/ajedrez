@@ -157,4 +157,55 @@ describe('migración de esquema Dexie', () => {
     expect(await current.curriculumProgress.count()).toBe(0);
     current.close();
   });
+
+  it('migra de v5 a v6 sin perder partidas (perfil del Prescriptor, Fase 3)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v5 = new Dexie(name);
+    v5.version(1).stores({ games: 'id, fecha' });
+    v5.version(2).stores({ games: 'id, fecha, fuente' });
+    v5.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    v5.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+    });
+    v5.version(5).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+    });
+    await v5.table('games').add({
+      id: 'g5',
+      pgn: '1. c4 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-17T00:00:00.000Z',
+    });
+    v5.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g5')).toMatchObject({ id: 'g5', pgn: '1. c4 *' });
+    expect(await current.profile.count()).toBe(0);
+    current.close();
+  });
 });

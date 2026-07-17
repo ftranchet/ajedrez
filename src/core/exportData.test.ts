@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { buildExportBundle, validateImportBundle } from './exportData';
+import { DEFAULT_PROFILE } from './prescriptor';
 import { SCHEMA_VERSION } from '../services/storage/db';
 
-const empty = { games: [], errorCards: [], calibrationRecords: [], radarProgress: [], radarAttempts: [], curriculumProgress: [] };
+const empty = {
+  games: [],
+  errorCards: [],
+  calibrationRecords: [],
+  radarProgress: [],
+  radarAttempts: [],
+  curriculumProgress: [],
+  profile: DEFAULT_PROFILE,
+};
 
 describe('buildExportBundle', () => {
   it('incluye la versión de esquema actual y la fecha de exportación', () => {
@@ -51,7 +60,7 @@ describe('validateImportBundle', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('acepta un respaldo de antes de Fase 3, sin progreso del currículo', () => {
+  it('acepta un respaldo de antes de Fase 3, sin progreso del currículo ni perfil', () => {
     const result = validateImportBundle({
       manifest: { esquema: SCHEMA_VERSION, exportadoEn: '2026-07-17T00:00:00.000Z', app: 'elomax' },
       games: [],
@@ -59,6 +68,9 @@ describe('validateImportBundle', () => {
       calibrationRecords: [],
     });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.bundle.curriculumProgress).toEqual([]);
+    if (result.ok) {
+      expect(result.bundle.curriculumProgress).toEqual([]);
+      expect(result.bundle.profile).toEqual(DEFAULT_PROFILE);
+    }
   });
 });

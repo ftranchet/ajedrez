@@ -1,10 +1,11 @@
-// Sesión simple de Fase 1 (roadmap): Cola vencida primero, después el
-// Radar (RF-4.4, RF-11.2 simplificado — el Prescriptor completo llega en
-// Fase 3). Orquesta E4 (Cola Universal + FSRS), E5 (Radar) y E10
+// Sesión del día (RF-4.4, RF-11.1/11.2): Cola vencida → currículo vencido →
+// Radar, con la dieta del Radar y el tope del currículo compuestos por el
+// Prescriptor (E11) según la banda de Elo del perfil y el ajuste por fugas.
+// Orquesta E4 (Cola Universal + FSRS), E6 (currículo), E5 (Radar) y E10
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, RadarItem, RadarProgress } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, Profile, RadarItem, RadarProgress } from '../../core/types';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
@@ -16,6 +17,7 @@ import {
   type RadarSelectionState,
 } from '../../core/radar';
 import { dueCurriculumItems, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
+import { DEFAULT_PROFILE, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
@@ -25,12 +27,9 @@ import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/rad
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
+import { profileRepo } from '../../services/storage/profileRepo';
 import { computeDests } from './chessBoardUtils';
 
-/** Cuántas posiciones sirve el bloque del Radar por sesión. Placeholder de
- * Fase 1: sin Prescriptor todavía no hay composición por duración real
- * (Fase 3, RF-11.2); un conteo fijo aproxima la sesión mínima de 15 min. */
-export const RADAR_SESSION_SIZE = 8;
 /** Ventana para la tasa de acierto reciente que ajusta la dificultad (RF-5.5). */
 const VENTANA_TASA_ACIERTO = 8;
 
@@ -44,6 +43,12 @@ interface SessionState {
   phase: Phase;
   /** Repasos vencidos, para mostrar en Hoy antes de arrancar. null = sin cargar todavía. */
   dueCount: number | null;
+  /** Patrones del currículo vencidos hoy, antes de topar por la dieta. Para el resumen de "Tu sesión de hoy" (RF-11.1). */
+  curriculumDueCount: number | null;
+
+  // Prescriptor (E11): perfil y dieta de la sesión en curso (RF-11.2).
+  profile: Profile;
+  dieta: DietaSesion;
 
   // Cola (E4)
   colaCards: ErrorCard[];
@@ -196,7 +201,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
   // `loadRadarItem` corriera y `radarItem` quedaba null un instante).
   function beginCurriculum(): Promise<void> | void {
     const s = get();
-    const queue = interleaveByPattern(dueCurriculumItems(s.curriculumItemsAll, s.curriculumProgressById));
+    const due = interleaveByPattern(dueCurriculumItems(s.curriculumItemsAll, s.curriculumProgressById));
+    // Interlevar y recién ahí topar preserva la mezcla de patrones dentro
+    // del cupo de la dieta (RF-6.1), en vez de topar antes y arriesgar un
+    // cupo monotemático.
+    const queue = due.slice(0, s.dieta.curriculumMax);
     if (queue.length === 0) {
       return beginRadar();
     }
@@ -217,6 +226,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
   return {
     phase: 'sinEmpezar',
     dueCount: null,
+    curriculumDueCount: null,
+    profile: DEFAULT_PROFILE,
+    dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
     colaCards: [],
     colaIndex: 0,
     colaSubPhase: 'jugando',
@@ -251,22 +263,37 @@ export const useSessionStore = create<SessionState>((set, get) => {
     check: false,
 
     async loadSummary() {
-      const allCards = await errorCardRepo.list();
-      set({ dueCount: dueErrorCards(allCards).length });
+      await curriculumItemRepo.ensureSeeded();
+      const [allCards, curriculumItems, curriculumProgressList, profile] = await Promise.all([
+        errorCardRepo.list(),
+        curriculumItemRepo.list(),
+        curriculumProgressRepo.list(),
+        profileRepo.get(),
+      ]);
+      const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
+      set({
+        dueCount: dueErrorCards(allCards).length,
+        curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).length,
+        profile,
+        dieta: dietaPorBanda(profile.bandaElo, allCards),
+      });
     },
 
     async start() {
       set({ phase: 'cargando' });
       await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
-      const [allCards, pool, progress, curriculumItems, curriculumProgressList] = await Promise.all([
+      const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile] = await Promise.all([
         errorCardRepo.list(),
         radarItemRepo.list(),
         radarProgressRepo.get(),
         curriculumItemRepo.list(),
         curriculumProgressRepo.list(),
+        profileRepo.get(),
       ]);
       const due = dueErrorCards(allCards);
       set({
+        profile,
+        dieta: dietaPorBanda(profile.bandaElo, allCards),
         radarPool: pool,
         colaCards: due,
         colaIndex: 0,
@@ -293,6 +320,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         // la Cola durante la sesión puede haber creado tarjetas vencidas de
         // inmediato, y el contador viejo quedaría desactualizado.
         dueCount: null,
+        curriculumDueCount: null,
         colaCards: [],
         colaIndex: 0,
         curriculumQueue: [],
@@ -427,7 +455,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const s = get();
       const selState = adjustDifficulty(s.radarSelState, s.radarUltimoAcierto ?? false, tasaAciertoReciente(s.radarAciertosRecientes));
       const servidos = s.radarServidos;
-      if (servidos >= RADAR_SESSION_SIZE) {
+      if (servidos >= s.dieta.radarCount) {
         // El ajuste de dificultad de esta última respuesta también se
         // persiste, aunque la sesión termine acá: si no, la banda 60–80%
         // (RF-5.5) pierde el incremento de la última posición de cada sesión.

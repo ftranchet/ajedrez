@@ -1,0 +1,10 @@
+{
+  "version": "prescriptor-dieta-v1",
+  "bandas": {
+    "principiante": { "curriculumMax": 6, "radarCount": 6 },
+    "elemental": { "curriculumMax": 5, "radarCount": 8 },
+    "intermedio": { "curriculumMax": 4, "radarCount": 8 },
+    "avanzado": { "curriculumMax": 3, "radarCount": 10 },
+    "experto": { "curriculumMax": 2, "radarCount": 10 }
+  }
+}

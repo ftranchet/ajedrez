@@ -1,8 +1,9 @@
 // Exportación e importación de datos (E14): lógica pura de armado y
 // validación del paquete. La mecánica de archivo (.zip) vive en
 // services/export — acá no hay File, Blob ni fetch (CONTRIBUTING regla 4).
-import type { CalibrationRecord, CurriculumProgress, ErrorCard, GameRecord, RadarAttempt, RadarProgress } from './types';
+import type { CalibrationRecord, CurriculumProgress, ErrorCard, GameRecord, Profile, RadarAttempt, RadarProgress } from './types';
 import { SCHEMA_VERSION } from '../services/storage/db';
+import { DEFAULT_PROFILE } from './prescriptor';
 
 export interface ExportManifest {
   esquema: number;
@@ -18,6 +19,7 @@ export interface ExportBundle {
   radarProgress: RadarProgress[];
   radarAttempts: RadarAttempt[];
   curriculumProgress: CurriculumProgress[];
+  profile: Profile;
 }
 
 export interface ExportSourceData {
@@ -27,6 +29,7 @@ export interface ExportSourceData {
   radarProgress: RadarProgress[];
   radarAttempts: RadarAttempt[];
   curriculumProgress: CurriculumProgress[];
+  profile: Profile;
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -39,6 +42,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     radarProgress: data.radarProgress,
     radarAttempts: data.radarAttempts,
     curriculumProgress: data.curriculumProgress,
+    profile: data.profile,
   };
 }
 
@@ -76,6 +80,11 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.curriculumProgress !== undefined && !Array.isArray(obj.curriculumProgress)) {
     return { ok: false, error: 'El progreso del currículo no tiene la forma esperada.' };
   }
+  // Ni perfil (E11): restaurarlos arranca con la banda por defecto, sin
+  // diagnosticar, en vez de rechazar un respaldo válido.
+  if (obj.profile !== undefined && (typeof obj.profile !== 'object' || obj.profile === null)) {
+    return { ok: false, error: 'El perfil no tiene la forma esperada.' };
+  }
   return {
     ok: true,
     bundle: {
@@ -86,6 +95,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       radarProgress: (obj.radarProgress ?? []) as RadarProgress[],
       radarAttempts: (obj.radarAttempts ?? []) as RadarAttempt[],
       curriculumProgress: (obj.curriculumProgress ?? []) as CurriculumProgress[],
+      profile: (obj.profile ?? DEFAULT_PROFILE) as Profile,
     },
   };
 }

@@ -11,8 +11,12 @@
 // aparece primero.
 import { test, type Page } from '@playwright/test';
 import { seedCurriculumItems } from '../src/services/puzzles/curriculumSeedData';
+import { DEFAULT_PROFILE, dietaPorBanda } from '../src/core/prescriptor';
 
 const SOLUCION_POR_NOMBRE = new Map(seedCurriculumItems.map((item) => [item.nombre, item.solucion[0]]));
+// El Prescriptor topa cuántos patrones sirve por sesión según la banda de
+// Elo del perfil (RF-11.2); sin diagnóstico todavía, es la banda por defecto.
+const CURRICULUM_MAX = dietaPorBanda(DEFAULT_PROFILE.bandaElo, []).curriculumMax;
 
 async function clickSquare(page: Page, board: ReturnType<Page['locator']>, file: string, rank: number) {
   const flipped = (await page.locator('.cg-wrap').first().getAttribute('class'))?.includes('orientation-black') ?? false;
@@ -29,7 +33,7 @@ test('currículo: sin repasos vencidos, la sesión sirve un patrón antes que el
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.getByRole('button', { name: 'Empezar sesión' }).click();
 
-  await page.getByText('Patrón 1 de 8').waitFor({ timeout: 15_000 });
+  await page.getByText(`Patrón 1 de ${CURRICULUM_MAX}`).waitFor({ timeout: 15_000 });
   const nombre = await page.locator('aside .font-display.text-xl').first().innerText();
   const solucion = SOLUCION_POR_NOMBRE.get(nombre);
   if (!solucion) throw new Error(`Patrón mostrado sin solución conocida en el seed: "${nombre}"`);
@@ -44,5 +48,5 @@ test('currículo: sin repasos vencidos, la sesión sirve un patrón antes que el
   await page.getByRole('button', { name: 'Siguiente' }).click();
 
   // Sigue con el segundo patrón (interleaving: nunca repite el mismo).
-  await page.getByText('Patrón 2 de 8').waitFor({ timeout: 10_000 });
+  await page.getByText(`Patrón 2 de ${CURRICULUM_MAX}`).waitFor({ timeout: 10_000 });
 });

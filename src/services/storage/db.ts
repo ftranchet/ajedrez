@@ -9,6 +9,7 @@ import type {
   CurriculumProgress,
   ErrorCard,
   GameRecord,
+  Profile,
   RadarAttempt,
   RadarDatasetMeta,
   RadarItem,
@@ -17,7 +18,7 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -30,6 +31,7 @@ export class ElomaxDB extends Dexie {
   curriculumItems!: Table<CurriculumItem, string>;
   curriculumDatasetMeta!: Table<CurriculumDatasetMeta, string>;
   curriculumProgress!: Table<CurriculumProgress, string>;
+  profile!: Table<Profile, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -95,6 +97,23 @@ export class ElomaxDB extends Dexie {
       curriculumItems: 'id, tipo, patternKey',
       curriculumDatasetMeta: 'id',
       curriculumProgress: 'id, fsrs.due, updatedAt',
+    });
+
+    // v6 — Fase 3 (E11): perfil del usuario (banda de Elo del diagnóstico
+    // inicial, RF-11.4), que el Prescriptor usa para la dieta base por banda
+    // (RF-11.2). Tabla nueva y chica; puramente aditiva.
+    this.version(6).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
     });
   }
 }

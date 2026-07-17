@@ -4,12 +4,18 @@
 // tomado del turno equivocado al crear una tarjeta desde un fallo del Radar.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RADAR_SESSION_SIZE, useSessionStore } from './sessionStore';
+import { useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedRadarItems } from '../../services/puzzles/seedData';
 import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
 import { newCurriculumProgress } from '../../core/curriculum';
+import { dietaPorBanda } from '../../core/prescriptor';
+import { DEFAULT_PROFILE } from '../../services/storage/profileRepo';
 import { buildErrorCard } from '../../core/errorCard';
+
+// Perfil por defecto (sin diagnóstico): fija cuántas posiciones sirve el
+// Radar por sesión para que estos tests no dependan del Prescriptor.
+const RADAR_SESSION_SIZE = dietaPorBanda(DEFAULT_PROFILE.bandaElo, []).radarCount;
 
 beforeEach(async () => {
   await db.games.clear();
@@ -22,6 +28,7 @@ beforeEach(async () => {
   await db.curriculumItems.clear();
   await db.curriculumDatasetMeta.clear();
   await db.curriculumProgress.clear();
+  await db.profile.clear();
   // Este archivo prueba Cola y Radar; el bloque de currículo (Fase 3) tiene
   // sus propios tests en sessionStore.curriculum.test.ts. Marcarlo
   // "automatizado" de entrada mantiene estos tests enfocados en lo que ya

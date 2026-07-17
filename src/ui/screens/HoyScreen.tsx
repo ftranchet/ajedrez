@@ -1,15 +1,14 @@
 // Pantalla principal: "Tu sesión de hoy" (RF-11.1, layout héroe validado en
-// docs/prototipos/sesion-de-hoy.dc.html). Fase 1 implementa la sesión
-// simple: Cola vencida primero, después el Radar (E4 + E5 + E10). El
-// Prescriptor completo (composición por duración, ajuste por fugas) llega
-// en Fase 3 — acá el "porqué" es fijo, no personalizado todavía.
+// docs/prototipos/sesion-de-hoy.dc.html). Cola vencida → currículo vencido →
+// Radar (E4 + E6 + E5 + E10), compuestos por el Prescriptor (E11) según la
+// banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
 import { useEffect } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
-import { RADAR_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
+import { useSessionStore } from '../state/sessionStore';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
@@ -24,15 +23,48 @@ export function HoyScreen() {
   return <SesionActiva />;
 }
 
+// Minutos estimados por elemento de cada bloque: heurística simple v1 (RF-11.1
+// pide una duración visible, no un cronómetro exacto) para mostrar "~N min"
+// antes de empezar.
+const MIN_POR_COLA = 0.75;
+const MIN_POR_CURRICULO = 0.75;
+const MIN_POR_RADAR = 1.25;
+const DURACION_MINIMA_MIN = 15;
+
+interface Bloque {
+  texto: string;
+  porque: string;
+}
+
+function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloque[] {
+  const bloques: Bloque[] = [];
+  const vencidas = s.dueCount ?? 0;
+  if (vencidas > 0) {
+    bloques.push({
+      texto: vencidas === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(vencidas)),
+      porque: vencidas === 1 ? t.sesion.cardsVencidas_uno : t.sesion.cardsVencidas_otro.replace('{n}', String(vencidas)),
+    });
+  }
+  const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
+  if (curriculo > 0) {
+    bloques.push({ texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)), porque: t.sesion.bloqueCurriculoPorque });
+  }
+  bloques.push({
+    texto: t.sesion.bloqueRadar.replace('{n}', String(s.dieta.radarCount)),
+    porque: s.dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
+  });
+  return bloques;
+}
+
 function Portada() {
   const s = useSessionStore();
+  const bloques = bloquesDeLaSesion(s);
   const vencidas = s.dueCount ?? 0;
-  const porque =
-    vencidas > 0
-      ? vencidas === 1
-        ? t.sesion.cardsVencidas_uno
-        : t.sesion.cardsVencidas_otro.replace('{n}', String(vencidas))
-      : 'El Radar mezcla táctica, defensa y posiciones tranquilas sin avisar cuál es cuál.';
+  const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
+  const duracionMin = Math.max(
+    DURACION_MINIMA_MIN,
+    Math.round(vencidas * MIN_POR_COLA + curriculo * MIN_POR_CURRICULO + s.dieta.radarCount * MIN_POR_RADAR),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -41,8 +73,16 @@ function Portada() {
       <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
         <div className="flex items-center justify-between">
           <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.sesion.subtitulo}</span>
+          <span className="font-mono text-xs text-tertiary">{t.sesion.duracion.replace('{n}', String(duracionMin))}</span>
         </div>
-        <p className="m-0 text-sm text-secondary">{porque}</p>
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {bloques.map((b) => (
+            <li key={b.texto} className="flex flex-col">
+              <span className="text-sm text-primary">{b.texto}</span>
+              <span className="text-xs text-secondary">{b.porque}</span>
+            </li>
+          ))}
+        </ul>
         <button
           onClick={() => void useSessionStore.getState().start()}
           disabled={s.phase === 'cargando'}
@@ -161,13 +201,13 @@ function CurriculumPanel() {
 
 function RadarPanel() {
   const s = useSessionStore();
-  const actual = Math.min(s.radarServidos + 1, RADAR_SESSION_SIZE);
+  const actual = Math.min(s.radarServidos + 1, s.dieta.radarCount);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-subtle bg-surface p-4">
         <p className="m-0 font-mono text-xs text-tertiary">
-          {t.radar.progreso.replace('{actual}', String(actual)).replace('{total}', String(RADAR_SESSION_SIZE))}
+          {t.radar.progreso.replace('{actual}', String(actual)).replace('{total}', String(s.dieta.radarCount))}
         </p>
         <p className="m-0 mt-1 font-display text-xl">{t.radar.titulo}</p>
       </div>

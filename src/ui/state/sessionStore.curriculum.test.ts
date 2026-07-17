@@ -7,6 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
+import { dietaPorBanda } from '../../core/prescriptor';
+import { DEFAULT_PROFILE } from '../../services/storage/profileRepo';
+
+// Perfil por defecto (sin diagnóstico): fija cuántos elementos del
+// currículo sirve el Prescriptor por sesión (RF-11.2).
+const CURRICULUM_MAX = dietaPorBanda(DEFAULT_PROFILE.bandaElo, []).curriculumMax;
 
 beforeEach(async () => {
   await db.games.clear();
@@ -19,6 +25,7 @@ beforeEach(async () => {
   await db.curriculumItems.clear();
   await db.curriculumDatasetMeta.clear();
   await db.curriculumProgress.clear();
+  await db.profile.clear();
 });
 
 describe('sessionStore — bloque de currículo', () => {
@@ -26,7 +33,7 @@ describe('sessionStore — bloque de currículo', () => {
     await useSessionStore.getState().start();
     const s = useSessionStore.getState();
     expect(s.phase).toBe('curriculo');
-    expect(s.curriculumQueue).toHaveLength(seedCurriculumItems.length);
+    expect(s.curriculumQueue).toHaveLength(CURRICULUM_MAX);
     expect(await db.curriculumItems.count()).toBe(seedCurriculumItems.length);
   });
 
@@ -86,7 +93,7 @@ describe('sessionStore — bloque de currículo', () => {
     }
     vi.restoreAllMocks();
     expect(s.phase).toBe('radar');
-    expect(guard).toBe(seedCurriculumItems.length);
+    expect(guard).toBe(CURRICULUM_MAX);
   });
 
   it('un elemento con 3 demostraciones limpias ya guardadas (automatizado) no aparece en la sesión', async () => {
@@ -115,6 +122,7 @@ describe('sessionStore — bloque de currículo', () => {
     await useSessionStore.getState().start();
     const s = useSessionStore.getState();
     expect(s.curriculumQueue.find((i) => i.id === automatizado.id)).toBeUndefined();
-    expect(s.curriculumQueue).toHaveLength(seedCurriculumItems.length - 1);
+    // Quedan 7 patrones vencidos (8 menos el automatizado), pero la dieta topa a CURRICULUM_MAX.
+    expect(s.curriculumQueue).toHaveLength(CURRICULUM_MAX);
   });
 });

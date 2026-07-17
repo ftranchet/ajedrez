@@ -229,3 +229,22 @@ export interface CalibrationRecord {
   acierto: boolean;
   fecha: string; // ISO 8601
 }
+
+/**
+ * Banda de Elo estimada por el diagnóstico inicial (RF-11.4). Coincide con
+ * los 5 niveles del motor local (config/engine-levels.json) para poder
+ * fundamentar la dieta del Prescriptor (RF-11.2) sin inventar una escala
+ * paralela.
+ */
+export type BandaElo = 'principiante' | 'elemental' | 'intermedio' | 'avanzado' | 'experto';
+
+/**
+ * Perfil del usuario (E11): banda de Elo y estado del diagnóstico inicial
+ * que la produjo. `diagnosticoCompletadoEn` en null significa que la banda
+ * es el valor por defecto, todavía sin diagnóstico real (RF-11.4).
+ */
+export interface Profile {
+  id: 'principal';
+  bandaElo: BandaElo;
+  diagnosticoCompletadoEn: string | null; // ISO 8601, o null si no se hizo
+}
