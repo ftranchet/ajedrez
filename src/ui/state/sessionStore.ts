@@ -224,6 +224,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       chess = new Chess();
       set({
         phase: 'sinEmpezar',
+        // null para que HoyScreen vuelva a pedirlo: un fallo del Radar o de
+        // la Cola durante la sesión puede haber creado tarjetas vencidas de
+        // inmediato, y el contador viejo quedaría desactualizado.
+        dueCount: null,
         colaCards: [],
         colaIndex: 0,
         radarItem: null,
@@ -320,7 +324,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const selState = adjustDifficulty(s.radarSelState, s.radarUltimoAcierto ?? false, tasaAciertoReciente(s.radarAciertosRecientes));
       const servidos = s.radarServidos;
       if (servidos >= RADAR_SESSION_SIZE) {
-        set({ phase: 'fin', radarItem: null });
+        // El ajuste de dificultad de esta última respuesta también se
+        // persiste, aunque la sesión termine acá: si no, la banda 60–80%
+        // (RF-5.5) pierde el incremento de la última posición de cada sesión.
+        set({ phase: 'fin', radarItem: null, radarSelState: selState });
+        await radarProgressRepo.save(progressFromState(selState, get().radarAciertosRecientes));
         return;
       }
       const item = selectNextRadarItem(s.radarPool, selState, Math.random);

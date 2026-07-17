@@ -4,7 +4,7 @@
 // tomado del turno equivocado al crear una tarjeta desde un fallo del Radar.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useSessionStore } from './sessionStore';
+import { RADAR_SESSION_SIZE, useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedRadarItems } from '../../services/puzzles/seedData';
 import { buildErrorCard } from '../../core/errorCard';
@@ -135,6 +135,46 @@ describe('sessionStore — bloque Radar', () => {
     expect(useSessionStore.getState().radarSelState.ratingCentro).toBe(guardado?.ratingCentro);
     expect(useSessionStore.getState().radarAciertosRecientes).toEqual(guardado?.aciertosRecientes);
   });
+
+  it('persiste el ajuste de dificultad de la última posición de la sesión, no solo el de las anteriores', async () => {
+    await useSessionStore.getState().start();
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // nunca muestrear confianza
+    let s = useSessionStore.getState();
+    // Historial de ratingCentro tras cada radarContinuar(), para detectar si
+    // la última llamada (la que cierra la sesión) de verdad cambió algo:
+    // antes del fix, esa última llamada no aplicaba el ajuste ni en memoria
+    // ni en Dexie, así que el valor quedaba idéntico al de la llamada previa.
+    const ratingCentroTrasCadaContinuar: number[] = [];
+    let guard = 0;
+    while (s.phase === 'radar' && guard < 20) {
+      const item = s.radarItem;
+      if (!item) break;
+      s.radarEval('igual');
+      s = useSessionStore.getState();
+      const [from, destinos] = s.dests.entries().next().value as [string, string[]];
+      await s.radarUserMove(from as never, destinos[0] as never);
+      s = useSessionStore.getState();
+      if (s.radarSubPhase === 'feedback') {
+        await s.radarContinuar();
+        s = useSessionStore.getState();
+        ratingCentroTrasCadaContinuar.push(s.radarSelState.ratingCentro);
+      }
+      guard++;
+    }
+    vi.restoreAllMocks();
+    expect(s.phase).toBe('fin');
+    expect(ratingCentroTrasCadaContinuar.length).toBe(RADAR_SESSION_SIZE);
+
+    // La última llamada (la que cierra la sesión) tiene que haber cambiado
+    // el rating respecto a la anteúltima: si no, el ajuste de la 8ª
+    // respuesta se descartó en vez de aplicarse.
+    const [penultimo, ultimo] = ratingCentroTrasCadaContinuar.slice(-2);
+    expect(ultimo).not.toBe(penultimo);
+
+    // Y lo que quedó persistido en Dexie coincide con ese último valor.
+    const guardado = await db.radarProgress.get('principal');
+    expect(guardado?.ratingCentro).toBe(ultimo);
+  });
 });
 
 describe('sessionStore — bloque Cola', () => {
@@ -190,5 +230,16 @@ describe('sessionStore — bloque Cola', () => {
     const revisada = await db.errorCards.get(vencida.id);
     expect(revisada!.fsrs.lapses).toBe(0); // era 'new', no 'review': todavía no cuenta como lapso
     expect(revisada!.fsrs.reps).toBe(1);
+  });
+});
+
+describe('sessionStore — volver()', () => {
+  it('limpia dueCount para que Hoy vuelva a pedirlo (un fallo pudo haber creado tarjetas nuevas)', async () => {
+    await useSessionStore.getState().start();
+    await useSessionStore.getState().loadSummary();
+    expect(useSessionStore.getState().dueCount).not.toBeNull();
+
+    useSessionStore.getState().volver();
+    expect(useSessionStore.getState().dueCount).toBeNull();
   });
 });
