@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.1 |
+| Versión | 0.2.2 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
 | Última actualización | 2026-07-17 |
@@ -222,7 +222,7 @@ Navegación por teclado completa en escritorio (incluida entrada de jugadas en n
 Interfaz en español rioplatense desde el día uno; textos externalizados (i18n) para habilitar inglés después sin reescritura.
 
 ### RNF-8 — Licencia (P0)
-El proyecto es de código abierto bajo **GPLv3** (formalizado en ADR-0006, coherente con la dependencia de Stockfish — ver ADR-0002). El texto oficial vive en `LICENSE` en la raíz del repositorio. Los datos de puzzles son CC0 con atribución de fuente en la documentación; los pesos de Maia son de investigación abierta.
+El proyecto es de código abierto bajo **GPLv3** (formalizado en ADR-0006, coherente con la dependencia de Stockfish — ver ADR-0002). El texto oficial vive en `LICENSE` en la raíz del repositorio. Los datos de puzzles son CC0 con atribución de fuente en la documentación; los pesos de Maia son de investigación abierta; el set de piezas Staunty es CC BY-NC-SA 4.0 con atribución (ver `public/piece/staunty/README.md`).
 
 ---
 
@@ -277,6 +277,7 @@ Regla de dependencias: `ui → core → (interfaces de) services`. `core` no imp
 │   │   ├── README.md      ← proceso + índice
 │   │   └── NNNN-*.md
 │   └── evidence/          ← informe científico, tier list, diseño de producto
+├── public/                ← assets estáticos servidos tal cual (set de piezas, íconos)
 └── src/                   ← código (estructura en §9)
 ```
 

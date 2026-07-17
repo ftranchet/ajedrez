@@ -2,7 +2,7 @@
 
 Documento vivo. Los tokens de esta página son la única fuente de estilos: se implementan en la configuración de Tailwind y ningún componente usa valores sueltos. Cambiar la estética = cambiar tokens acá, con entrada en el changelog.
 
-> **Cambios v2:** jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía con más carácter (Newsreader en lugar de Fraunces, Instrument Sans en lugar de Inter), layout validado de la pantalla "Tu sesión de hoy" y flujo del Radar (§4.1–4.2), y referencia visual renderizada (`Design System.dc.html`) + prototipo interactivo (`Sesión de Hoy.dc.html`).
+> **Cambios v2:** jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía con más carácter (Newsreader en lugar de Fraunces, Instrument Sans en lugar de Inter), y layout validado de la pantalla "Tu sesión de hoy" y flujo del Radar (§4.1–4.2). Las decisiones de layout se validaron con una referencia visual renderizada y un prototipo interactivo (no versionados en el repo).
 
 ## 1. Dirección estética: "Sala de estudio"
 
@@ -80,7 +80,7 @@ Escala: 4 / 8 / 12 / 16 / 24 / 32 / 48. Radio: `r-sm` 6 (chips, inputs), `r-md` 
 ## 3. Tablero y piezas
 
 ### 3.1 Piezas
-Set **Staunty** (Lichess, licencia libre; `public/piece/staunty/`): siluetas rotundas de relleno sólido con contorno, máxima diferenciación de formas a tamaños chicos. La pieza ocupa el 90% de la casilla (5% de aire por lado). Sin sombras proyectadas.
+Set **Staunty** (Lichess, autor sadsnake1, licencia CC BY-NC-SA 4.0 — ver `public/piece/staunty/README.md`): siluetas rotundas de relleno sólido con contorno, máxima diferenciación de formas a tamaños chicos. La pieza ocupa el 90% de la casilla (5% de aire por lado). Sin sombras proyectadas.
 
 ### 3.2 Casillas
 | Token | Valor | Uso |
