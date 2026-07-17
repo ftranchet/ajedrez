@@ -4,12 +4,16 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { GameRecord, RadarAttempt, Ritmo } from '../../core/types';
+import type { CalibrationRecord, GameRecord, Profile, RadarAttempt, Ritmo } from '../../core/types';
 import { buildGameRecord } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
+import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
+import { brierScore } from '../../core/calibration';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
+import { calibrationRepo } from '../../services/storage/calibrationRepo';
+import { profileRepo } from '../../services/storage/profileRepo';
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { AnalizarScreen } from './AnalizarScreen';
@@ -23,6 +27,8 @@ export function PanelScreen() {
   const analysisPhase = useAnalysisStore((s) => s.phase);
   const [games, setGames] = useState<GameRecord[] | null>(null);
   const [radarAttempts, setRadarAttempts] = useState<RadarAttempt[] | null>(null);
+  const [calibraciones, setCalibraciones] = useState<CalibrationRecord[] | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
@@ -32,6 +38,12 @@ export function PanelScreen() {
     });
     void radarAttemptRepo.list().then((attempts) => {
       if (alive) setRadarAttempts(attempts);
+    });
+    void calibrationRepo.list().then((c) => {
+      if (alive) setCalibraciones(c);
+    });
+    void profileRepo.get().then((p) => {
+      if (alive) setProfile(p);
     });
     return () => {
       alive = false;
@@ -43,7 +55,8 @@ export function PanelScreen() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <h1 className="m-0 font-display text-3xl font-medium">{t.panel.titulo}</h1>
-      <p className="m-0 text-secondary">{t.panel.vacioMetricas}</p>
+
+      <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
 
       <section>
         <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.partidas}</h2>
@@ -81,6 +94,47 @@ export function PanelScreen() {
 
       <DatosSection />
     </div>
+  );
+}
+
+// Panel de verdad v1 (RF-12.1): grande, al frente, sin confeti. Banda de Elo
+// (categórica: sin historial real todavía no hay con qué calibrar un número
+// de Elo con sentido — ver core/panel.ts), errores graves por partida
+// (media móvil) y calibración (Brier, cuanto más cerca de 0 mejor).
+function PanelDeVerdad({
+  games,
+  calibraciones,
+  profile,
+}: {
+  games: GameRecord[] | null;
+  calibraciones: CalibrationRecord[] | null;
+  profile: Profile | null;
+}) {
+  if (games === null || calibraciones === null || profile === null) return null;
+
+  const mediaErroresGraves = erroresGravesPorPartidaMediaMovil(games);
+  const brier = brierScore(calibraciones);
+
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
+      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.verdadTitulo}</h2>
+      <div className="flex flex-col gap-1">
+        <span className="text-sm text-secondary">{t.panel.verdadBanda}</span>
+        <span className="font-mono text-lg text-primary">
+          {profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-sm text-secondary">{t.panel.verdadErroresGraves}</span>
+        <span className="font-mono text-lg text-primary">
+          {mediaErroresGraves === null ? t.panel.verdadSinPartidas : mediaErroresGraves.toFixed(1)}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-sm text-secondary">{t.panel.verdadCalibracion}</span>
+        <span className="font-mono text-lg text-primary">{brier === null ? t.panel.verdadSinCalibracion : brier.toFixed(2)}</span>
+      </div>
+    </section>
   );
 }
 
