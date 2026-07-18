@@ -68,6 +68,61 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
 
 export type ImportResult = { ok: true; bundle: ExportBundle } | { ok: false; error: string };
 
+// --- Validadores por-registro (RF-14.2) ---
+// La restauración reemplaza el estado local entero (services/export borra las
+// tablas antes de escribir), así que un respaldo con un registro corrupto
+// podía dejar la base en un estado inconsistente. Se valida cada entidad
+// crítica antes de tocar Dexie; si una sola está mal formada, se rechaza el
+// paquete completo (mejor negarse que escribir basura sobre datos buenos).
+
+function isObj(x: unknown): x is Record<string, unknown> {
+  return typeof x === 'object' && x !== null;
+}
+
+function esGameRecordValido(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  return (
+    typeof x.id === 'string' &&
+    typeof x.pgn === 'string' &&
+    typeof x.fecha === 'string' &&
+    typeof x.fuente === 'string' &&
+    typeof x.ritmo === 'string' &&
+    typeof x.resultado === 'string' &&
+    typeof x.analizada === 'boolean' &&
+    Array.isArray(x.tiemposPorJugadaMs)
+  );
+}
+
+function esFsrsValido(x: unknown): boolean {
+  return isObj(x) && typeof x.due === 'string' && typeof x.reps === 'number' && typeof x.lapses === 'number';
+}
+
+function esErrorCardValida(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  return (
+    typeof x.id === 'string' &&
+    typeof x.fen === 'string' &&
+    (x.ladoAMover === 'w' || x.ladoAMover === 'b') &&
+    typeof x.jugadaUsuario === 'string' &&
+    typeof x.jugadaCorrecta === 'string' &&
+    typeof x.categoria === 'string' &&
+    typeof x.origen === 'string' &&
+    typeof x.creadaEn === 'string' &&
+    esFsrsValido(x.fsrs)
+  );
+}
+
+function esCalibrationRecordValido(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  return (
+    typeof x.id === 'string' &&
+    typeof x.contexto === 'string' &&
+    typeof x.confianzaDeclarada === 'number' &&
+    typeof x.acierto === 'boolean' &&
+    typeof x.fecha === 'string'
+  );
+}
+
 /**
  * Valida la forma de un paquete importado antes de tocar la base de datos
  * (RF-14.2). No migra todavía versiones de esquema anteriores a la actual:
@@ -116,6 +171,18 @@ export function validateImportBundle(raw: unknown): ImportResult {
   // Ni doble solución (RF-5.7).
   if (obj.dobleSolucionAttempts !== undefined && !Array.isArray(obj.dobleSolucionAttempts)) {
     return { ok: false, error: 'El historial de doble solución no tiene la forma esperada.' };
+  }
+  // Validación por-registro de las entidades críticas (RF-14.2): como la
+  // restauración reemplaza el estado local entero, un solo registro corrupto
+  // rechaza el paquete en vez de escribirse sobre datos buenos.
+  if (!(obj.games as unknown[]).every(esGameRecordValido)) {
+    return { ok: false, error: 'Alguna partida del respaldo está corrupta o incompleta.' };
+  }
+  if (!(obj.errorCards as unknown[]).every(esErrorCardValida)) {
+    return { ok: false, error: 'Alguna tarjeta de la Cola del respaldo está corrupta o incompleta.' };
+  }
+  if (!(obj.calibrationRecords as unknown[]).every(esCalibrationRecordValido)) {
+    return { ok: false, error: 'Algún registro de calibración del respaldo está corrupto o incompleto.' };
   }
   return {
     ok: true,

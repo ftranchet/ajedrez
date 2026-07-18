@@ -151,7 +151,9 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   continuarAErrores() {
     const s = get();
     if (!s.analysis) return;
-    const errores = detectedErrorMoves(s.analysis);
+    // Solo los errores del usuario se ofrecen como tarjetas (RF-3.3): las
+    // jugadas malas del motor no son "sus" errores para repasar.
+    const errores = detectedErrorMoves(s.analysis, s.game?.jugadorColor);
     if (errores.length === 0) {
       set({ phase: 'fin' });
       return;

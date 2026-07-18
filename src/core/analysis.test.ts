@@ -161,4 +161,23 @@ describe('detectedErrorMoves', () => {
     const errores = detectedErrorMoves(analysis);
     expect(errores.map((e) => e.ply)).toEqual([0, 2]);
   });
+
+  it('con jugadorColor conocido, solo devuelve los errores de ese lado (no los del motor, RF-1.3/RF-3.3)', () => {
+    // ply0 (blancas) pierde 120cp → error; ply2 (blancas) pierde 250cp → grave;
+    // ambos son de blancas. Un usuario que jugó negras no debe recibir tarjetas
+    // por estos: son errores del motor.
+    const analysis = buildGameAnalysis(
+      [
+        { ply: 0, fen: 'f0', san: 'a', ladoQueMueve: 'w', jugadaUsuario: 'x', cpAntes: 50, jugadaMotor: 'x' },
+        { ply: 1, fen: 'f1', san: 'b', ladoQueMueve: 'b', jugadaUsuario: 'x', cpAntes: -70, jugadaMotor: 'x' },
+        { ply: 2, fen: 'f2', san: 'c', ladoQueMueve: 'w', jugadaUsuario: 'x', cpAntes: -10, jugadaMotor: 'x' },
+        { ply: 3, fen: 'f3', san: 'd', ladoQueMueve: 'b', jugadaUsuario: 'x', cpAntes: -260, jugadaMotor: 'x' },
+      ],
+      { momentoCriticoPly: 0, plan: '', evaluaciones: [], completadaEn: '2026-07-17T00:00:00.000Z' },
+    );
+    // Usuario jugó blancas: recibe sus dos errores.
+    expect(detectedErrorMoves(analysis, 'w').map((e) => e.ply)).toEqual([0, 2]);
+    // Usuario jugó negras: ninguno de esos dos errores es suyo.
+    expect(detectedErrorMoves(analysis, 'b').map((e) => e.ply)).toEqual([]);
+  });
 });

@@ -129,6 +129,70 @@ describe('exportAllData / importAllData', () => {
     expect(outcome.ok).toBe(false);
   });
 
+  it('restaurar REEMPLAZA, no fusiona: los registros locales ausentes del respaldo desaparecen (RF-14.2)', async () => {
+    // Respaldo con una sola partida.
+    const enElRespaldo = buildGameRecord({ pgn: '1. e4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(enElRespaldo);
+    const zip = await exportAllData();
+
+    // El dispositivo destino ya tiene datos propios distintos.
+    await db.games.clear();
+    const soloLocal = buildGameRecord({ pgn: '1. d4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(soloLocal);
+    await db.errorCards.put(
+      buildErrorCard({ fen: '8/8/8/8/8/8/8/8 w - - 0 1', ladoAMover: 'w', jugadaUsuario: 'a1a2', jugadaCorrecta: 'a1b1', categoria: 'tactico', origen: 'radar' }),
+    );
+
+    const outcome = await importAllData(zip);
+    expect(outcome.ok).toBe(true);
+    // La partida local, ausente del respaldo, ya no está: el estado quedó
+    // idéntico al del respaldo, no fusionado con lo que había.
+    expect(await db.games.get(soloLocal.id)).toBeUndefined();
+    expect(await db.games.get(enElRespaldo.id)).toBeDefined();
+    expect(await db.games.count()).toBe(1);
+    // Una tabla vacía en el respaldo vacía la local (antes bulkPut no podía).
+    expect(await db.errorCards.count()).toBe(0);
+  });
+
+  it('importar dos veces el mismo respaldo deja el mismo estado (idempotente)', async () => {
+    const game = buildGameRecord({ pgn: '1. e4 e5 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(game);
+    const zip = await exportAllData();
+
+    await importAllData(zip);
+    await importAllData(zip);
+    expect(await db.games.count()).toBe(1);
+  });
+
+  it('rechaza un respaldo con una partida corrupta sin tocar los datos existentes', async () => {
+    const bueno = buildGameRecord({ pgn: '1. e4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(bueno);
+
+    // Armar a mano un zip con una partida sin `pgn` (corrupta).
+    const { zipSync, strToU8 } = await import('fflate');
+    const zip = zipSync({
+      'manifest.json': strToU8(JSON.stringify({ esquema: 10, exportadoEn: new Date().toISOString(), app: 'elomax' })),
+      'games.json': strToU8(JSON.stringify([{ id: 'x', fuente: 'local', ritmo: 'sin-reloj', resultado: '*', analizada: false, fecha: '2026-01-01' }])),
+      'errorCards.json': strToU8('[]'),
+      'calibrationRecords.json': strToU8('[]'),
+    });
+
+    const outcome = await importAllData(zip);
+    expect(outcome.ok).toBe(false);
+    // El dato bueno preexistente sigue intacto: la validación corre antes de
+    // tocar Dexie, así que un respaldo corrupto no borra nada.
+    expect(await db.games.get(bueno.id)).toBeDefined();
+  });
+
+  it('rechaza un archivo comprimido descomunal antes de descomprimirlo', async () => {
+    // > 100 MB de entrada: se corta sin intentar unzipSync (evita el spike de memoria).
+    const enorme = new Uint8Array(101 * 1024 * 1024);
+    const outcome = await importAllData(enorme);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.error).toContain('demasiado grande');
+  });
+
   it('exporta el PGN de cada partida como archivo legible aparte (RF-14.3/14.5)', async () => {
     const { unzipSync, strFromU8 } = await import('fflate');
     const game = buildGameRecord({

@@ -7,6 +7,7 @@ import { EvalGraph } from '../components/EvalGraph';
 import { MoveListPicker } from '../components/MoveListPicker';
 import { Chip } from '../components/Chip';
 import { useAnalysisStore } from '../state/analysisStore';
+import { detectedErrorMoves } from '../../core/analysis';
 import type { CategoriaError } from '../../core/types';
 import { t } from '../i18n/es';
 
@@ -114,7 +115,9 @@ function Resultado() {
   const s = useAnalysisStore();
   const analysis = s.analysis;
   if (!analysis) return null;
-  const errores = analysis.jugadas.filter((j) => j.clasificacion === 'grave' || j.clasificacion === 'error');
+  // Mismo criterio que continuarAErrores: el contador del botón debe coincidir
+  // con las tarjetas que realmente se van a ofrecer (solo las del usuario).
+  const errores = detectedErrorMoves(analysis, s.game?.jugadorColor);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">

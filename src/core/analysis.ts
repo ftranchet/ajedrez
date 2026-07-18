@@ -119,7 +119,16 @@ export function buildGameAnalysis(evals: EngineEvalAtPly[], fase1: PhaseOneData,
   return { jugadas, comparacionEvaluaciones, analizadaEn: now.toISOString() };
 }
 
-/** Jugadas que ameritan una tarjeta candidata para la Cola (RF-3.3). */
-export function detectedErrorMoves(analysis: GameAnalysis): MoveAnalysisEntry[] {
-  return analysis.jugadas.filter((m) => m.clasificacion === 'grave' || m.clasificacion === 'error');
+/**
+ * Jugadas que ameritan una tarjeta candidata para la Cola (RF-3.3). Con
+ * `jugadorColor` conocido, solo las del usuario: una tarjeta de error es
+ * "tu error para repasar" (E4), y las jugadas malas del motor (que en niveles
+ * bajos las comete a propósito, RF-1.3) no son errores del usuario. Sin color
+ * (partidas importadas que todavía no registran el lado), se devuelven todas
+ * y el usuario confirma o descarta cada una a mano (RF-3.3).
+ */
+export function detectedErrorMoves(analysis: GameAnalysis, jugadorColor?: Color): MoveAnalysisEntry[] {
+  return analysis.jugadas.filter(
+    (m) => (m.clasificacion === 'grave' || m.clasificacion === 'error') && (jugadorColor === undefined || m.ladoQueMueve === jugadorColor),
+  );
 }

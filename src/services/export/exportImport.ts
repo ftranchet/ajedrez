@@ -59,13 +59,28 @@ export async function exportAllData(): Promise<Uint8Array> {
 
 export type ImportOutcome = { ok: true; resumen: { partidas: number; tarjetas: number; calibraciones: number; respuestasRadar: number } } | { ok: false; error: string };
 
-/** Restaura un .zip exportado previamente (RF-14.2), con migración validada. */
+// Topes de tamaño para no descomprimir un archivo enorme o un "zip bomb" en
+// memoria (unzipSync descomprime todo de una). Una exportación real de ELOmax
+// —local-first, los datos de una sola persona— pesa a lo sumo unos pocos MB;
+// estos topes son holgados y solo cortan lo patológico o malicioso.
+const MAX_ZIP_INPUT_BYTES = 100 * 1024 * 1024; // 100 MB comprimidos de entrada
+const MAX_UNCOMPRESSED_BYTES = 400 * 1024 * 1024; // 400 MB descomprimidos en total
+
+/** Restaura un .zip exportado previamente (RF-14.2): reemplaza el estado local
+ * completo, con validación y topes de tamaño. */
 export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome> {
+  if (zipBytes.length > MAX_ZIP_INPUT_BYTES) {
+    return { ok: false, error: 'El archivo es demasiado grande para ser una exportación de ELOmax.' };
+  }
   let unzipped: Record<string, Uint8Array>;
   try {
     unzipped = unzipSync(zipBytes);
   } catch {
     return { ok: false, error: 'El archivo no es un .zip válido de ELOmax.' };
+  }
+  const totalDescomprimido = Object.values(unzipped).reduce((sum, bytes) => sum + bytes.length, 0);
+  if (totalDescomprimido > MAX_UNCOMPRESSED_BYTES) {
+    return { ok: false, error: 'El contenido del archivo es demasiado grande para restaurarse.' };
   }
 
   const manifestRaw = unzipped['manifest.json'];
@@ -112,6 +127,14 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   if (!result.ok) return { ok: false, error: result.error };
 
   const { bundle } = result;
+  // Restauración = REEMPLAZO, no fusión (RF-14.2, "restauración total"): se
+  // vacía cada tabla de datos personales antes de escribir el respaldo, todo
+  // dentro de una transacción. Sin esto, `bulkPut` fusionaba —registros
+  // locales que no estaban en el respaldo sobrevivían, una colección vacía
+  // en el respaldo no podía vaciar la local, e importar dos veces mezclaba
+  // historiales—, así que restaurar en el dispositivo B no dejaba a B igual
+  // a A. Los catálogos (radarItems/curriculumItems/stoykoItems) NO se tocan:
+  // son contenido reseedable, no datos del usuario, y se repueblan solos.
   await db.transaction(
     'rw',
     [
@@ -127,6 +150,18 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       db.dobleSolucionAttempts,
     ],
     async () => {
+      await Promise.all([
+        db.games.clear(),
+        db.errorCards.clear(),
+        db.calibrationRecords.clear(),
+        db.radarProgress.clear(),
+        db.radarAttempts.clear(),
+        db.curriculumProgress.clear(),
+        db.profile.clear(),
+        db.candidataAttempts.clear(),
+        db.compromisoAttempts.clear(),
+        db.dobleSolucionAttempts.clear(),
+      ]);
       if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
       if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
       if (bundle.calibrationRecords.length > 0) await db.calibrationRecords.bulkPut(bundle.calibrationRecords);
