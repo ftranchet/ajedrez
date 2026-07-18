@@ -64,6 +64,17 @@ describe('compromisoStore', () => {
     expect(attempts[0]).toMatchObject({ itemId: item.id, profundidad: 3, correcta: true, primerErrorEn: null });
   });
 
+  it('registra el tiempo en silencio (RF-7.3: sin cronómetro visible)', async () => {
+    await useCompromisoStore.getState().empezar();
+    for (const jugada of item.solucion) {
+      useCompromisoStore.getState().setInputActual(jugada);
+      useCompromisoStore.getState().agregarJugada();
+    }
+    const attempts = await db.compromisoAttempts.toArray();
+    expect(typeof attempts[0].tiempoMs).toBe('number');
+    expect(attempts[0].tiempoMs).toBeGreaterThanOrEqual(0);
+  });
+
   it('un error en la segunda jugada marca la línea entera como incorrecta, con el índice del primer error', async () => {
     await useCompromisoStore.getState().empezar();
     useCompromisoStore.getState().setInputActual('f1c4');

@@ -434,4 +434,114 @@ describe('migración de esquema Dexie', () => {
     expect(await current.dobleSolucionAttempts.count()).toBe(0);
     current.close();
   });
+
+  it('migra de v9 a v10 sin perder partidas (Stoyko semanal, Fase 4)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v9 = new Dexie(name);
+    v9.version(1).stores({ games: 'id, fecha' });
+    v9.version(2).stores({ games: 'id, fecha, fuente' });
+    v9.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    v9.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+    });
+    v9.version(5).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+    });
+    v9.version(6).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+    });
+    v9.version(7).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+    });
+    v9.version(8).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+    });
+    v9.version(9).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+    });
+    await v9.table('games').add({
+      id: 'g8',
+      pgn: '1. c4 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-18T00:00:00.000Z',
+    });
+    v9.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g8')).toMatchObject({ id: 'g8', pgn: '1. c4 *' });
+    expect(await current.stoykoItems.count()).toBe(0);
+    expect(await current.stoykoDatasetMeta.count()).toBe(0);
+    current.close();
+  });
 });

@@ -17,11 +17,13 @@ import type {
   RadarDatasetMeta,
   RadarItem,
   RadarProgress,
+  StoykoDatasetMeta,
+  StoykoItem,
 } from '../../core/types';
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -38,6 +40,8 @@ export class ElomaxDB extends Dexie {
   candidataAttempts!: Table<CandidataAttempt, string>;
   compromisoAttempts!: Table<CompromisoAttempt, string>;
   dobleSolucionAttempts!: Table<DobleSolucionAttempt, string>;
+  stoykoItems!: Table<StoykoItem, string>;
+  stoykoDatasetMeta!: Table<StoykoDatasetMeta, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -174,6 +178,31 @@ export class ElomaxDB extends Dexie {
       candidataAttempts: 'id, itemId, fecha',
       compromisoAttempts: 'id, itemId, fecha',
       dobleSolucionAttempts: 'id, itemId, fecha',
+    });
+
+    // v10 — Fase 4 (E7): ejercicio de Stoyko semanal (RF-7.2). Catálogo
+    // reseedable nuevo (`stoykoItems`, igual patrón que `curriculumItems`);
+    // no hay tabla de intentos propia — el resultado de cada ejercicio se
+    // registra en `calibrationRecords` (contexto 'stoyko', ya contemplado
+    // desde E10) y la fecha del último se guarda en `profile` (sin nuevo
+    // índice, no hace falta bump de tabla para ese campo). Puramente aditiva.
+    this.version(10).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
     });
   }
 }

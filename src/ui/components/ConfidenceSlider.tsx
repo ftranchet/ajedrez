@@ -4,12 +4,20 @@
 import { useState } from 'react';
 import { t } from '../i18n/es';
 
-export function ConfidenceSlider({ onConfirm }: { onConfirm: (valor: number) => void }) {
+export function ConfidenceSlider({
+  onConfirm,
+  label = t.radar.confianza,
+  confirmLabel = t.radar.confirmarConfianza,
+}: {
+  onConfirm: (valor: number) => void;
+  label?: string;
+  confirmLabel?: string;
+}) {
   const [valor, setValor] = useState(50);
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-4">
       <label className="flex flex-col gap-1">
-        <span className="text-sm text-secondary">{t.radar.confianza}</span>
+        <span className="text-sm text-secondary">{label}</span>
         <span className="font-mono text-2xl text-primary">{valor}%</span>
         <input
           type="range"
@@ -22,7 +30,7 @@ export function ConfidenceSlider({ onConfirm }: { onConfirm: (valor: number) => 
         />
       </label>
       <button onClick={() => onConfirm(valor)} className="btn-primary">
-        {t.radar.confirmarConfianza}
+        {confirmLabel}
       </button>
     </div>
   );

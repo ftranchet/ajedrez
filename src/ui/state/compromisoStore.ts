@@ -2,11 +2,11 @@
 // (3 a 7 plies) antes de que el tablero se mueva — nunca antes, para que la
 // consigna sea real. Reutiliza el catálogo del Radar, ya verificado.
 import { create } from 'zustand';
-import { Chess } from 'chess.js';
 import type { RadarItem } from '../../core/types';
 import { evaluarLinea, itemsParaCompromiso, type ResultadoCompromiso } from '../../core/compromiso';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
+import { sanDeLinea } from './chessBoardUtils';
 
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
 
@@ -23,23 +23,14 @@ interface CompromisoState {
   inputActual: string;
   inputError: string | null;
   resultado: ResultadoCompromiso | null;
+  /** Marca de tiempo al servir el ítem, para el cronómetro silencioso (RF-7.3: nunca visible). */
+  inicioMs: number | null;
 
   empezar(): Promise<void>;
   setInputActual(value: string): void;
   agregarJugada(): void;
   borrarUltima(): void;
   siguiente(): void;
-}
-
-function sanDeLinea(fen: string, uciMoves: string[]): string[] {
-  const chess = new Chess(fen);
-  const san: string[] = [];
-  for (const uci of uciMoves) {
-    const move = chess.moves({ verbose: true }).find((m) => m.from === uci.slice(0, 2) && m.to === uci.slice(2, 4));
-    if (!move) break; // jugada ilegal en esta línea: no se puede seguir reproduciendo
-    san.push(chess.move(move).san);
-  }
-  return san;
 }
 
 export const useCompromisoStore = create<CompromisoState>((set, get) => {
@@ -59,6 +50,7 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
       inputActual: '',
       inputError: null,
       resultado: null,
+      inicioMs: Date.now(),
     });
   }
 
@@ -72,6 +64,7 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
     inputActual: '',
     inputError: null,
     resultado: null,
+    inicioMs: null,
 
     async empezar() {
       set({ phase: 'cargando' });
@@ -111,6 +104,7 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
         profundidad: item.solucion.length,
         correcta: resultado.correcta,
         primerErrorEn: resultado.primerErrorEn,
+        tiempoMs: s.inicioMs !== null ? Date.now() - s.inicioMs : undefined,
         fecha: new Date().toISOString(),
       });
     },

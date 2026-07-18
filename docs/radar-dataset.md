@@ -23,6 +23,18 @@ node scripts/mine-doble-solucion.mjs --target 6 --max-checked 1200 --checkpoint 
 node scripts/finalize-doble-solucion.mjs
 ```
 
+## Catálogo de Stoyko semanal (RF-7.2)
+
+El ejercicio de Stoyko (E7) usa un catálogo aparte, `stoykoItems` (no es un subtipo de `RadarItem`: no hay "una" solución, sino una línea del motor contra la que se comparan las candidatas del usuario). `stoyko-v1-8` tiene 8 posiciones "ricas" — varias jugadas genuinamente competitivas, sin ganador claro — generadas por `scripts/mine-stoyko.mjs` con el mismo método que doble solución: autojuego del motor local, criba con MultiPV a profundidad 14 y reconfirmación a 17. Acá el criterio de aceptación es distinto: no "hay una jugada claramente mejor" sino lo opuesto — el hueco entre la mejor y la tercera candidata en MultiPV(3) debe ser ≤50 cp y la evaluación de la mejor jugada debe estar entre −150 y 150 cp (ni ganada ni perdida, para que valga la pena pararse a calcular).
+
+La primera corrida (con muestreo cada 2 plies desde el ply 10 de una sola partida de autojuego) encontró el objetivo casi de inmediato, pero 5 de las 8 candidatas venían de la misma partida — jugadas consecutivas de una posición que cambia poco de un ply al siguiente, muy poca variedad real para un ejercicio pensado para durar meses. La corrida final limita a 1 candidata aceptada por partida de autojuego y aleatoriza las primeras 8 jugadas de cada partida (elige al azar entre las 3 mejores del motor, en vez de siempre la mejor) para que las partidas diverjan de verdad; las 8 posiciones resultantes vienen de aperturas y estructuras distintas. `mejorLinea` guarda los primeros 3 plies de la variante principal del motor a profundidad 17, verificados legales con chess.js de forma independiente (nunca se confía en la notación del motor sin re-verificar).
+
+Sin fuente de dificultad calibrada (igual que doble solución) y sin rating: Stoyko no puntúa una jugada "correcta", así que no aplica. Reproducible con:
+
+```sh
+node scripts/mine-stoyko.mjs --target 8 --max-checked 800
+```
+
 ## Generación reproducible
 
 Requisitos: Node 20+, `zstd`, y `script` (util-linux; da un pseudo-terminal al binario WASM de Stockfish). Los archivos de entrada no se versionan en este repositorio.

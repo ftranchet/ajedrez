@@ -195,6 +195,13 @@ export interface CompromisoAttempt {
   correcta: boolean;
   /** Índice (0-based) de la primera jugada que no coincidió; null si toda la línea fue correcta. */
   primerErrorEn: number | null;
+  /**
+   * Milisegundos desde que se sirvió la posición hasta declarar la línea
+   * completa, registrados en silencio (RF-7.3: sin cronómetro visible,
+   * el objetivo es profundidad, no velocidad). Ausente en intentos previos
+   * a esta métrica.
+   */
+  tiempoMs?: number;
   fecha: string; // ISO 8601
 }
 
@@ -310,4 +317,38 @@ export interface Profile {
   id: 'principal';
   bandaElo: BandaElo;
   diagnosticoCompletadoEn: string | null; // ISO 8601, o null si no se hizo
+  /**
+   * Fecha de la última vez que se completó el ejercicio de Stoyko (E7,
+   * RF-7.2), para el enfriamiento semanal. `undefined`/`null` = nunca hecho,
+   * disponible de entrada.
+   */
+  stoykoUltimaCompletadaEn?: string | null; // ISO 8601
+}
+
+/**
+ * Posición "rica" para el ejercicio de Stoyko semanal (E7, RF-7.2): varias
+ * jugadas genuinamente competitivas, sin ganador claro (a diferencia del
+ * Radar, donde siempre hay una jugada objetivamente mejor). No es dato del
+ * usuario: catálogo reseedable, igual que `RadarItem`/`CurriculumItem`.
+ */
+export interface StoykoItem {
+  id: string;
+  fen: string;
+  /**
+   * Primeras jugadas (UCI) de la variante principal del motor a profundidad
+   * de reconfirmación, para comparar al revelar. No es "la" solución —
+   * Stoyko no puntúa una única jugada correcta, sino si el usuario la
+   * consideró entre sus candidatas.
+   */
+  mejorLinea: string[];
+  /** Evaluación del motor en la escala +−/±/=/∓/−+, perspectiva blancas. */
+  evaluacionMotor: EvalSymbol;
+  fuente: 'pipeline-stoyko' | 'seed-dev';
+}
+
+/** Versión del catálogo de Stoyko embebido (mismo patrón que `RadarDatasetMeta`). */
+export interface StoykoDatasetMeta {
+  id: 'catalogo';
+  version: string;
+  seededAt: string; // ISO 8601
 }

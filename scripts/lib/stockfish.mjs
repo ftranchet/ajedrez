@@ -42,12 +42,13 @@ export class StockfishEngine {
     const depth = Number(/\bdepth (\d+)/.exec(line)?.[1] ?? 0);
     const pvIndex = Number(/\bmultipv (\d+)/.exec(line)?.[1] ?? 1);
     const scoreMatch = /\bscore (cp|mate) (-?\d+)/.exec(line);
-    const pvMove = /\bpv ([a-h][1-8][a-h][1-8][qrbn]?)/.exec(line)?.[1];
+    const pvList = /\bpv (.+)$/.exec(line)?.[1];
+    const pvMove = pvList?.split(' ')[0];
     if (depth > 0 && scoreMatch && pvMove) {
       const score = parseScore(scoreMatch[1], scoreMatch[2]);
       const previous = this.multipv.get(pvIndex);
       if (score !== null && (!previous || depth >= previous.depth)) {
-        this.multipv.set(pvIndex, { depth, move: pvMove, score });
+        this.multipv.set(pvIndex, { depth, move: pvMove, score, pv: pvList.split(' ') });
       }
     }
 
