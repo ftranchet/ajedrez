@@ -111,7 +111,7 @@ Coordenadas: `font-mono` 10–11 px, peso 600, dentro de la casilla (files abajo
 
 | Contexto | Composición |
 |---|---|
-| Celular vertical (<640 px) | Tablero arriba a ancho completo; panel de acción abajo; navegación inferior de 3 ítems: Hoy / Jugar / Panel |
+| Celular vertical (<640 px) | Tablero arriba a ancho completo; panel de acción abajo; navegación inferior de 4 ítems: Hoy / Jugar / Cálculo / Panel |
 | Celular horizontal / tablet (640–1024) | Tablero a la izquierda (≤60%), panel a la derecha; navegación colapsada |
 | Escritorio (>1024) | Tablero centrado (máx. 640 px), panel contextual a la derecha, navegación lateral izquierda fina |
 

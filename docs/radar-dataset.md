@@ -8,6 +8,21 @@ Este documento describe cómo se genera el catálogo offline del Radar de ELOmax
 
 Los exports de base de datos de Lichess son CC0 y su formato oficial explica que el FEN del puzzle es anterior a la jugada de armado; por eso el pipeline aplica la primera UCI antes de guardar la posición que ve el usuario. Fuente: [Lichess open database](https://database.lichess.org/).
 
+## Subtipo doble solución (RF-5.7)
+
+Sobre ese lote base, `radar-97561c841622` agrega 7 posiciones con el subtipo anti-Einstellung (RF-5.7): una jugada "familiar" que también gana con claridad, pero es objetivamente peor que la superior. No se sacaron del export de puzzles de Lichess (curados justamente para tener una sola solución: minar ese catálogo con MultiPV de Stockfish, sobre 15 posiciones probadas, dio 0 candidatas) ni de partidas reales (sin acceso de red en este entorno de desarrollo — ver limitación documentada en `docs/roadmap.md`, Fase 2).
+
+En su lugar, `scripts/mine-doble-solucion.mjs` genera posiciones por autojuego del motor local (profundidad 7, para variedad realista sin gastar tiempo de más) y criba cada una con MultiPV a profundidad 14 — mismo estándar que las tranquilas. Esa criba sola resultó insuficiente para esta afirmación más fina ("esta jugada específica es la segunda mejor", no solo "la mejor es buena"): sobre 10 candidatas iniciales, una reconfirmación a profundidad 17 descartó 3 por no sostener el margen a mayor profundidad (una vio colapsar la diferencia a 60 cp, otra terminó empatada con la mejor). Las 7 que sobrevivieron se agregaron al lote con `scripts/finalize-doble-solucion.mjs`, tras una verificación final de legalidad con chess.js. Ninguna tiene rating calibrado (no hay una comunidad detrás, a diferencia de los puzzles de Lichess): usan un valor fijo de 1500, documentado como simplificación v1.
+
+Es un lote chico a propósito: la tasa de acierto de este método (~0.3–1% de las posiciones revisadas sostienen la afirmación a profundidad 17) hace que sumar más sea una cuestión de tiempo de cómputo, no de otra técnica. Reproducible con:
+
+```sh
+node scripts/mine-doble-solucion.mjs --target 6 --max-checked 1200 --checkpoint /ruta/checkpoint.json
+# revisar a mano las candidatas del checkpoint, reconfirmar a profundidad 17
+# las que sobrevivan, sumarlas a CANDIDATOS en finalize-doble-solucion.mjs
+node scripts/finalize-doble-solucion.mjs
+```
+
 ## Generación reproducible
 
 Requisitos: Node 20+, `zstd`, y `script` (util-linux; da un pseudo-terminal al binario WASM de Stockfish). Los archivos de entrada no se versionan en este repositorio.
