@@ -256,7 +256,7 @@ function ColaPanel() {
       {s.colaSubPhase === 'feedback' && (
         <FeedbackPanel
           acierto={s.colaUltimoAcierto ?? false}
-          texto={s.colaUltimoAcierto ? '' : `${t.radar.jugadaCorrecta}: ${s.colaJugadaCorrecta}`}
+          texto=""
           jugadaCorrecta={s.colaJugadaCorrecta ?? ''}
           onContinuar={() => s.colaContinuar()}
         />
@@ -286,7 +286,7 @@ function CurriculumPanel() {
       {s.curriculumSubPhase === 'feedback' && (
         <FeedbackPanel
           acierto={s.curriculumUltimaLimpia ?? false}
-          texto={s.curriculumUltimaLimpia ? '' : `${t.radar.jugadaCorrecta}: ${s.curriculumJugadaCorrecta}`}
+          texto=""
           jugadaCorrecta={s.curriculumJugadaCorrecta ?? ''}
           onContinuar={() => s.curriculumContinuar()}
         />
@@ -335,7 +335,10 @@ function TriagePanel() {
 
 function RadarPanel() {
   const s = useSessionStore();
-  const actual = Math.min(s.radarServidos + 1, s.dieta.radarCount);
+  // radarServidos ya cuenta la posición actual cuando se está en feedback
+  // (se incrementa al resolver); antes de eso, la posición en curso es la
+  // siguiente al contador.
+  const actual = Math.min(s.radarSubPhase === 'feedback' ? s.radarServidos : s.radarServidos + 1, s.dieta.radarCount);
 
   return (
     <div className="flex flex-col gap-3">

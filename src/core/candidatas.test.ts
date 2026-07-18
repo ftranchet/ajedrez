@@ -36,3 +36,22 @@ describe('clasificarCambioCandidata', () => {
     expect(clasificarCambioCandidata(item, 'e2e4', 'e2e4')).toBe('sin-cambio');
   });
 });
+
+describe('clasificarCambioCandidata sobre un ítem de doble solución (RF-5.7)', () => {
+  // Mismo criterio de acierto que la resolución del Radar: la familiar
+  // también es acierto, así que cambiar entre familiar y superior no es
+  // "mejorar" ni "empeorar" — y abandonar la familiar por otra cosa sí empeora.
+  const itemDS: RadarItem = { ...item, dobleSolucion: { familiar: 'd2d4' } };
+
+  it('de familiar a superior: sin cambio (ambas son acierto)', () => {
+    expect(clasificarCambioCandidata(itemDS, 'd2d4', 'e2e4')).toBe('sin-cambio');
+  });
+
+  it('de familiar a otra jugada: empeoró (abandonó un acierto)', () => {
+    expect(clasificarCambioCandidata(itemDS, 'd2d4', 'a2a3')).toBe('empeoro');
+  });
+
+  it('de otra jugada a familiar: mejoró (llegó a un acierto)', () => {
+    expect(clasificarCambioCandidata(itemDS, 'a2a3', 'd2d4')).toBe('mejoro');
+  });
+});

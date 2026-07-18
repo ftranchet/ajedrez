@@ -3,7 +3,7 @@
 // evaluación y mejor jugada. Vive en services/ porque usa EnginePort; la
 // lógica de clasificación es pura y está en core/analysis.ts.
 import { Chess } from 'chess.js';
-import type { EnginePort } from '../../core/ports';
+import type { EngineEvaluation, EnginePort } from '../../core/ports';
 import type { EngineEvalAtPly } from '../../core/analysis';
 import type { Color } from '../../core/types';
 
@@ -41,7 +41,15 @@ export async function analyzeGameWithEngine(
   for (let ply = 0; ply <= moves.length; ply++) {
     const fen = chess.fen();
     const sideToMove: Color = chess.turn();
-    const result = await engine.evaluate(fen, depth);
+    // Posición terminal (mate o ahogado): sin jugadas legales, el motor
+    // responde "bestmove (none)" y el adaptador lo trata como error. Solo
+    // puede pasar en la última posición de la partida; se sintetiza la
+    // evaluación sin consultar al motor.
+    const result: EngineEvaluation = chess.isCheckmate()
+      ? { move: '', cp: null, mateIn: -1 } // quien mueve está en mate
+      : chess.isStalemate()
+        ? { move: '', cp: 0, mateIn: null }
+        : await engine.evaluate(fen, depth);
     const cpAntes = cpInWhitePerspective(result.cp ?? 0, result.mateIn, sideToMove);
 
     const move = moves[ply];

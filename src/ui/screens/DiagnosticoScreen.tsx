@@ -91,7 +91,12 @@ function RadarDiagnostico() {
       <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
         <div className="rounded-lg border border-subtle bg-surface p-4">
           <p className="m-0 font-mono text-xs text-tertiary">
-            {t.diagnostico.radarProgreso.replace('{actual}', String(s.radarServidos + 1)).replace('{total}', '20')}
+            {/* radarServidos ya cuenta la posición actual durante el feedback
+                (se incrementa al responder); sin esto, el feedback de la
+                posición 20 mostraba "21 de 20". */}
+            {t.diagnostico.radarProgreso
+              .replace('{actual}', String(s.radarSubPhase === 'feedback' ? s.radarServidos : s.radarServidos + 1))
+              .replace('{total}', '20')}
           </p>
           <p className="m-0 mt-1 font-display text-xl">{t.radar.titulo}</p>
         </div>

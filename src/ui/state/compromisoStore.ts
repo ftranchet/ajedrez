@@ -2,13 +2,27 @@
 // (3 a 7 plies) antes de que el tablero se mueva — nunca antes, para que la
 // consigna sea real. Reutiliza el catálogo del Radar, ya verificado.
 import { create } from 'zustand';
+import { Chess } from 'chess.js';
 import type { RadarItem } from '../../core/types';
 import { evaluarLinea, itemsParaCompromiso, type ResultadoCompromiso } from '../../core/compromiso';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
 import { sanDeLinea } from './chessBoardUtils';
+import { t } from '../i18n/es';
 
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
+
+/** Reproduce la línea ya ingresada desde el FEN del ítem, para validar la
+ * legalidad del próximo ply (design system §5, LineComposer). */
+function replayLinea(fen: string, uciMoves: string[]): Chess {
+  const chess = new Chess(fen);
+  for (const uci of uciMoves) {
+    const move = chess.moves({ verbose: true }).find((m) => m.from + m.to + (m.promotion ?? '') === uci);
+    if (!move) break; // no debería pasar: cada ply se validó al ingresarlo
+    chess.move(move);
+  }
+  return chess;
+}
 
 type Phase = 'cargando' | 'sinContenido' | 'jugando' | 'feedback';
 
@@ -84,7 +98,15 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
       if (s.phase !== 'jugando' || !s.item) return;
       const jugada = s.inputActual.trim().toLowerCase();
       if (!UCI_RE.test(jugada)) {
-        set({ inputError: 'Formato inválido — usá casilla de origen y destino, p. ej. e2e4.' });
+        set({ inputError: t.calculo.errorFormato });
+        return;
+      }
+      // Validación de legalidad por ply (design system §5, LineComposer): la
+      // jugada debe ser legal en la posición que dejan los plies anteriores.
+      const posicion = replayLinea(s.item.fen, s.lineaIngresada);
+      const legales = posicion.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ''));
+      if (!legales.includes(jugada)) {
+        set({ inputError: t.calculo.errorIlegal });
         return;
       }
       const lineaIngresada = [...s.lineaIngresada, jugada];

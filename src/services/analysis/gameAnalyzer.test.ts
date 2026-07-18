@@ -59,6 +59,27 @@ describe('analyzeGameWithEngine', () => {
     expect(progresos).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
+  it('una partida que termina en jaque mate se analiza sin consultar al motor en la posición final', async () => {
+    // En una posición terminal el motor real responde "bestmove (none)" y el
+    // adaptador lo trata como error: antes de la guarda, analizar cualquier
+    // partida terminada en mate tiraba y el análisis quedaba colgado.
+    const pgnConMate = '1. f3 e5 2. g4 Qh4# 0-1';
+    const evals = await analyzeGameWithEngine(pgnConMate, new FakeAnalysisEngine());
+    expect(evals).toHaveLength(5);
+    // Posición final: blancas a mover, en mate → decisivo para negras en perspectiva blancas.
+    expect(evals[4].ladoQueMueve).toBe('w');
+    expect(evals[4].cpAntes).toBeLessThan(-10_000);
+
+    // Y la jugada de mate no se clasifica como error de quien la dio.
+    const analysis = buildGameAnalysis(evals, {
+      momentoCriticoPly: 0,
+      plan: '',
+      evaluaciones: [],
+      completadaEn: '2026-07-17T00:00:00.000Z',
+    });
+    expect(analysis.jugadas[3].clasificacion).toBe('buena');
+  });
+
   it('invierte el signo cuando la posición se evalúa con negras a mover (perspectiva blancas)', async () => {
     // 4. Ba6?? cuelga el alfil sin compensación (verificado con chess.js);
     // en la posición resultante (negras a mover) el motor ve la recaptura

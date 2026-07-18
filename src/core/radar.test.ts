@@ -125,6 +125,15 @@ describe('adjustDifficulty', () => {
     const next = adjustDifficulty(RADAR_INITIAL_STATE, true, 0.7);
     expect(Math.abs(next.ratingCentro - RADAR_INITIAL_STATE.ratingCentro)).toBeLessThan(40);
   });
+
+  it('no empuja el centro más allá del rango del catálogo (800–2000)', () => {
+    // Sin tope, una racha sostenida dejaba el centro fuera del rango de
+    // cualquier posición y el filtro por banda quedaba vacío para siempre.
+    const arriba = adjustDifficulty({ ...RADAR_INITIAL_STATE, ratingCentro: 2000 }, true, 0.9);
+    expect(arriba.ratingCentro).toBe(2000);
+    const abajo = adjustDifficulty({ ...RADAR_INITIAL_STATE, ratingCentro: 800 }, false, 0.4);
+    expect(abajo.ratingCentro).toBe(800);
+  });
 });
 
 describe('explainFeedback', () => {

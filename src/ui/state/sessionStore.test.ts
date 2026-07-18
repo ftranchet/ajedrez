@@ -237,6 +237,31 @@ describe('sessionStore — bloque Cola', () => {
     expect(s.phase).toBe('radar');
   });
 
+  it('una jugada de promoción no rompe el flujo: corona dama por defecto y puntúa contra la solución', async () => {
+    // chess.js tira si una jugada que corona llega sin pieza de promoción, y
+    // el tablero de la sesión no tiene selector: antes de la corrección,
+    // coronar en la Cola dejaba la sesión colgada en 'jugando'.
+    const vencida = buildErrorCard({
+      fen: '8/4P1k1/8/8/8/8/8/4K3 w - - 0 1',
+      ladoAMover: 'w',
+      jugadaUsuario: 'e1e2',
+      jugadaCorrecta: 'e7e8q',
+      categoria: 'tactico',
+      origen: 'partida',
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    await db.errorCards.put(vencida);
+
+    await useSessionStore.getState().start();
+    let s = useSessionStore.getState();
+    expect(s.phase).toBe('cola');
+
+    await s.colaUserMove('e7' as never, 'e8' as never);
+    s = useSessionStore.getState();
+    expect(s.colaSubPhase).toBe('feedback');
+    expect(s.colaUltimoAcierto).toBe(true);
+  });
+
   it('una respuesta incorrecta en la Cola no espacia el intervalo (fallo reinicia, RF-4.2)', async () => {
     const vencida = buildErrorCard({
       fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',

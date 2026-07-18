@@ -16,6 +16,7 @@ import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
+import { t } from '../i18n/es';
 
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
 
@@ -100,17 +101,17 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     if (s.phase !== 'analizando' || !s.item) return;
     const jugada = s.inputActual.trim().toLowerCase();
     if (!UCI_RE.test(jugada)) {
-      set({ inputError: 'Formato inválido — usá casilla de origen y destino, p. ej. e2e4.' });
+      set({ inputError: t.calculo.errorFormato });
       return;
     }
     const chess = new Chess(s.item.fen);
     const legales = chess.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ''));
     if (!legales.includes(jugada)) {
-      set({ inputError: 'Esa jugada no es legal en esta posición.' });
+      set({ inputError: t.stoyko.errorIlegal });
       return;
     }
     if (s.candidatas.some((c) => c.jugada === jugada)) {
-      set({ inputError: 'Ya anotaste esa candidata.' });
+      set({ inputError: t.stoyko.errorDuplicada });
       return;
     }
     set({

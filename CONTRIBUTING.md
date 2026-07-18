@@ -56,4 +56,4 @@ La CI (GitHub Actions) corre lint + typecheck + test + build en cada push; no se
 `main` se publica automáticamente en GitHub Pages (workflow `deploy-pages.yml`, build con `BASE_PATH=/ajedrez/`). La fuente de Pages en la configuración del repo debe ser **GitHub Actions**, no una rama: publicar la rama sirve el código sin compilar y la página queda en blanco. Toda ruta a assets en el código usa `import.meta.env.BASE_URL` (nunca `/` absoluto), para que la app funcione en cualquier base.
 
 ## Estado actual
-Fase 1 — Radar + Cola Universal. Ver `docs/roadmap.md` para el criterio de salida de la fase.
+El estado por fase vive en un solo lugar: `docs/roadmap.md` (documento vivo, con criterio de salida por fase). No se duplica acá — la duplicación diverge, como ya pasó cuando esta sección decía "Fase 1" con el roadmap en Fase 4.

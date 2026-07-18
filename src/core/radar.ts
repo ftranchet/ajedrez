@@ -25,6 +25,13 @@ const VENTANA_TIPOS = 3; // cuántos tipos recientes penalizan la repetición
 const VENTANA_IDS = 8; // cuántos ids recientes se evitan
 const ANCHO_BANDA = 150; // ± sobre ratingCentro
 const PASO_AJUSTE = 40; // cuánto se mueve ratingCentro por respuesta
+// Rango de rating del catálogo (pipeline: puzzles 800–2000, ver
+// docs/radar-dataset.md). Sin este tope, una racha sostenida fuera de la
+// banda 60–80% empuja ratingCentro más allá de cualquier posición existente
+// y el filtro por banda queda vacío para siempre: la selección cae al pool
+// completo y la adaptación de RF-5.5 se apaga en silencio.
+const RATING_MIN = 800;
+const RATING_MAX = 2000;
 
 /**
  * Ajusta el centro de la banda de dificultad tras una respuesta (RF-5.5):
@@ -37,7 +44,8 @@ export function adjustDifficulty(state: RadarSelectionState, acierto: boolean, t
       : tasaAciertoReciente < 0.6
         ? -PASO_AJUSTE
         : (acierto ? 1 : -1) * (PASO_AJUSTE / 4); // deriva suave dentro de la banda buena
-  return { ...state, ratingCentro: state.ratingCentro + delta };
+  const ratingCentro = Math.min(RATING_MAX, Math.max(RATING_MIN, state.ratingCentro + delta));
+  return { ...state, ratingCentro };
 }
 
 function pesoPorTipo(tipo: TipoRadar, historialTipos: TipoRadar[]): number {

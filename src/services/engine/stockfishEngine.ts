@@ -13,6 +13,10 @@ interface AnalyzeOptions {
 export class StockfishEngine implements EnginePort {
   private worker: Worker | null = null;
   private initPromise: Promise<void> | null = null;
+  /** Cola de análisis: UCI es un protocolo con estado y dos `go` intercalados
+   * mezclan sus `bestmove` (p. ej. una partida en curso y un análisis E3
+   * disparados casi a la vez sobre este mismo singleton). */
+  private pending: Promise<unknown> = Promise.resolve();
 
   init(): Promise<void> {
     this.initPromise ??= this.boot();
@@ -43,7 +47,14 @@ export class StockfishEngine implements EnginePort {
     return this.analyze(fen, { skill: 20, depth });
   }
 
-  private async analyze(fen: string, opts: AnalyzeOptions): Promise<EngineEvaluation> {
+  private analyze(fen: string, opts: AnalyzeOptions): Promise<EngineEvaluation> {
+    const run = () => this.analyzeNow(fen, opts);
+    const result = this.pending.then(run, run);
+    this.pending = result.catch(() => {}); // un análisis fallido no bloquea los siguientes
+    return result;
+  }
+
+  private async analyzeNow(fen: string, opts: AnalyzeOptions): Promise<EngineEvaluation> {
     await this.init();
     const worker = this.worker;
     if (!worker) throw new Error('Motor no inicializado');

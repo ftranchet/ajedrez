@@ -56,6 +56,12 @@ cg-board {
   font-weight: 600;
 }
 
-/* Piezas §3.1: set Staunty, 90% de la casilla. Las reglas con la URL de cada
-   pieza se inyectan en runtime (src/ui/styles/pieceTheme.ts) porque dependen
-   de la base de despliegue (import.meta.env.BASE_URL). */
+/* Piezas §3.1: set Staunty, 90% de la casilla (5% de aire por lado). Las
+   reglas con la URL de cada pieza se inyectan en runtime
+   (src/ui/styles/pieceTheme.ts) porque dependen de la base de despliegue
+   (import.meta.env.BASE_URL). */
+.cg-wrap piece {
+  background-size: 90%;
+  background-position: center;
+  background-repeat: no-repeat;
+}

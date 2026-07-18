@@ -101,6 +101,28 @@ describe('compromisoStore', () => {
     expect(s.inputError).not.toBeNull();
   });
 
+  it('rechaza una jugada bien formada pero ilegal en la posición (LineComposer, design system §5)', async () => {
+    await useCompromisoStore.getState().empezar();
+    useCompromisoStore.getState().setInputActual('e2e4'); // el peón ya está en e4 en este FEN
+    useCompromisoStore.getState().agregarJugada();
+    const s = useCompromisoStore.getState();
+    expect(s.lineaIngresada).toEqual([]);
+    expect(s.inputError).not.toBeNull();
+  });
+
+  it('valida la legalidad de cada ply contra la línea ya declarada, no contra la posición inicial', async () => {
+    await useCompromisoStore.getState().empezar();
+    useCompromisoStore.getState().setInputActual('f1c4');
+    useCompromisoStore.getState().agregarJugada();
+    // f1c4 otra vez: era legal en la posición inicial, pero ya no después de
+    // la primera jugada de la línea (el alfil ya salió de f1).
+    useCompromisoStore.getState().setInputActual('f1c4');
+    useCompromisoStore.getState().agregarJugada();
+    const s = useCompromisoStore.getState();
+    expect(s.lineaIngresada).toEqual(['f1c4']);
+    expect(s.inputError).not.toBeNull();
+  });
+
   it('borrarUltima() quita la última jugada declarada', async () => {
     await useCompromisoStore.getState().empezar();
     useCompromisoStore.getState().setInputActual('f1c4');

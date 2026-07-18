@@ -101,8 +101,9 @@ export const es = {
     subtitulo: 'Declarás tu línea completa antes de que el tablero se mueva.',
     cargando: 'Buscando una posición…',
     sinContenido: 'Por ahora no hay posiciones con línea forzada verificada para este modo.',
-    empezar: 'Empezar',
     progreso: 'Jugada {actual} de {total}',
+    errorFormato: 'Formato inválido — usá casilla de origen y destino, p. ej. e2e4.',
+    errorIlegal: 'Esa jugada no es legal después de tu línea hasta acá.',
     consigna: 'Escribí tu jugada, la respuesta que esperás y tu continuación — una por vez, casilla de origen y destino (p. ej. e2e4).',
     placeholder: 'p. ej. e2e4',
     agregar: 'Agregar jugada',
@@ -127,13 +128,13 @@ export const es = {
     agregarCandidata: 'Agregar candidata',
     candidatasTitulo: 'Tus candidatas',
     quitar: 'Quitar',
-    sinCandidatas: 'Todavía no anotaste ninguna candidata.',
     terminarAnalisis: 'Terminar análisis',
     confianzaPregunta: '¿Qué tan segura/o estás de haber tenido la mejor jugada entre tus candidatas?',
     acierto: 'La tenías entre tus candidatas',
     fallo: 'No la tenías entre tus candidatas',
     lineaMotor: 'Línea del motor',
-    otraSemana: 'Volver a Hoy',
+    errorIlegal: 'Esa jugada no es legal en esta posición.',
+    errorDuplicada: 'Ya anotaste esa candidata.',
   },
   jugar: {
     titulo: 'Jugar',
@@ -176,8 +177,6 @@ export const es = {
     } as Record<string, string>,
   },
   analisis: {
-    tituloLista: 'Partidas sin analizar',
-    sinPendientes: 'No tenés partidas sin analizar.',
     analizar: 'Analizar',
     yaAnalizada: 'Analizada',
     muyCortaParaAnalizar: 'Muy corta para analizar',
@@ -185,7 +184,6 @@ export const es = {
 
     // Fase 1
     fase1Titulo: 'Fase 1 — tu análisis',
-    momentoTitulo: 'Marcá el momento crítico',
     momentoConsigna: 'Tocá la jugada donde sentiste que se definía la partida.',
     momentoSiguiente: 'Confirmar momento crítico',
     planTitulo: '¿Cuál era tu plan ahí?',
@@ -199,7 +197,6 @@ export const es = {
     evalIgual: '= (igual)',
     evalMejorNegras: '∓ (negras mejor)',
     evalMuyMejorNegras: '−+ (negras ganan)',
-    evalSiguiente: 'Confirmar',
 
     // Fase 2
     analizandoTitulo: 'El motor está analizando…',
@@ -211,7 +208,6 @@ export const es = {
     comparacionCoincide: 'coincidiste',
     comparacionNoCoincide: 'no coincidiste',
     verErrores: 'Revisar errores ({n})',
-    sinErrores: 'Sin errores graves — vas bien acá',
     terminarSinErrores: 'Terminar',
 
     // Confirmar errores

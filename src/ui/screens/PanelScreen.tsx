@@ -103,7 +103,7 @@ export function PanelScreen() {
 
       <DobleSolucionSummary attempts={dobleSolucionAttempts} />
 
-      <DatosSection />
+      <DatosSection onImported={() => setImportVersion((v) => v + 1)} />
     </div>
   );
 }
@@ -258,7 +258,7 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
   );
 }
 
-function DatosSection() {
+function DatosSection({ onImported }: { onImported: () => void }) {
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -297,6 +297,9 @@ function DatosSection() {
             .replace('{calibraciones}', String(outcome.resumen.calibraciones))
             .replace('{radar}', String(outcome.resumen.respuestasRadar)),
         );
+        // Sin esto, la lista de partidas y las métricas del Panel seguían
+        // mostrando el estado previo a la restauración hasta cambiar de pestaña.
+        onImported();
       } else {
         setMensaje(`${t.panel.importadoError}: ${outcome.error}`);
       }

@@ -109,6 +109,10 @@ export const useGameStore = create<GameState>((set, get) => {
     turnStartedAt = performance.now();
     try {
       const uci = await engine.bestMove(chess.fen(), levelById(get().levelId));
+      // La partida pudo terminar mientras el motor pensaba (p. ej. el usuario
+      // se rindió): aplicar la jugada ahora ensuciaría el tablero y el PGN ya
+      // guardado por finish().
+      if (get().phase !== 'playing') return;
       const from = uci.slice(0, 2) as Square;
       const to = uci.slice(2, 4) as Square;
       const promotion = uci.slice(4, 5) || undefined;

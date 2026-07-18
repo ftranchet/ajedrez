@@ -91,7 +91,10 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       radarAciertos: s.radarAciertos,
       radarTotal: DIAGNOSTICO_RADAR_TOTAL,
     });
-    await profileRepo.save({ id: 'principal', bandaElo: banda, diagnosticoCompletadoEn: new Date().toISOString() });
+    // Se preserva el resto del perfil (p. ej. la fecha del último Stoyko):
+    // pisarlo con un objeto nuevo borraría datos ajenos al diagnóstico.
+    const actual = await profileRepo.get();
+    await profileRepo.save({ ...actual, bandaElo: banda, diagnosticoCompletadoEn: new Date().toISOString() });
     set({ phase: 'resultado', bandaEstimada: banda, radarItem: null });
   }
 
@@ -146,7 +149,11 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       useGameStore.getState().reset();
       void (async () => {
         await radarItemRepo.ensureSeeded();
-        const pool = await radarItemRepo.list();
+        // Sin ítems de doble solución (RF-5.7) en el diagnóstico: acá la
+        // jugada "familiar" contaría como fallo y generaría una tarjeta de
+        // error, contradiciendo la regla de que la familiar también es
+        // acierto. Esa lógica vive en la sesión (sessionStore), no acá.
+        const pool = (await radarItemRepo.list()).filter((item) => !item.dobleSolucion);
         set({ phase: 'radar', radarPool: pool });
         const item = selectNextRadarItem(pool, RADAR_INITIAL_STATE, Math.random);
         loadRadarItem(item);
@@ -161,10 +168,13 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
         set(boardSnapshot());
         return;
       }
-      const jugadaUsuario = from + to + (promotion ?? '');
+      // Promoción a dama por defecto (mismo criterio que sessionStore):
+      // chess.js tira si la jugada corona y falta la pieza.
+      const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
+      const jugadaUsuario = from + to + (promo ?? '');
       const item = s.radarItem;
       const acierto = jugadaUsuario === item.solucion[0];
-      chess.move({ from, to, promotion });
+      chess.move({ from, to, promotion: promo });
 
       set({
         ...boardSnapshot(),

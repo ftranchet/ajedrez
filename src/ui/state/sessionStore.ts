@@ -243,7 +243,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
     if (!s.dieta.triageActivo || s.radarPool.length === 0) {
       return beginRadar();
     }
-    const queue = [...s.radarPool].sort(() => Math.random() - 0.5).slice(0, TRIAGE_SESSION_SIZE);
+    // Fisher-Yates parcial: sort(() => random - 0.5) no baraja uniforme.
+    const pool = [...s.radarPool];
+    for (let i = 0; i < Math.min(TRIAGE_SESSION_SIZE, pool.length); i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const queue = pool.slice(0, TRIAGE_SESSION_SIZE);
     set({ phase: 'triage', triageQueue: queue, triageIndex: 0 });
     loadTriageItem(queue[0]);
   }
@@ -409,10 +415,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
         set(boardSnapshot());
         return;
       }
-      const jugadaUsuario = from + to + (promotion ?? '');
+      // Promoción a dama por defecto (simplificación v1): el tablero de la
+      // sesión no tiene selector de pieza y chess.js tira si falta la pieza
+      // de promoción — sin esto, coronar rompía el flujo del bloque.
+      const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
+      const jugadaUsuario = from + to + (promo ?? '');
       const card = s.colaCards[s.colaIndex];
       const acierto = jugadaUsuario === card.jugadaCorrecta;
-      chess.move({ from, to, promotion });
+      chess.move({ from, to, promotion: promo });
 
       const revisada = reviewErrorCard(card, acierto);
       await errorCardRepo.save(revisada);
@@ -444,10 +454,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
         set(boardSnapshot());
         return;
       }
-      const jugadaUsuario = from + to + (promotion ?? '');
+      // Promoción a dama por defecto (mismo criterio que colaUserMove).
+      const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
+      const jugadaUsuario = from + to + (promo ?? '');
       const item = s.curriculumQueue[s.curriculumIndex];
       const limpia = jugadaUsuario === item.solucion[0];
-      chess.move({ from, to, promotion });
+      chess.move({ from, to, promotion: promo });
 
       const progresoPrevio = s.curriculumProgressById.get(item.id) ?? newCurriculumProgress(item.id);
       const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia);
@@ -499,9 +511,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
         set(boardSnapshot());
         return;
       }
-      const jugadaUsuario = from + to + (promotion ?? '');
+      // Promoción a dama por defecto (mismo criterio que colaUserMove).
+      const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
+      const jugadaUsuario = from + to + (promo ?? '');
       const item = s.radarItem;
-      chess.move({ from, to, promotion });
+      chess.move({ from, to, promotion: promo });
 
       // RF-5.8: en un ítem muestreado, la primera jugada no revela todavía —
       // pregunta "¿hay algo mejor?" antes de resolver.
