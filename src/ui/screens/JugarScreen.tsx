@@ -51,9 +51,21 @@ export function JugarScreen() {
           )}
         </div>
 
+        {/* Fallo del motor durante la partida: antes solo se veía en la pantalla
+            de configuración, así que en juego el usuario quedaba sin turno del
+            motor y sin explicación. */}
+        {s.engineError && s.phase === 'playing' && (
+          <div className="flex flex-col gap-2 rounded-lg border border-error/35 bg-error-subtle p-3">
+            <p className="m-0 text-sm text-primary">{t.jugar.errorMotorEnJuego}</p>
+            <button onClick={() => s.reset()} className="btn-secondary">
+              {t.jugar.nuevaPartida}
+            </button>
+          </div>
+        )}
+
         <MoveList moves={s.sanMoves} />
 
-        {s.phase === 'playing' && <ResignButton />}
+        {s.phase === 'playing' && !s.engineError && <ResignButton />}
         {s.phase === 'ended' && (
           <button onClick={() => s.reset()} className="btn-primary">
             {t.jugar.nuevaPartida}

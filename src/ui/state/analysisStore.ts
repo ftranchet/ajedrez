@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { Chess } from 'chess.js';
 import type { CategoriaError, Color, EvalSymbol, GameAnalysis, GameRecord, MoveAnalysisEntry, PhaseOneData } from '../../core/types';
 import { buildGameAnalysis, detectedErrorMoves, esMomentoCriticoValido, pickPhaseOnePositions } from '../../core/analysis';
-import { buildErrorCard } from '../../core/errorCard';
+import { altaErrorCard } from '../../core/errorCard';
 import { analyzeGameWithEngine } from '../../services/analysis/gameAnalyzer';
 import { engine } from '../../services/engine/stockfishEngine';
 import { gameRepo } from '../../services/storage/gameRepo';
@@ -18,6 +18,7 @@ type Phase =
   | 'fase1-plan'
   | 'fase1-evaluaciones'
   | 'fase2-analizando'
+  | 'fase2-error'
   | 'fase2-resultado'
   | 'confirmar-errores'
   | 'fin';
@@ -52,6 +53,8 @@ interface AnalysisState {
   marcarMomentoCritico(ply: number): void;
   confirmarPlan(texto: string): void;
   evaluarPosicion(valor: EvalSymbol): Promise<void>;
+  correrFase2(): Promise<void>;
+  reintentarAnalisis(): void;
   continuarAErrores(): void;
   elegirCategoria(categoria: CategoriaError): void;
   confirmarErrorActual(): Promise<void>;
@@ -111,9 +114,13 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   },
 
   confirmarPlan(texto) {
+    // El plan es la parte cognitivamente central de la fase 1 (RF-3.1b:
+    // "escribir su plan"): no se avanza con el campo vacío, para no saltearla.
+    // Guarda del lado del store, además del botón deshabilitado en la UI.
+    if (texto.trim() === '') return;
     const s = get();
     const posiciones = pickPhaseOnePositions(s.moves.length, 3);
-    set({ plan: texto, fase1Posiciones: posiciones, fase1EvalIndex: 0, fase1Evaluaciones: [], phase: 'fase1-evaluaciones' });
+    set({ plan: texto.trim(), fase1Posiciones: posiciones, fase1EvalIndex: 0, fase1Evaluaciones: [], phase: 'fase1-evaluaciones' });
   },
 
   async evaluarPosicion(valor) {
@@ -137,15 +144,33 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     const game = s.game!;
     const gameConFase1: GameRecord = { ...game, fase1 };
     await gameRepo.save(gameConFase1);
-    set({ game: gameConFase1, fase1Evaluaciones: evaluaciones, phase: 'fase2-analizando', progreso: null });
+    set({ game: gameConFase1, fase1Evaluaciones: evaluaciones });
+    await get().correrFase2();
+  },
 
-    const evals = await analyzeGameWithEngine(game.pgn, engine, {
-      onProgress: (p) => set({ progreso: p }),
-    });
-    const analysis = buildGameAnalysis(evals, fase1);
-    const gameFinal: GameRecord = { ...gameConFase1, analisis: analysis, analizada: true };
-    await gameRepo.save(gameFinal);
-    set({ game: gameFinal, analysis, phase: 'fase2-resultado' });
+  /** Corre la fase 2 (el motor) sobre la partida ya con fase 1 guardada. Si el
+   * motor falla (Worker no arranca, timeout), pasa a `fase2-error` en vez de
+   * quedar colgado para siempre en "analizando"; reintentar no repite la fase 1. */
+  async correrFase2() {
+    const game = get().game;
+    if (!game?.fase1) return;
+    set({ phase: 'fase2-analizando', progreso: null });
+    try {
+      const evals = await analyzeGameWithEngine(game.pgn, engine, {
+        onProgress: (p) => set({ progreso: p }),
+      });
+      const analysis = buildGameAnalysis(evals, game.fase1);
+      const gameFinal: GameRecord = { ...game, analisis: analysis, analizada: true };
+      await gameRepo.save(gameFinal);
+      set({ game: gameFinal, analysis, phase: 'fase2-resultado' });
+    } catch {
+      set({ phase: 'fase2-error', progreso: null });
+    }
+  },
+
+  reintentarAnalisis() {
+    if (get().phase !== 'fase2-error') return;
+    void get().correrFase2();
   },
 
   continuarAErrores() {
@@ -169,7 +194,10 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     const s = get();
     const entry = s.erroresPendientes[0];
     if (!entry) return;
-    const card = buildErrorCard({
+    // Dedup por identidad + tope diario (RF-4.1/4.5): el mismo error en dos
+    // análisis no duplica la tarjeta, y no se avalancha la Cola.
+    const cards = await errorCardRepo.list();
+    const alta = altaErrorCard(cards, {
       fen: entry.fenAntes,
       ladoAMover: entry.ladoQueMueve,
       jugadaUsuario: entry.jugadaUsuario,
@@ -177,7 +205,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       categoria: s.errorActualCategoria,
       origen: 'partida',
     });
-    await errorCardRepo.save(card);
+    if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
     const restantes = s.erroresPendientes.slice(1);
     set({
       erroresPendientes: restantes,

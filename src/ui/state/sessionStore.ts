@@ -23,7 +23,7 @@ import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
 import { clasificarRespuestaDobleSolucion, feedbackConformismo } from '../../core/dobleSolucion';
-import { buildErrorCard } from '../../core/errorCard';
+import { altaErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -114,6 +114,14 @@ interface SessionState {
   // Tablero compartido entre Cola y Radar
   fen: string;
   turn: Color;
+  /**
+   * Lado desde el que se ve el tablero, fijado al cargar la posición (el lado
+   * que resuelve). No es `turn`: tras la jugada del usuario `turn` pasa al
+   * rival y, si el tablero se orientara por `turn`, giraría 180° justo en el
+   * feedback —revelando la solución del revés—. La orientación queda quieta
+   * toda la posición.
+   */
+  boardOrientation: Color;
   dests: Map<string, string[]>;
   lastMove: [string, string] | null;
   check: boolean;
@@ -147,6 +155,12 @@ function boardSnapshot() {
     dests: computeDests(chess),
     check: chess.inCheck(),
   };
+}
+
+/** Snapshot al CARGAR una posición: además fija la orientación al lado que
+ * resuelve (el que mueve ahora), para que el tablero no gire tras la jugada. */
+function loadSnapshot() {
+  return { ...boardSnapshot(), boardOrientation: chess.turn() as Color };
 }
 
 function tasaAciertoReciente(historial: boolean[]): number {
@@ -192,7 +206,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarJugadaUsuario: null,
       radarCandidataActiva: shouldSampleCandidata(),
       radarCandidataJugadaOriginal: null,
-      ...boardSnapshot(),
+      ...loadSnapshot(),
       lastMove: null,
     });
   }
@@ -208,7 +222,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       colaSubPhase: 'jugando',
       colaUltimoAcierto: null,
       colaJugadaCorrecta: null,
-      ...boardSnapshot(),
+      ...loadSnapshot(),
       lastMove: null,
     });
   }
@@ -225,7 +239,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       curriculumSubPhase: 'jugando',
       curriculumUltimaLimpia: null,
       curriculumJugadaCorrecta: null,
-      ...boardSnapshot(),
+      ...loadSnapshot(),
       lastMove: null,
     });
   }
@@ -240,7 +254,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       triageSubPhase: 'decidiendo',
       triageUltimaCorrecta: null,
       triageDecisionCorrecta: null,
-      ...boardSnapshot(),
+      ...loadSnapshot(),
       lastMove: null,
     });
   }
@@ -338,6 +352,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     fen: chess.fen(),
     turn: 'w',
+    boardOrientation: 'w',
     dests: new Map(),
     lastMove: null,
     check: false,
@@ -611,7 +626,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       fecha: new Date().toISOString(),
     });
     if (!acierto) {
-      const card = buildErrorCard({
+      // Dedup por identidad + tope diario (RF-4.1/4.5): si ya hay una tarjeta
+      // de esta posición se refuerza en vez de duplicar; superado el tope
+      // diario de tarjetas nuevas, se omite para no avalanchar la Cola.
+      const cards = await errorCardRepo.list();
+      const alta = altaErrorCard(cards, {
         fen: item.fen,
         ladoAMover: item.fen.split(' ')[1] === 'b' ? 'b' : 'w',
         jugadaUsuario,
@@ -619,7 +638,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         categoria: categoriaFromTipo(item.tipo),
         origen: 'radar',
       });
-      await errorCardRepo.save(card);
+      if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
     }
   }
 

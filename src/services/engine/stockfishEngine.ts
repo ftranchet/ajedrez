@@ -19,7 +19,16 @@ export class StockfishEngine implements EnginePort {
   private pending: Promise<unknown> = Promise.resolve();
 
   init(): Promise<void> {
-    this.initPromise ??= this.boot();
+    this.initPromise ??= this.boot().catch((err) => {
+      // Un fallo de arranque (sin red / cache frío la primera vez) no debe
+      // quedar cacheado para siempre: sin esto, `??=` conservaba la promesa
+      // rechazada y ningún reintento podía volver a bootear sin recargar la
+      // página. Se limpia el estado para que la próxima llamada re-intente.
+      this.initPromise = null;
+      this.worker?.terminate();
+      this.worker = null;
+      throw err;
+    });
     return this.initPromise;
   }
 
@@ -106,6 +115,10 @@ export class StockfishEngine implements EnginePort {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         worker.removeEventListener('message', onMessage);
+        // Cortar la búsqueda en curso: sin `stop`, el motor sigue pensando y su
+        // `bestmove` tardío podría llegar durante la siguiente operación y
+        // resolverla con un resultado ajeno.
+        worker.postMessage('stop');
         reject(new Error(`Timeout esperando ${pattern}`));
       }, timeoutMs);
       const onMessage = (e: MessageEvent) => {

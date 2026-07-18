@@ -40,6 +40,25 @@ beforeEach(async () => {
 });
 
 describe('sessionStore — bloque Radar', () => {
+  it('la orientación del tablero queda fija tras jugar (no gira 180° en el feedback)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // sin candidatas ni confianza
+    await useSessionStore.getState().start();
+    let s = useSessionStore.getState();
+    const orientacionInicial = s.boardOrientation;
+    expect(orientacionInicial).toBe(s.turn); // al cargar, se ve desde el lado que resuelve
+
+    s.radarEval('igual');
+    s = useSessionStore.getState();
+    const [from, destinos] = s.dests.entries().next().value as [string, string[]];
+    await s.radarUserMove(from as never, destinos[0] as never);
+    vi.restoreAllMocks();
+
+    s = useSessionStore.getState();
+    // Tras la jugada, el turno pasó al rival pero la orientación no se movió.
+    expect(s.turn).not.toBe(orientacionInicial);
+    expect(s.boardOrientation).toBe(orientacionInicial);
+  });
+
   it('sin tarjetas vencidas, arranca directo en el Radar con el pool sembrado', async () => {
     await useSessionStore.getState().start();
     const s = useSessionStore.getState();

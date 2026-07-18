@@ -234,7 +234,7 @@ function SesionActiva() {
       <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board
           fen={s.fen}
-          orientation={s.turn}
+          orientation={s.boardOrientation}
           turn={s.turn}
           lastMove={s.lastMove}
           check={s.check}

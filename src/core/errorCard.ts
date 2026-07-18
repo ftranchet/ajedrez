@@ -45,3 +45,48 @@ export function dueErrorCards(cards: ErrorCard[], now: Date = new Date()): Error
 export function leechCards(cards: ErrorCard[], umbralLapsos = 5): ErrorCard[] {
   return cards.filter((c) => c.fsrs.lapses > umbralLapsos);
 }
+
+/**
+ * Identidad ajedrecística de una tarjeta: misma posición y misma respuesta
+ * correcta. Dos fallos de la misma posición (p. ej. un ítem del Radar que
+ * reaparece, o el mismo error en dos análisis) no deben crear dos tarjetas
+ * distintas — la Cola es una sola cola sin duplicados (E4).
+ */
+export function tarjetaEquivalente(cards: ErrorCard[], fen: string, jugadaCorrecta: string): ErrorCard | undefined {
+  return cards.find((c) => c.fen === fen && c.jugadaCorrecta === jugadaCorrecta);
+}
+
+/** Tope diario de tarjetas nuevas por defecto (RF-4.5): evita avalanchas de repaso. */
+export const TOPE_DIARIO_NUEVAS = 10;
+
+/** Cuántas tarjetas nuevas se crearon hoy (por `creadaEn`), para el tope de RF-4.5. */
+export function tarjetasNuevasHoy(cards: ErrorCard[], now: Date = new Date()): number {
+  const hoy = now.toISOString().slice(0, 10);
+  return cards.filter((c) => c.creadaEn.slice(0, 10) === hoy).length;
+}
+
+export type AltaTarjeta =
+  | { accion: 'crear'; card: ErrorCard }
+  | { accion: 'reforzar'; card: ErrorCard }
+  | { accion: 'omitir' };
+
+/**
+ * Decide qué hacer ante un nuevo fallo, antes de tocar el almacenamiento
+ * (RF-4.1/4.5):
+ * - si ya existe una tarjeta con la misma identidad → **reforzar** (un fallo
+ *   sobre la existente, que adelanta su repaso), en vez de duplicar;
+ * - si no existe pero ya se alcanzó el tope diario de tarjetas nuevas → **omitir**;
+ * - si no → **crear** una tarjeta nueva.
+ */
+export function altaErrorCard(
+  cards: ErrorCard[],
+  args: BuildErrorCardArgs,
+  opts: { topeDiario?: number } = {},
+): AltaTarjeta {
+  const now = args.now ?? new Date();
+  const tope = opts.topeDiario ?? TOPE_DIARIO_NUEVAS;
+  const existente = tarjetaEquivalente(cards, args.fen, args.jugadaCorrecta);
+  if (existente) return { accion: 'reforzar', card: reviewErrorCard(existente, false, now) };
+  if (tarjetasNuevasHoy(cards, now) >= tope) return { accion: 'omitir' };
+  return { accion: 'crear', card: buildErrorCard(args) };
+}

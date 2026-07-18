@@ -10,7 +10,7 @@ import { Chess, type Square } from 'chess.js';
 import type { Color, RadarItem } from '../../core/types';
 import { RADAR_INITIAL_STATE, categoriaFromTipo, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
 import { estimarBandaElo, type ResultadoPartida } from '../../core/prescriptor';
-import { buildErrorCard } from '../../core/errorCard';
+import { altaErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -47,6 +47,8 @@ interface DiagnosticoState {
 
   fen: string;
   turn: Color;
+  /** Lado que resuelve, fijado al cargar: el tablero no gira tras la jugada (ver sessionStore). */
+  boardOrientation: Color;
   dests: Map<string, string[]>;
   lastMove: [string, string] | null;
   check: boolean;
@@ -85,7 +87,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       return;
     }
     chess = new Chess(item.fen);
-    set({ radarItem: item, radarSubPhase: 'jugando', radarUltimoAcierto: null, radarFeedbackTexto: '', radarJugadaCorrecta: null, ...boardSnapshot(), lastMove: null });
+    set({ radarItem: item, radarSubPhase: 'jugando', radarUltimoAcierto: null, radarFeedbackTexto: '', radarJugadaCorrecta: null, ...boardSnapshot(), boardOrientation: chess.turn() as Color, lastMove: null });
   }
 
   async function finalizarConResultado() {
@@ -120,6 +122,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
 
     fen: chess.fen(),
     turn: 'w',
+    boardOrientation: 'w',
     dests: new Map(),
     lastMove: null,
     check: false,
@@ -201,7 +204,9 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
 
       await radarAttemptRepo.save({ id: crypto.randomUUID(), itemId: item.id, tipo: item.tipo, rating: item.rating, acierto, fecha: new Date().toISOString() });
       if (!acierto) {
-        const card = buildErrorCard({
+        // Dedup + tope diario (RF-4.1/4.5), igual que en la sesión.
+        const cards = await errorCardRepo.list();
+        const alta = altaErrorCard(cards, {
           fen: item.fen,
           ladoAMover: item.fen.split(' ')[1] === 'b' ? 'b' : 'w',
           jugadaUsuario,
@@ -209,7 +214,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
           categoria: categoriaFromTipo(item.tipo),
           origen: 'radar',
         });
-        await errorCardRepo.save(card);
+        if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
       }
     },
 

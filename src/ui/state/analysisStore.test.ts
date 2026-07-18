@@ -11,6 +11,7 @@ vi.mock('../../services/engine/stockfishEngine', () => ({
 }));
 
 const { useAnalysisStore } = await import('./analysisStore');
+const { engine } = await import('../../services/engine/stockfishEngine');
 const { db } = await import('../../services/storage/db');
 const { buildGameRecord } = await import('../../core/game');
 
@@ -53,6 +54,11 @@ describe('analysisStore — fase 1', () => {
     await db.games.put(game);
     await useAnalysisStore.getState().iniciar(game.id);
     useAnalysisStore.getState().marcarMomentoCritico(2);
+
+    // Un plan vacío no avanza (RF-3.1b: la parte central de la fase 1).
+    useAnalysisStore.getState().confirmarPlan('   ');
+    expect(useAnalysisStore.getState().phase).toBe('fase1-plan');
+
     useAnalysisStore.getState().confirmarPlan('Desarrollar rápido y enrocar');
 
     let s = useAnalysisStore.getState();
@@ -87,6 +93,29 @@ describe('analysisStore — fase 1', () => {
     const guardado = await db.games.get(game.id);
     expect(guardado?.fase1?.plan).toBe('plan');
     expect(guardado?.fase1?.evaluaciones).toHaveLength(3);
+  });
+
+  it('si el motor falla, pasa a fase2-error (no queda colgado) y se puede reintentar', async () => {
+    const game = buildGameRecord({ pgn: PGN_CON_ERROR, resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(game);
+    await useAnalysisStore.getState().iniciar(game.id);
+    useAnalysisStore.getState().marcarMomentoCritico(2);
+    useAnalysisStore.getState().confirmarPlan('plan');
+
+    // El motor tira durante la fase 2.
+    const spy = vi.spyOn(engine, 'evaluate').mockRejectedValue(new Error('boom'));
+    await useAnalysisStore.getState().evaluarPosicion('=');
+    await useAnalysisStore.getState().evaluarPosicion('=');
+    await useAnalysisStore.getState().evaluarPosicion('=');
+    expect(useAnalysisStore.getState().phase).toBe('fase2-error');
+    // La fase 1 quedó guardada pese al fallo.
+    expect((await db.games.get(game.id))?.fase1?.plan).toBe('plan');
+
+    // Reintentar con el motor ya funcionando llega al resultado sin repetir la fase 1.
+    spy.mockRestore();
+    await useAnalysisStore.getState().correrFase2();
+    expect(useAnalysisStore.getState().phase).toBe('fase2-resultado');
+    expect(useAnalysisStore.getState().analysis).not.toBeNull();
   });
 });
 

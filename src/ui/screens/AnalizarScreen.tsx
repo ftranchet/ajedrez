@@ -19,6 +19,7 @@ export function AnalizarScreen() {
   if (phase === 'fase1-plan') return <Plan />;
   if (phase === 'fase1-evaluaciones') return <Evaluaciones />;
   if (phase === 'fase2-analizando') return <Analizando />;
+  if (phase === 'fase2-error') return <ErrorMotor />;
   if (phase === 'fase2-resultado') return <Resultado />;
   if (phase === 'confirmar-errores') return <ConfirmarErrores />;
   if (phase === 'fin') return <Fin />;
@@ -66,7 +67,7 @@ function Plan() {
         rows={3}
         className="w-full resize-none rounded-lg border border-subtle bg-surface p-3 text-primary placeholder:text-tertiary focus-visible:border-accent"
       />
-      <button className="btn-primary" onClick={() => confirmarPlan(texto)}>
+      <button className="btn-primary" disabled={texto.trim() === ''} onClick={() => confirmarPlan(texto)}>
         {t.analisis.planSiguiente}
       </button>
     </div>
@@ -107,6 +108,22 @@ function Analizando() {
           {t.analisis.analizandoProgreso.replace('{actual}', String(progreso.ply + 1)).replace('{total}', String(progreso.totalPlies + 1))}
         </p>
       )}
+    </div>
+  );
+}
+
+function ErrorMotor() {
+  const s = useAnalysisStore();
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
+      <Encabezado titulo={t.analisis.errorMotorTitulo} />
+      <p className="m-0 text-secondary">{t.analisis.errorMotorTexto}</p>
+      <button className="btn-primary" onClick={() => s.reintentarAnalisis()}>
+        {t.analisis.errorMotorReintentar}
+      </button>
+      <button className="btn-secondary" onClick={() => s.volver()}>
+        {t.analisis.volver}
+      </button>
     </div>
   );
 }

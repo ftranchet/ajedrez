@@ -149,6 +149,7 @@ export const es = {
     empezar: 'Empezar partida',
     cargandoMotor: 'Cargando el motor…',
     errorMotor: 'El motor no pudo cargar. Revisá tu conexión la primera vez; después funciona sin internet.',
+    errorMotorEnJuego: 'El motor dejó de responder. Podés empezar una partida nueva.',
     teToca: 'Te toca',
     pensando: 'El motor piensa…',
     jaque: 'Jaque',
@@ -202,6 +203,9 @@ export const es = {
     // Fase 2
     analizandoTitulo: 'El motor está analizando…',
     analizandoProgreso: 'Jugada {actual} de {total}',
+    errorMotorTitulo: 'El motor no pudo analizar',
+    errorMotorTexto: 'Puede ser un problema de carga del motor o de conexión la primera vez. Tu fase 1 quedó guardada; podés reintentar sin repetirla.',
+    errorMotorReintentar: 'Reintentar análisis',
     fase2Titulo: 'Fase 2 — el motor',
     curvaTitulo: 'Curva de evaluación',
     jugadasTitulo: 'Jugadas',
