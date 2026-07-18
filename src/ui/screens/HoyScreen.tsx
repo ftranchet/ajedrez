@@ -33,12 +33,14 @@ export function HoyScreen() {
 // antes de empezar.
 const MIN_POR_COLA = 0.75;
 const MIN_POR_CURRICULO = 0.75;
+const MIN_POR_TRIAGE = 0.5;
 const MIN_POR_RADAR = 1.25;
 const DURACION_MINIMA_MIN = 15;
 
 interface Bloque {
   texto: string;
   porque: string;
+  minutos: number;
 }
 
 function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloque[] {
@@ -48,23 +50,45 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
     bloques.push({
       texto: vencidas === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(vencidas)),
       porque: vencidas === 1 ? t.sesion.cardsVencidas_uno : t.sesion.cardsVencidas_otro.replace('{n}', String(vencidas)),
+      minutos: Math.max(1, Math.round(vencidas * MIN_POR_COLA)),
     });
   }
   const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
   if (curriculo > 0) {
-    bloques.push({ texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)), porque: t.sesion.bloqueCurriculoPorque });
+    bloques.push({
+      texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)),
+      porque: t.sesion.bloqueCurriculoPorque,
+      minutos: Math.max(1, Math.round(curriculo * MIN_POR_CURRICULO)),
+    });
   }
   if (s.dieta.triageActivo) {
     bloques.push({
       texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),
       porque: t.sesion.bloqueTriagePorque,
+      minutos: Math.max(1, Math.round(TRIAGE_SESSION_SIZE * MIN_POR_TRIAGE)),
     });
   }
   bloques.push({
     texto: t.sesion.bloqueRadar.replace('{n}', String(s.dieta.radarCount)),
     porque: s.dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
+    minutos: Math.max(1, Math.round(s.dieta.radarCount * MIN_POR_RADAR)),
   });
   return bloques;
+}
+
+// Nombres en español para el encabezado de fecha (font-mono, ver prototipo
+// docs/prototipos/sesion-de-hoy.dc.html). Se arman a mano en vez de usar
+// Intl.DateTimeFormat porque el formato con coma que da 'es-AR' no coincide
+// con el patrón validado ("JUEVES 16 DE JULIO").
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+function fechaDeHoy(): string {
+  const d = new Date();
+  return `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
 
 function Portada() {
@@ -82,30 +106,27 @@ function Portada() {
   if (!s.profile.diagnosticoCompletadoEn) return <DiagnosticoPrompt />;
 
   const bloques = bloquesDeLaSesion(s);
-  const vencidas = s.dueCount ?? 0;
-  const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
-  const duracionMin = Math.max(
-    DURACION_MINIMA_MIN,
-    Math.round(vencidas * MIN_POR_COLA + curriculo * MIN_POR_CURRICULO + s.dieta.radarCount * MIN_POR_RADAR),
-  );
+  const [siguiente, ...resto] = bloques;
+  const duracionMin = Math.max(DURACION_MINIMA_MIN, bloques.reduce((total, b) => total + b.minutos, 0));
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-      {/* Bloque héroe (design system §4.1): tarjeta destacada, un solo botón primario */}
-      <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.sesion.subtitulo}</span>
-          <span className="font-mono text-xs text-tertiary">{t.sesion.duracion.replace('{n}', String(duracionMin))}</span>
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
+        <div className="flex items-baseline justify-between">
+          <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+          <span className="font-mono text-sm text-secondary">{t.sesion.minutos.replace('{n}', String(duracionMin))}</span>
         </div>
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {bloques.map((b) => (
-            <li key={b.texto} className="flex flex-col">
-              <span className="text-sm text-primary">{b.texto}</span>
-              <span className="text-xs text-secondary">{b.porque}</span>
-            </li>
-          ))}
-        </ul>
+      </div>
+
+      {/* Bloque héroe (design system §4.1): el siguiente bloque, destacado con
+          borde accent y el único botón primario de la pantalla. */}
+      <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
+        <span className="font-mono text-xs tracking-wider text-accent uppercase">
+          {t.sesion.siguiente} · {t.sesion.minutos.replace('{n}', String(siguiente.minutos))}
+        </span>
+        <p className="m-0 font-display text-2xl font-medium">{siguiente.texto}</p>
+        <p className="m-0 text-sm text-secondary">{siguiente.porque}</p>
         <button
           onClick={() => void useSessionStore.getState().start()}
           disabled={s.phase === 'cargando'}
@@ -114,6 +135,23 @@ function Portada() {
           {s.phase === 'cargando' ? t.sesion.cargando : t.sesion.empezar}
         </button>
       </div>
+
+      {/* Bloques restantes: tarjetas secundarias debajo del héroe. */}
+      {resto.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {resto.map((b) => (
+            <li key={b.texto} className="flex items-center gap-3 rounded-md border border-subtle bg-surface p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-base font-mono text-xs text-secondary">
+                {t.sesion.minutos.replace('{n}', String(b.minutos))}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-sm font-semibold text-primary">{b.texto}</span>
+                <span className="text-xs text-secondary">{b.porque}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

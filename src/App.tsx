@@ -20,6 +20,36 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'panel', label: t.nav.panel },
 ];
 
+// Trazos de ícono por destino (prototipo docs/prototipos/sesion-de-hoy.dc.html):
+// líneas simples, un solo <path>, sin relleno. "Cálculo" no tenía ícono en el
+// prototipo (era una pestaña nueva); se agrega una línea quebrada como analogía
+// de la línea de jugadas que se declara en E7.
+const NAV_ICON_PATHS: Record<Tab, string> = {
+  hoy: 'M12 3l8 7v10h-5v-6h-6v6H4V10z',
+  jugar: 'M8 5v14l11-7z',
+  calculo: 'M4 17l5-5 3 3 8-8',
+  panel: 'M4 19V9m6 10V5m6 14v-8',
+};
+
+function NavIcon({ tab, active }: { tab: Tab; active: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={active ? 'text-accent' : 'text-tertiary'}
+    >
+      <path d={NAV_ICON_PATHS[tab]} />
+    </svg>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('hoy');
 
@@ -29,7 +59,7 @@ export default function App() {
       <nav className="hidden shrink-0 flex-col gap-1 border-r border-subtle p-2 lg:flex lg:w-36">
         <span className="px-3 py-2 font-display text-lg text-accent">{t.app.nombre}</span>
         {TABS.map((item) => (
-          <NavButton key={item.id} active={tab === item.id} onClick={() => setTab(item.id)}>
+          <NavButton key={item.id} tab={item.id} active={tab === item.id} onClick={() => setTab(item.id)}>
             {item.label}
           </NavButton>
         ))}
@@ -42,17 +72,18 @@ export default function App() {
         {tab === 'panel' && <PanelScreen />}
       </main>
 
-      {/* Navegación inferior de 3 ítems (celular/tablet), targets ≥44 px */}
+      {/* Navegación inferior de 4 ítems (celular/tablet), targets ≥44 px */}
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-subtle bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
         {TABS.map((item) => (
           <button
             key={item.id}
             onClick={() => setTab(item.id)}
             aria-current={tab === item.id ? 'page' : undefined}
-            className={`min-h-12 flex-1 text-sm transition-colors duration-[120ms] ${
-              tab === item.id ? 'font-semibold text-accent' : 'text-secondary'
+            className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10.5px] font-semibold transition-colors duration-[120ms] ${
+              tab === item.id ? 'text-accent' : 'text-tertiary'
             }`}
           >
+            <NavIcon tab={item.id} active={tab === item.id} />
             {item.label}
           </button>
         ))}
@@ -61,15 +92,26 @@ export default function App() {
   );
 }
 
-function NavButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function NavButton({
+  tab,
+  active,
+  onClick,
+  children,
+}: {
+  tab: Tab;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`min-h-11 rounded-md px-3 py-2 text-left text-sm transition-colors duration-[120ms] ${
+      className={`flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors duration-[120ms] ${
         active ? 'bg-accent-subtle text-primary' : 'text-secondary hover:bg-elevated'
       }`}
     >
+      <NavIcon tab={tab} active={active} />
       {children}
     </button>
   );

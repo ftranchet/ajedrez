@@ -89,5 +89,5 @@ test('diagnóstico inicial: dos partidas y 20 posiciones del Radar arman la prim
   await page.getByRole('button', { name: 'Empezar a entrenar' }).click();
 
   // De vuelta en Hoy, ya no vuelve a pedir el diagnóstico.
-  await page.getByText('Plan de hoy').waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Empezar sesión' }).waitFor({ timeout: 10_000 });
 });
