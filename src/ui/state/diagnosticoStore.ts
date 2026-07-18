@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
 import type { Color, RadarItem } from '../../core/types';
-import { RADAR_INITIAL_STATE, categoriaFromTipo, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
+import { RADAR_INITIAL_STATE, categoriaFromTipo, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
 import { estimarBandaElo, type ResultadoPartida } from '../../core/prescriptor';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
@@ -185,7 +185,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
       const jugadaUsuario = from + to + (promo ?? '');
       const item = s.radarItem;
-      const acierto = jugadaUsuario === item.solucion[0];
+      const acierto = esRespuestaCorrectaRadar(item, jugadaUsuario);
       chess.move({ from, to, promotion: promo });
 
       set({

@@ -11,6 +11,7 @@ import {
   RADAR_INITIAL_STATE,
   adjustDifficulty,
   categoriaFromTipo,
+  esRespuestaCorrectaRadar,
   explainFeedback,
   recordServed,
   selectNextRadarItem,
@@ -629,7 +630,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     // como acierto (la jugada funciona, no genera tarjeta de error) pero se
     // registra aparte para medir la tasa de conformismo.
     const resultadoDS = item.dobleSolucion ? clasificarRespuestaDobleSolucion(item, jugadaUsuario) : null;
-    const acierto = resultadoDS ? resultadoDS !== 'otra' : jugadaUsuario === item.solucion[0];
+    const acierto = resultadoDS ? resultadoDS !== 'otra' : esRespuestaCorrectaRadar(item, jugadaUsuario);
     if (resultadoDS) {
       void dobleSolucionAttemptRepo.save({ id: crypto.randomUUID(), itemId: item.id, resultado: resultadoDS, fecha: new Date().toISOString() });
     }

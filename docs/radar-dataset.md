@@ -59,7 +59,15 @@ El comando genera `src/services/puzzles/seedData.ts`. Su versión es un hash del
 - Puzzles: rating 800–2000 y popularidad mínima 50.
 - Tipos tácticos: `defensiveMove` → defensa; `hangingPiece` → genuina; `sacrifice` o `trappedPiece` → envenenada; el resto → ofensiva. Las etiquetas originales de Lichess se conservan en cada item para auditoría.
 - Tranquilas: posiciones de partidas desde el ply 16, espaciadas cada 8 plies, sin jaque ni final de partida. Stockfish examina todas las variantes legales vía MultiPV a profundidad configurable; se aceptan solo posiciones con evaluación absoluta ≤120 cp, diferencia entre las dos mejores jugadas ≤70 cp y una mejor jugada que no sea captura, promoción ni jaque.
+- **Jugadas aceptables (RF-5.3, corrección de auditoría 2026-07):** como una posición tranquila se acepta justamente porque *no* tiene un golpe único, casi siempre hay varias jugadas prácticamente equivalentes. El pipeline guarda en `jugadasAceptables` todas las que están dentro de `maxAcceptableGapCp` (50 cp) de la mejor, y el entrenamiento cuenta cualquiera de ellas como acierto — exigir la primera jugada exacta marcaba fallo (y generaba una tarjeta de error espuria) una segunda jugada igual de buena. Las tranquilas ya embebidas se enriquecieron con `scripts/backfill-tranquilas-aceptables.mjs`, que re-corre MultiPV a profundidad 14 anclando en la jugada canónica ya validada sin cambiarla.
 - El generador aborta si no alcanza la cuota de los cinco tipos, si duplica FEN/ID o si algún item no tiene solución.
+
+### Deuda conocida (auditoría 2026-07)
+
+Dos problemas de **validez de contenido** quedan registrados acá para no perderlos; su corrección de fondo excede lo que se puede hacer sin decisiones de producto y/o los archivos fuente de Lichess (no versionados):
+
+1. **Escala de rating heterogénea.** El `rating` mezcla tres cosas que no miden lo mismo: el rating de puzzle de Lichess (tácticas), el Elo promedio de los jugadores de la partida (tranquilas) y un 1500 fijo (doble solución). El selector adaptativo (RF-5.5) los trata como una sola escala de dificultad, así que la convergencia a la banda 60–80% no es del todo confiable hasta unificar la escala. Normalizarla es una decisión de producto pendiente.
+2. **`sacrifice → envenenada` es semánticamente inválido.** El tema `sacrifice` de Lichess describe un sacrificio *correcto del solucionador* (la jugada que hay que jugar), no una carnada que haya que rechazar. En el lote actual, **10 de 20** posiciones `envenenada` tienen una captura/sacrificio como `solucion[0]`, y el feedback de "detectaste la trampa y no capturaste" queda invertido. La corrección real —re-derivar `genuina`/`envenenada`/`ofensiva` con el motor, o generar posiciones de "carnada envenenada" con un pipeline propio como el de tranquilas— vacía o rehace el bucket `envenenada` y afecta la promesa de "cinco tipos" de RF-5.1: es una decisión de producto, no solo de código.
 
 ## Validación de uso real
 

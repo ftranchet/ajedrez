@@ -9,6 +9,12 @@ export const DEFAULT_QUIET_CONFIG = {
   plyStep: 8,
   maxAbsoluteCp: 120,
   maxBestMoveGapCp: 70,
+  // Tolerancia para las jugadas que también cuentan como acierto (RF-5.3): una
+  // segunda jugada dentro de estos cp del mejor es prácticamente equivalente
+  // en una posición tranquila, así que no debe marcarse fallo. Más estrecha
+  // que maxBestMoveGapCp (el umbral que define la posición como "sin golpe
+  // único"): solo aceptamos las genuinamente empatadas, no todo el margen.
+  maxAcceptableGapCp: 50,
   verificationDepth: 14,
 };
 
@@ -86,6 +92,14 @@ export async function verifyQuietCandidate(candidate, engine, config = DEFAULT_Q
   const assessment = assessQuietAnalysis({ rankedMoves, bestMove }, config);
   if (!assessment.accepted || !best) return { accepted: false, reason: assessment.reason };
 
+  // Jugadas que también cuentan como acierto: las que están dentro de
+  // maxAcceptableGapCp del mejor (RF-5.3). Sin esto, exigir best.move exacto
+  // marcaba fallo una segunda jugada prácticamente equivalente en una posición
+  // que, por definición de tranquila, no tiene un golpe único.
+  const jugadasAceptables = rankedMoves
+    .filter((m) => best.score - m.score <= config.maxAcceptableGapCp && m.move !== best.move)
+    .map((m) => m.move);
+
   const id = `quiet-${createHash('sha256').update(candidate.fen).digest('hex').slice(0, 16)}`;
   return {
     accepted: true,
@@ -96,6 +110,7 @@ export async function verifyQuietCandidate(candidate, engine, config = DEFAULT_Q
       temas: ['partida-real', 'verificada-stockfish'],
       rating: candidate.rating,
       solucion: [best.move],
+      ...(jugadasAceptables.length > 0 ? { jugadasAceptables } : {}),
       fuente: 'pipeline-tranquilas',
     },
   };

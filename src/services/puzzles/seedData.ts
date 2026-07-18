@@ -1,10 +1,10 @@
 // GENERADO por scripts/build-radar-dataset.mjs — no editar a mano.
-// Lote radar-4c8552fff66e: puzzles de Lichess (CC0) y posiciones tranquilas de
+// Lote radar-5d230615d6be: puzzles de Lichess (CC0) y posiciones tranquilas de
 // partidas reales verificadas por Stockfish. Ver docs/radar-dataset.md,
 // ADR-0005 y RF-5.6 para reproducirlo.
 import type { RadarItem } from '../../core/types';
 
-export const RADAR_DATASET_VERSION = "radar-4c8552fff66e";
+export const RADAR_DATASET_VERSION = "radar-5d230615d6be";
 
 export const seedRadarItems: RadarItem[] = [
   {
@@ -57,7 +57,10 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "f3e5"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "g4h3"
+    ]
   },
   {
     "id": "lichess-00008",
@@ -153,7 +156,31 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "g1f3"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "c4b3",
+      "a2a4",
+      "g3h3",
+      "g3h4",
+      "c1e3",
+      "c1d2",
+      "a2a3",
+      "g1e2",
+      "c1g5",
+      "g3e3",
+      "g3f3",
+      "h2h3",
+      "g1h3",
+      "g3g5",
+      "f2f4",
+      "g3f4",
+      "a1b1",
+      "g3e5",
+      "h2h4",
+      "f2f3",
+      "c2c3",
+      "c1f4"
+    ]
   },
   {
     "id": "lichess-000lC",
@@ -246,7 +273,12 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "h2h4"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "c2c3",
+      "f4g6",
+      "e1c1"
+    ]
   },
   {
     "id": "lichess-001gi",
@@ -339,7 +371,14 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "a2a4"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "f3e3",
+      "f3e2",
+      "e4e5",
+      "g2g4",
+      "g2g3"
+    ]
   },
   {
     "id": "lichess-002Z9",
@@ -428,7 +467,26 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "d1b3"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "b1a3",
+      "h2h3",
+      "d1e1",
+      "b2b3",
+      "f1f2",
+      "f1e1",
+      "d1d2",
+      "g1h1",
+      "g2g3",
+      "d1c2",
+      "g2g4",
+      "f3e1",
+      "f3g5",
+      "g1f2",
+      "a2a4",
+      "c3c4",
+      "h2h4"
+    ]
   },
   {
     "id": "lichess-002bK",
@@ -521,7 +579,11 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "d3d4"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "e1g1",
+      "g3e3"
+    ]
   },
   {
     "id": "lichess-005wJ",
@@ -612,7 +674,10 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "g3h2"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "d3d4"
+    ]
   },
   {
     "id": "lichess-007OE",
@@ -709,7 +774,22 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "b1c3"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "c1e3",
+      "b1d2",
+      "f3f6",
+      "h1f1",
+      "a1a2",
+      "f3g3",
+      "a3a4",
+      "c1d2",
+      "h3h4",
+      "e1g1",
+      "e2d1",
+      "h1g1",
+      "g2g3"
+    ]
   },
   {
     "id": "lichess-0095W",
@@ -805,7 +885,17 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "b1d1"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "g4f3",
+      "g4g3",
+      "c4c5",
+      "f1d1",
+      "h3h4",
+      "a3a4",
+      "e2d1",
+      "g4h5"
+    ]
   },
   {
     "id": "lichess-00B8m",
@@ -898,7 +988,22 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "c4c5"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "b1d1",
+      "b1e1",
+      "b4b5",
+      "e2d1",
+      "a3a4",
+      "b1b3",
+      "f1d1",
+      "b1b2",
+      "f1e1",
+      "e3g3",
+      "f1c1",
+      "g2g3",
+      "b1a1"
+    ]
   },
   {
     "id": "lichess-00BJm",
@@ -994,7 +1099,11 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "d1d2"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "f2f4",
+      "d1c1"
+    ]
   },
   {
     "id": "lichess-00Er4",
@@ -1087,7 +1196,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "e1g1"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "h2h3",
+      "b2b3",
+      "b2b4",
+      "e2d3",
+      "f3d4",
+      "d1d2",
+      "a1b1",
+      "d1d3",
+      "c1d2",
+      "f3d2"
+    ]
   },
   {
     "id": "lichess-00HEx",
@@ -1177,7 +1298,24 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "d1e2"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "g2g3",
+      "f1e1",
+      "g1h1",
+      "e3e4",
+      "b2b3",
+      "f3e2",
+      "c1b1",
+      "d1e1",
+      "c3a4",
+      "b2b4",
+      "d2e1",
+      "h2h4",
+      "h2h3",
+      "a3a4",
+      "c1a1"
+    ]
   },
   {
     "id": "lichess-00LI0",
@@ -1270,7 +1408,21 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "e2e3"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "f3g4",
+      "c2c3",
+      "g2g3",
+      "f3h5",
+      "b2b4",
+      "h1h2",
+      "h1g1",
+      "e2d1",
+      "e2e1",
+      "b2b3",
+      "a3a4",
+      "g2g4"
+    ]
   },
   {
     "id": "lichess-00MTn",
@@ -1372,7 +1524,15 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "b2b4"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "d2f4",
+      "d2h6",
+      "g2g4",
+      "h1g1",
+      "g2g3",
+      "a3a4"
+    ]
   },
   {
     "id": "lichess-00WzS",
@@ -1470,7 +1630,17 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "h3h4"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "f1e1",
+      "a2a3",
+      "c1b1",
+      "g1h2",
+      "f2f3",
+      "c1e1",
+      "f4e3",
+      "f4d2"
+    ]
   },
   {
     "id": "lichess-00X1l",
@@ -1559,7 +1729,15 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "g4h3"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "g4g3",
+      "g4e2",
+      "g4h5",
+      "g4f4",
+      "e5f6",
+      "g4d1"
+    ]
   },
   {
     "id": "lichess-00ZAn",
@@ -1647,7 +1825,25 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "g1h1"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "a1b1",
+      "c1e3",
+      "c3e2",
+      "c3a4",
+      "c1d2",
+      "a1a2",
+      "h2h3",
+      "b4b5",
+      "d1e1",
+      "c1b2",
+      "c3d5",
+      "f3e1",
+      "f3d2",
+      "c4a2",
+      "d1e2",
+      "c4b3"
+    ]
   },
   {
     "id": "lichess-00dzT",
@@ -1736,7 +1932,13 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "f3h4"
     ],
-    "fuente": "pipeline-tranquilas"
+    "fuente": "pipeline-tranquilas",
+    "jugadasAceptables": [
+      "c3e4",
+      "c3e2",
+      "c3d5",
+      "c3a4"
+    ]
   },
   {
     "id": "lichess-00hbV",

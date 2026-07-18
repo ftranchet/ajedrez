@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RADAR_INITIAL_STATE, adjustDifficulty, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from './radar';
+import { RADAR_INITIAL_STATE, adjustDifficulty, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from './radar';
 import type { RadarItem, TipoRadar } from './types';
 
 function seededRng(seed: number): () => number {
@@ -159,5 +159,33 @@ describe('explainFeedback', () => {
     const tipos: RadarItem['tipo'][] = ['ofensiva', 'defensa', 'tranquila', 'genuina', 'envenenada'];
     const textos = tipos.map((tipo) => explainFeedback({ ...item, tipo }, false));
     expect(new Set(textos).size).toBe(5);
+  });
+});
+
+describe('esRespuestaCorrectaRadar', () => {
+  const base: RadarItem = {
+    id: 'q1',
+    fen: '8/8/8/8/8/8/8/8 w - - 0 1',
+    tipo: 'tranquila',
+    temas: [],
+    rating: 1200,
+    solucion: ['e2e4'],
+    fuente: 'pipeline-tranquilas',
+  };
+
+  it('la jugada canónica siempre acierta', () => {
+    expect(esRespuestaCorrectaRadar(base, 'e2e4')).toBe(true);
+  });
+
+  it('sin jugadasAceptables, cualquier otra jugada falla', () => {
+    expect(esRespuestaCorrectaRadar(base, 'd2d4')).toBe(false);
+  });
+
+  it('una jugada equivalente listada en jugadasAceptables también acierta (RF-5.3)', () => {
+    const conAlt: RadarItem = { ...base, jugadasAceptables: ['d2d4', 'g1f3'] };
+    expect(esRespuestaCorrectaRadar(conAlt, 'd2d4')).toBe(true);
+    expect(esRespuestaCorrectaRadar(conAlt, 'g1f3')).toBe(true);
+    // Una que no está listada sigue siendo fallo.
+    expect(esRespuestaCorrectaRadar(conAlt, 'a2a3')).toBe(false);
   });
 });

@@ -119,6 +119,19 @@ export function explainFeedback(item: RadarItem, acierto: boolean): string {
 }
 
 /**
+ * ¿La jugada del usuario cuenta como acierto en el Radar? La jugada principal
+ * (`solucion[0]`) siempre, más cualquiera de las `jugadasAceptables` — en
+ * posiciones tranquilas, donde varias jugadas son prácticamente equivalentes
+ * y exigir una exacta marcaría un fallo falso (RF-5.3). La lógica del subtipo
+ * doble solución (RF-5.7, la jugada "familiar" también acierta) vive aparte
+ * en core/dobleSolucion.ts porque además registra la tasa de conformismo.
+ */
+export function esRespuestaCorrectaRadar(item: RadarItem, jugadaUsuario: string): boolean {
+  if (jugadaUsuario === item.solucion[0]) return true;
+  return item.jugadasAceptables?.includes(jugadaUsuario) ?? false;
+}
+
+/**
  * Categoría por defecto para una tarjeta que nace de un fallo del Radar
  * (RF-5.4). RF-3.3 pide categorización manual en un toque, pero esa regla es
  * específica del análisis de partidas (E3); acá se asigna automáticamente

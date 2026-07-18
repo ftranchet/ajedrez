@@ -133,6 +133,16 @@ export interface RadarItem {
   solucion: string[];
   fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'seed-dev';
   /**
+   * Jugadas UCI adicionales que también cuentan como acierto (RF-5.3). Solo
+   * en posiciones tranquilas: la definición de "tranquila" es que no hay un
+   * golpe único (las mejores jugadas están dentro de una tolerancia de
+   * centipeones), así que exigir la primera jugada exacta marcaría como fallo
+   * una segunda jugada prácticamente equivalente. El motor las verifica en el
+   * pipeline (MultiPV). Vacío/ausente en el resto de los tipos, donde sí hay
+   * una única jugada correcta.
+   */
+  jugadasAceptables?: string[];
+  /**
    * Subtipo anti-Einstellung (RF-5.7): además de la jugada superior (ya en
    * `solucion[0]`), una jugada "familiar" verificada por el motor (MultiPV)
    * que también gana con claridad pero es objetivamente peor. Ambas cuentan

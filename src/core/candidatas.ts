@@ -5,6 +5,7 @@
 // revisar y cuándo no.
 import type { RadarItem } from './types';
 import { clasificarRespuestaDobleSolucion } from './dobleSolucion';
+import { esRespuestaCorrectaRadar } from './radar';
 
 /** Mismo muestreo que la confianza declarada (RF-10.1): ~1 de cada 4-5, para no interrumpir cada posición. */
 export function shouldSampleCandidata(rng: () => number = Math.random): boolean {
@@ -13,11 +14,12 @@ export function shouldSampleCandidata(rng: () => number = Math.random): boolean 
 
 export type ResultadoCandidata = 'mejoro' | 'empeoro' | 'sin-cambio';
 
-/** Mismo criterio de acierto que la resolución del Radar: en un ítem de
- * doble solución (RF-5.7) la jugada familiar también cuenta como acierto. */
+/** Mismo criterio de acierto que la resolución del Radar: en un ítem de doble
+ * solución (RF-5.7) la familiar también acierta; en tranquilas, cualquier
+ * jugada aceptable equivalente (RF-5.3). */
 function esAcierto(item: RadarItem, jugada: string): boolean {
   if (item.dobleSolucion) return clasificarRespuestaDobleSolucion(item, jugada) !== 'otra';
-  return jugada === item.solucion[0];
+  return esRespuestaCorrectaRadar(item, jugada);
 }
 
 /**
