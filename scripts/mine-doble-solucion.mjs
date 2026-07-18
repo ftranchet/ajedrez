@@ -1,9 +1,10 @@
 // Explora posiciones de autojuego del motor (no hay acceso a partidas reales
 // en este entorno, ver docs/roadmap.md) buscando candidatas de doble
 // solución (RF-5.7): una jugada "familiar" que gana con claridad, y otra
-// claramente superior. Verificación con MultiPV a profundidad 14 — mismo
-// estándar de rigor que ya usa el pipeline de posiciones tranquilas
-// (scripts/lib/quietPositions.mjs, DEFAULT_QUIET_CONFIG.verificationDepth).
+// claramente superior. Cribado con MultiPV a profundidad 14 y reconfirmación
+// a profundidad 17 antes de aceptar (mismo estándar de rigor que
+// scripts/mine-stoyko.mjs — automatizado acá también: hasta esta versión del
+// script, la reconfirmación a 17 se hacía a mano fuera de esta corrida).
 // Resumible: guarda progreso en --checkpoint para poder cortar y seguir.
 //
 // Uso: node scripts/mine-doble-solucion.mjs --target 6 --max-checked 1200 --checkpoint /tmp/doble-solucion.json
@@ -16,6 +17,14 @@ const MIN_FAMILIAR_SCORE = 80;
 const MIN_GAP_CP = 120;
 const SELFPLAY_DEPTH = 7;
 const SCREEN_DEPTH = 14;
+const RECONFIRM_DEPTH = 17;
+
+// Máximo de candidatas aceptadas de UN MISMO autojuego (mismo motivo que
+// scripts/mine-stoyko.mjs#MAX_POR_JUEGO): una posición "familiar-vs-superior"
+// suele seguir siéndolo varias jugadas seguidas del mismo juego, y sin este
+// tope el lote termina con posiciones casi idénticas entre sí en vez de
+// variedad real de estructuras y aperturas.
+const MAX_POR_JUEGO = 1;
 
 function parseArgs(argv) {
   const options = {};
@@ -86,19 +95,36 @@ async function main() {
   try {
     while (state.found.length < target && state.checked < maxChecked) {
       const positions = await selfPlayPositions(engine, 30 + Math.floor(Math.random() * 15));
+      let aceptadasDeEsteJuego = 0;
       for (const fen of positions) {
         if (state.found.length >= target || state.checked >= maxChecked) break;
+        if (aceptadasDeEsteJuego >= MAX_POR_JUEGO) break;
         if (seenFens.has(fen)) continue;
         seenFens.add(fen);
         state.checked++;
 
-        const lines = await engine.analyseMultiPv(fen, 3, SCREEN_DEPTH);
-        const [best, second] = lines;
+        const screen = await engine.analyseMultiPv(fen, 3, SCREEN_DEPTH);
+        const [bestScreen, secondScreen] = screen;
+        if (!bestScreen || !secondScreen) continue;
+        if (secondScreen.score < MIN_FAMILIAR_SCORE) continue;
+        if (!gapEsClaro(bestScreen, secondScreen)) continue;
+
+        // La criba a 14 sola es insuficiente para esta afirmación fina
+        // ("esta jugada es la segunda mejor, y por un margen claro"): se
+        // reconfirma a 17 antes de aceptar, mismo motivo que
+        // scripts/mine-stoyko.mjs — sin esto, el catálogo generado
+        // requeriría una segunda pasada manual fuera de este script.
+        const confirm = await engine.analyseMultiPv(fen, 3, RECONFIRM_DEPTH);
+        const [best, second] = confirm;
         if (!best || !second) continue;
         if (second.score < MIN_FAMILIAR_SCORE) continue;
         if (!gapEsClaro(best, second)) continue;
+        // El orden puede cambiar entre 14 y 17: solo cuenta si la misma
+        // jugada sigue siendo la mejor y la misma sigue siendo la segunda.
+        if (best.move !== bestScreen.move || second.move !== secondScreen.move) continue;
 
         state.found.push({ fen, superior: best.move, superiorScore: best.score, familiar: second.move, familiarScore: second.score });
+        aceptadasDeEsteJuego++;
         console.error(
           `Candidata ${state.found.length}/${target} (tras ${state.checked} posiciones): superior=${best.move}(${best.score}) familiar=${second.move}(${second.score})`,
         );

@@ -5,7 +5,7 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, Profile, RadarItem, RadarProgress } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress } from '../../core/types';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
@@ -34,14 +34,23 @@ import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { gameRepo } from '../../services/storage/gameRepo';
-import { computeDests } from './chessBoardUtils';
+import { computeDests, sanDeLinea } from './chessBoardUtils';
+
+/** SAN de una jugada UCI para mostrar en el feedback (design system §5,
+ * MoveList: "font-mono" pero notación legible, no UCI crudo); `fen` es la
+ * posición antes de la jugada. Cae a UCI si la línea resultara ilegal
+ * (no debería pasar: `jugadaUci` sale de `item.solucion`/`card.jugadaCorrecta`,
+ * ya verificados por el pipeline o por el motor). */
+function sanDeJugada(fen: string, jugadaUci: string): string {
+  return sanDeLinea(fen, [jugadaUci])[0] ?? jugadaUci;
+}
 
 /** Ventana para la tasa de acierto reciente que ajusta la dificultad (RF-5.5). */
 const VENTANA_TASA_ACIERTO = 8;
 /** Cuántas posiciones sirve el bloque de Triage cuando la dieta lo activa (RF-9.2/9.3). */
 export const TRIAGE_SESSION_SIZE = 5;
 
-export type EvalGuess = 'blancas' | 'igual' | 'negras';
+export type { EvalGuess };
 type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'curriculo' | 'triage' | 'radar' | 'fin';
 type ColaSubPhase = 'jugando' | 'feedback';
 type CurriculumSubPhase = 'jugando' | 'feedback';
@@ -433,7 +442,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         colaCards: nuevasCards,
         colaSubPhase: 'feedback',
         colaUltimoAcierto: acierto,
-        colaJugadaCorrecta: card.jugadaCorrecta,
+        colaJugadaCorrecta: sanDeJugada(card.fen, card.jugadaCorrecta),
         ...boardSnapshot(),
         lastMove: [from, to],
       });
@@ -471,7 +480,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         curriculumProgressById: nuevoMapa,
         curriculumSubPhase: 'feedback',
         curriculumUltimaLimpia: limpia,
-        curriculumJugadaCorrecta: item.solucion[0],
+        curriculumJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
         ...boardSnapshot(),
         lastMove: [from, to],
       });
@@ -582,6 +591,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
   };
 
   async function finalizeRadarAnswer(item: RadarItem, acierto: boolean, jugadaUsuario: string) {
+    // Capturado antes del set() de abajo: loadRadarItem (llamado más tarde,
+    // al pasar al siguiente ítem) recién ahí resetea radarEvalGuess a null.
+    const evalGuess = get().radarEvalGuess ?? undefined;
     set((s) => ({
       radarServidos: s.radarServidos + 1,
       radarAciertosRecientes: [...s.radarAciertosRecientes, acierto].slice(-VENTANA_TASA_ACIERTO),
@@ -594,6 +606,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       tipo: item.tipo,
       rating: item.rating,
       acierto,
+      evalGuess,
       fecha: new Date().toISOString(),
     });
     if (!acierto) {
@@ -625,7 +638,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       ...boardSnapshot(),
       lastMove,
       radarUltimoAcierto: acierto,
-      radarJugadaCorrecta: item.solucion[0],
+      radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
       radarJugadaUsuario: jugadaUsuario,
       radarFeedbackTexto: resultadoDS === 'familiar' ? feedbackConformismo(item) : explainFeedback(item, acierto),
       radarPedirConfianza: pedirConfianza,

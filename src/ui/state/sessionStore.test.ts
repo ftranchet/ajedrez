@@ -4,6 +4,7 @@
 // tomado del turno equivocado al crear una tarjeta desde un fallo del Radar.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Chess } from 'chess.js';
 import { useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedRadarItems } from '../../services/puzzles/seedData';
@@ -82,6 +83,31 @@ describe('sessionStore — bloque Radar', () => {
     const attempts = await db.radarAttempts.toArray();
     expect(attempts).toHaveLength(1);
     expect(attempts[0]).toMatchObject({ itemId: item.id, acierto: false, tipo: item.tipo });
+
+    // El feedback muestra la jugada correcta en SAN, no en UCI crudo.
+    const solucion = item.solucion[0];
+    const chess = new Chess(item.fen);
+    const sanEsperado = chess.move({ from: solucion.slice(0, 2), to: solucion.slice(2, 4), promotion: solucion.slice(4, 5) || undefined }).san;
+    expect(s.radarJugadaCorrecta).toBe(sanEsperado);
+    expect(s.radarJugadaCorrecta).not.toBe(solucion);
+  });
+
+  it('persiste la evaluación rápida declarada (RF-5.2) en el RadarAttempt, en vez de descartarla', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // sin candidatas ni confianza, directo a feedback
+    await useSessionStore.getState().start();
+    let s = useSessionStore.getState();
+    const item = s.radarItem!;
+
+    s.radarEval('negras');
+    s = useSessionStore.getState();
+    expect(s.radarEvalGuess).toBe('negras');
+    const [from, destinos] = s.dests.entries().next().value as [string, string[]];
+    await s.radarUserMove(from as never, destinos[0] as never);
+    vi.restoreAllMocks();
+
+    const attempts = await db.radarAttempts.toArray();
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({ itemId: item.id, evalGuess: 'negras' });
   });
 
   it('con muestreo de confianza forzado, guarda el registro de calibración antes de crear la tarjeta', async () => {
@@ -281,6 +307,26 @@ describe('sessionStore — bloque Cola', () => {
     const revisada = await db.errorCards.get(vencida.id);
     expect(revisada!.fsrs.lapses).toBe(0); // era 'new', no 'review': todavía no cuenta como lapso
     expect(revisada!.fsrs.reps).toBe(1);
+  });
+
+  it('el feedback de la Cola muestra la jugada correcta en SAN, no en UCI crudo', async () => {
+    // Una captura (bxc6), para que UCI ("b7c6") y SAN de verdad difieran en forma.
+    const vencida = buildErrorCard({
+      fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
+      ladoAMover: 'b',
+      jugadaUsuario: 'g8f6',
+      jugadaCorrecta: 'f8c5',
+      categoria: 'tactico',
+      origen: 'partida',
+    });
+    await db.errorCards.put(vencida);
+    await useSessionStore.getState().start();
+    const s = useSessionStore.getState();
+
+    await s.colaUserMove('g8' as never, 'f6' as never); // no es f8c5: fallo, dispara feedback igual
+    const after = useSessionStore.getState();
+    expect(after.colaJugadaCorrecta).toBe('Bc5');
+    expect(after.colaJugadaCorrecta).not.toBe('f8c5');
   });
 });
 

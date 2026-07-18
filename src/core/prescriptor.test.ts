@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { detectarFugaTactica, dietaPorBanda, estimarBandaElo } from './prescriptor';
 import type { ErrorCard, GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
 
-function cardTactica(creadaEn: string): ErrorCard {
+function cardTactica(creadaEn: string, origen: ErrorCard['origen'] = 'partida'): ErrorCard {
   return {
     id: crypto.randomUUID(),
     fen: 'startpos',
@@ -10,7 +10,7 @@ function cardTactica(creadaEn: string): ErrorCard {
     jugadaUsuario: 'a2a3',
     jugadaCorrecta: 'e2e4',
     categoria: 'tactico',
-    origen: 'radar',
+    origen,
     fsrs: {
       due: creadaEn,
       stability: 0,
@@ -27,8 +27,8 @@ function cardTactica(creadaEn: string): ErrorCard {
   };
 }
 
-function cardPosicional(creadaEn: string): ErrorCard {
-  return { ...cardTactica(creadaEn), categoria: 'posicional' };
+function cardPosicional(creadaEn: string, origen: ErrorCard['origen'] = 'partida'): ErrorCard {
+  return { ...cardTactica(creadaEn, origen), categoria: 'posicional' };
 }
 
 describe('detectarFugaTactica', () => {
@@ -38,7 +38,7 @@ describe('detectarFugaTactica', () => {
     expect(detectarFugaTactica([], ahora)).toEqual({ categoria: null, proporcion: 0 });
   });
 
-  it('detecta fuga táctica cuando superan el 35% de lo reciente', () => {
+  it('detecta fuga táctica cuando superan el 35% de lo reciente (tarjetas de partida)', () => {
     const cards = [cardTactica('2026-07-10'), cardTactica('2026-07-11'), cardPosicional('2026-07-12')];
     const resultado = detectarFugaTactica(cards, ahora);
     expect(resultado.categoria).toBe('tactico');
@@ -52,6 +52,29 @@ describe('detectarFugaTactica', () => {
 
   it('ignora tarjetas de hace más de 30 días', () => {
     const cards = [cardTactica('2026-01-01T00:00:00.000Z')];
+    expect(detectarFugaTactica(cards, ahora)).toEqual({ categoria: null, proporcion: 0 });
+  });
+
+  it('ignora tarjetas de origen Radar: casi todo fallo del Radar es "táctico" por construcción (categoriaFromTipo), y contarlas retroalimentaría el ajuste sobre sí mismo', () => {
+    const cardsSoloRadar = [
+      cardTactica('2026-07-10', 'radar'),
+      cardTactica('2026-07-11', 'radar'),
+      cardTactica('2026-07-12', 'radar'),
+      cardTactica('2026-07-13', 'radar'),
+    ];
+    expect(detectarFugaTactica(cardsSoloRadar, ahora)).toEqual({ categoria: null, proporcion: 0 });
+  });
+
+  it('una mayoría táctica de origen Radar no enmascara una fuga real de partida: solo cuentan las de partida', () => {
+    const cards = [
+      cardTactica('2026-07-10', 'radar'),
+      cardTactica('2026-07-11', 'radar'),
+      cardTactica('2026-07-12', 'radar'),
+      cardPosicional('2026-07-13', 'partida'),
+      cardPosicional('2026-07-14', 'partida'),
+    ];
+    // 0 de 2 tarjetas de partida son tácticas: sin fuga, pese a que la
+    // mayoría absoluta de las tarjetas recientes (las del Radar) sí lo sean.
     expect(detectarFugaTactica(cards, ahora)).toEqual({ categoria: null, proporcion: 0 });
   });
 });

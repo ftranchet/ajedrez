@@ -8,13 +8,13 @@
   display: block;
 }
 
-/* Casillas §3.2: damero con board-light #e8d9b7 y board-dark #a67c52.
+/* Casillas §3.2: damero con board-light y board-dark.
    a8 (arriba-izquierda con blancas) es clara. */
 cg-board {
-  background-color: #e8d9b7;
+  background-color: var(--color-board-light);
   background-image: repeating-conic-gradient(
-    #e8d9b7 0% 25%,
-    #a67c52 25% 50%
+    var(--color-board-light) 0% 25%,
+    var(--color-board-dark) 25% 50%
   );
   background-size: 25% 25%;
 }
@@ -49,11 +49,19 @@ cg-board {
   );
 }
 
-/* Coordenadas §3.2: font-mono, chicas, en el color de la casilla opuesta. */
+/* Coordenadas §3.2: font-mono, chicas, en una franja fuera del tablero
+   (ranks a la izquierda, files abajo — chessground `coordinates: true`, sin
+   `coordinatesOnSquares`: esa variante escribe el nombre completo de la
+   casilla, p. ej. "a1", en cada una de las 64 casillas — no el esquema de
+   una sola letra/número solo en el borde que describía una versión previa
+   de este documento; corregido para que coincida con lo implementado). Sin
+   esta regla no tenían color asignado y caían al valor por defecto del
+   navegador. */
 .cg-wrap coords {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
+  color: var(--color-secondary);
 }
 
 /* Piezas §3.1: set Staunty, 90% de la casilla (5% de aire por lado). Las

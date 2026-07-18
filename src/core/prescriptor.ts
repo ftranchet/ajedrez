@@ -38,11 +38,25 @@ export interface AjusteFugas {
   proporcion: number;
 }
 
-/** Perfil de fugas simplificado (RF-11.2 punto 3, v1): proporción de
- * tarjetas tácticas creadas en los últimos 30 días. */
+/**
+ * Perfil de fugas simplificado (RF-11.2 punto 3, v1): proporción de
+ * tarjetas tácticas creadas en los últimos 30 días, contando solo las que
+ * vienen de partidas propias (`origen: 'partida'`).
+ *
+ * Se excluyen a propósito las tarjetas de origen `'radar'`: `categoriaFromTipo`
+ * (core/radar.ts) etiqueta como `tactico` cuatro de los cinco tipos del Radar
+ * (todo salvo `tranquila`), así que casi cualquier fallo del Radar entra acá
+ * como "táctico" por construcción, no porque refleje una fuga real del
+ * usuario. Sin este filtro, el propio Radar generaba el bucle "fallo del
+ * Radar → cuenta como táctico → dispara la fuga → el Prescriptor refuerza el
+ * Radar → más fallos del Radar" — una señal que se retroalimenta a sí misma
+ * en vez de medir algo del mundo. Los errores de partida real, en cambio, sí
+ * están categorizados por el usuario en un toque (RF-3.3) y reflejan la
+ * fuga que RF-11.2 pide detectar.
+ */
 export function detectarFugaTactica(cards: ErrorCard[], now: Date = new Date()): AjusteFugas {
   const desde = now.getTime() - VENTANA_FUGA_DIAS * 24 * 60 * 60 * 1000;
-  const recientes = cards.filter((c) => new Date(c.creadaEn).getTime() >= desde);
+  const recientes = cards.filter((c) => c.origen === 'partida' && new Date(c.creadaEn).getTime() >= desde);
   if (recientes.length === 0) return { categoria: null, proporcion: 0 };
   const tacticas = recientes.filter((c) => c.categoria === 'tactico').length;
   const proporcion = tacticas / recientes.length;

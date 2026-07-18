@@ -10,16 +10,18 @@ Los exports de base de datos de Lichess son CC0 y su formato oficial explica que
 
 ## Subtipo doble solución (RF-5.7)
 
-Sobre ese lote base, `radar-97561c841622` agrega 7 posiciones con el subtipo anti-Einstellung (RF-5.7): una jugada "familiar" que también gana con claridad, pero es objetivamente peor que la superior. No se sacaron del export de puzzles de Lichess (curados justamente para tener una sola solución: minar ese catálogo con MultiPV de Stockfish, sobre 15 posiciones probadas, dio 0 candidatas) ni de partidas reales (sin acceso de red en este entorno de desarrollo — ver limitación documentada en `docs/roadmap.md`, Fase 2).
+Sobre ese lote base, `radar-4c8552fff66e` agrega 8 posiciones con el subtipo anti-Einstellung (RF-5.7): una jugada "familiar" que también gana con claridad, pero es objetivamente peor que la superior. No se sacaron del export de puzzles de Lichess (curados justamente para tener una sola solución: minar ese catálogo con MultiPV de Stockfish, sobre 15 posiciones probadas, dio 0 candidatas) ni de partidas reales (sin acceso de red en este entorno de desarrollo — ver limitación documentada en `docs/roadmap.md`, Fase 2).
 
-En su lugar, `scripts/mine-doble-solucion.mjs` genera posiciones por autojuego del motor local (profundidad 7, para variedad realista sin gastar tiempo de más) y criba cada una con MultiPV a profundidad 14 — mismo estándar que las tranquilas. Esa criba sola resultó insuficiente para esta afirmación más fina ("esta jugada específica es la segunda mejor", no solo "la mejor es buena"): sobre 10 candidatas iniciales, una reconfirmación a profundidad 17 descartó 3 por no sostener el margen a mayor profundidad (una vio colapsar la diferencia a 60 cp, otra terminó empatada con la mejor). Las 7 que sobrevivieron se agregaron al lote con `scripts/finalize-doble-solucion.mjs`, tras una verificación final de legalidad con chess.js. Ninguna tiene rating calibrado (no hay una comunidad detrás, a diferencia de los puzzles de Lichess): usan un valor fijo de 1500, documentado como simplificación v1.
+En su lugar, `scripts/mine-doble-solucion.mjs` genera posiciones por autojuego del motor local (profundidad 7, para variedad realista sin gastar tiempo de más) y criba cada una con MultiPV a profundidad 14 — mismo estándar que las tranquilas. Esa criba sola resultó insuficiente para esta afirmación más fina ("esta jugada específica es la segunda mejor", no solo "la mejor es buena"): la reconfirmación a profundidad 17, automatizada dentro del propio script, descarta cualquier candidata que no sostenga el margen o cambie de jugada "mejor"/"segunda mejor" a mayor profundidad.
 
-Es un lote chico a propósito: la tasa de acierto de este método (~0.3–1% de las posiciones revisadas sostienen la afirmación a profundidad 17) hace que sumar más sea una cuestión de tiempo de cómputo, no de otra técnica. Reproducible con:
+**Corregido en la auditoría de 2026-07-18:** el primer lote (7 posiciones) no limitaba cuántas candidatas podía aportar una misma partida de autojuego, y 3 de las 7 terminaron viniendo de la misma partida — casi idénticas entre sí, mismo problema que ya se había encontrado y corregido para el catálogo de Stoyko semanal (más abajo). Este lote aplica el mismo tope (`MAX_POR_JUEGO = 1`, igual que `scripts/mine-stoyko.mjs`) y automatiza la reconfirmación a 17 dentro del script de minado (antes era un paso manual fuera de él, documentado acá pero no codificado). Las 8 posiciones resultantes vienen de 8 partidas de autojuego distintas. Ninguna tiene rating calibrado (no hay una comunidad detrás, a diferencia de los puzzles de Lichess): usan un valor fijo de 1500, documentado como simplificación v1.
+
+Es un lote chico a propósito: la tasa de acierto de este método (~0.3–1% de las posiciones revisadas sostienen la afirmación a profundidad 17, y baja más todavía una vez aplicado el tope de 1 por partida) hace que sumar más sea una cuestión de tiempo de cómputo, no de otra técnica. Reproducible con:
 
 ```sh
-node scripts/mine-doble-solucion.mjs --target 6 --max-checked 1200 --checkpoint /ruta/checkpoint.json
-# revisar a mano las candidatas del checkpoint, reconfirmar a profundidad 17
-# las que sobrevivan, sumarlas a CANDIDATOS en finalize-doble-solucion.mjs
+node scripts/mine-doble-solucion.mjs --target 8 --max-checked 3000 --checkpoint /ruta/checkpoint.json
+# las candidatas del checkpoint ya vienen reconfirmadas a profundidad 17 y
+# limitadas a 1 por partida: sumarlas a CANDIDATOS en finalize-doble-solucion.mjs
 node scripts/finalize-doble-solucion.mjs
 ```
 

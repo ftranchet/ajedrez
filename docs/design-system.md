@@ -88,7 +88,7 @@ Set **Staunty** (Lichess, autor sadsnake1, licencia CC BY-NC-SA 4.0 — ver `pub
 | `board-light` | `#e8d9b7` | Casilla clara (crema) |
 | `board-dark` | `#a67c52` | Casilla oscura (nogal) |
 
-Coordenadas: `font-mono` 10–11 px, peso 600, dentro de la casilla (files abajo-derecha en fila 1, ranks arriba-izquierda en columna a), en el color de la casilla opuesta.
+Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina fuera del tablero (ranks a la izquierda, files abajo — chessground `coordinates: true`), en `text-secondary`. *(Corregido 2026-07-18: la versión anterior de esta línea describía coordenadas dentro de la casilla; nunca se implementó así — chessground las pone dentro de la casilla solo con `coordinatesOnSquares`, y ahí escribe el nombre completo de cada casilla (p. ej. "a1") en las 64, no una sola letra/número solo en el borde. Se corrigió el texto para que describa lo que la app realmente muestra.)*
 
 ### 3.3 Estados del tablero (velos sobre la casilla, nunca reemplazo del fondo)
 | Estado | Especificación | Segunda señal (RNF-6) |
@@ -134,9 +134,10 @@ Cada componente lista sus **estados obligatorios**; un componente sin todos sus 
 | Componente | Estados obligatorios | Notas de diseño |
 |---|---|---|
 | `Board` | interactivo / solo lectura / a ciegas | envoltorio de chessground; ver §3 |
-| `Button` | default / hover / pressed / focus / disabled | primario (accent pleno, único por pantalla), secundario (borde), fantasma |
+| `Button` | default / hover / pressed / focus / disabled | primario (accent pleno, único por pantalla), secundario (borde), peligro (fondo `-subtle`, para acciones irreversibles como rendirse) |
 | `SessionCard` | pendiente / en curso / completado / salteado | siempre con su porqué en `text-secondary`; en curso = borde `accent`; completado = tachado + opacidad .75; salteado = borde punteado |
-| `EvalPicker` | default / seleccionado / revelado (correcto·incorrecto) | 5 chips `+− ± = ∓ −+` en `font-mono`; selección = `accent-subtle` + borde `accent` |
+| `EvalPicker` | default / seleccionado | 3 chips "mejor blancas / igual / mejor negras" (RF-5.2, evaluación rápida del Radar antes de jugar); selección = `accent-subtle` + borde `accent` |
+| `EvalScalePicker` | default / seleccionado | 5 chips `+− ± = ∓ −+` en `font-mono` (RF-3.1c, escala de evaluación de la fase 1 del análisis); mismo criterio de selección que `EvalPicker` |
 | `ConfidenceSlider` | default / arrastrando / confirmado | 0–100, aparece solo por muestreo; nunca descartable |
 | `FeedbackPanel` | acierto / fallo / no-había-táctica (info) | fondo `-subtle` + borde 35%; el porqué es obligatorio, también sin táctica (RF-5.3) |
 | `MoveList` | default / jugada activa / colapsado (celular) | `font-mono`; error grave/error/imprecisión con marca de color |

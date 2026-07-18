@@ -156,6 +156,13 @@ export interface RadarProgress {
   updatedAt: string; // ISO 8601
 }
 
+/**
+ * Evaluación rápida que el usuario declara antes de jugar (RF-5.2, design
+ * system §4.2 paso 1): "¿cómo está la posición?", el paso previo a producir
+ * la jugada. `EvalPicker` en la UI muestra estas tres opciones.
+ */
+export type EvalGuess = 'blancas' | 'igual' | 'negras';
+
 /** Resultado de una posición del Radar, para medir la banda 60–80% (RF-5.5). */
 export interface RadarAttempt {
   id: string;
@@ -163,6 +170,17 @@ export interface RadarAttempt {
   tipo: TipoRadar;
   rating: number;
   acierto: boolean;
+  /**
+   * Evaluación rápida declarada antes de jugar (RF-5.2). Se persiste tal
+   * cual, sin juzgarla correcta o incorrecta: el catálogo no guarda un
+   * "quién está mejor" verificado por el motor para los cinco tipos del
+   * Radar (a diferencia de la jugada solución, que sí lo está), así que
+   * inventar ese puntaje sería afirmar algo que no se puede probar (PRD
+   * §11, última fila de riesgos). Queda como dato de calibración disponible
+   * para cuando ese ground truth exista. Ausente en intentos anteriores a
+   * este campo.
+   */
+  evalGuess?: EvalGuess;
   fecha: string; // ISO 8601
 }
 

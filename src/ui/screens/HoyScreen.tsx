@@ -10,6 +10,7 @@ import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
+import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { nivelCiegas } from '../../core/curriculum';
 import { t } from '../i18n/es';
@@ -157,6 +158,13 @@ function Portada() {
 }
 
 function DiagnosticoPrompt() {
+  // useGameStore es compartido con la pantalla Jugar: si hay una partida en
+  // curso ahí (el store zustand persiste aunque esa pestaña esté
+  // desmontada), empezar el diagnóstico la resetearía sin aviso al llamar
+  // useGameStore().reset() (RF-1.3). Se deshabilita el botón y se explica
+  // por qué, en vez de perder la partida en silencio.
+  const partidaEnCurso = useGameStore((g) => g.phase === 'playing');
+
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
@@ -164,7 +172,12 @@ function DiagnosticoPrompt() {
         <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.diagnostico.titulo}</span>
         <p className="m-0 text-sm text-secondary">{t.diagnostico.introTexto}</p>
         <p className="m-0 text-xs text-tertiary">{t.diagnostico.introNota}</p>
-        <button onClick={() => void useDiagnosticoStore.getState().empezarJuego1()} className="btn-primary">
+        {partidaEnCurso && <p className="m-0 text-xs text-error">{t.diagnostico.partidaEnCurso}</p>}
+        <button
+          onClick={() => void useDiagnosticoStore.getState().empezarJuego1()}
+          disabled={partidaEnCurso}
+          className="btn-primary"
+        >
           {t.diagnostico.empezar}
         </button>
         <button onClick={() => void useSessionStore.getState().start()} className="btn-secondary">

@@ -29,6 +29,10 @@
   --color-info-subtle: rgba(111, 143, 166, 0.1);
   --color-focus: #e2b356;
 
+  /* Tablero (§3.2) */
+  --color-board-light: #e8d9b7;
+  --color-board-dark: #a67c52;
+
   /* Tipografía */
   --font-display: 'Newsreader Variable', Georgia, serif;
   --font-ui: 'Instrument Sans Variable', system-ui, sans-serif;
@@ -98,6 +102,17 @@
     border-color: var(--color-strong);
     background: var(--color-elevated);
   }
+  /* pressed: "fondo baja un nivel" (§2.1) — surface es su nivel de reposo,
+     así que baja a base, el escalón de abajo. */
+  .btn-secondary:active {
+    background: var(--color-base);
+  }
+  .btn-secondary:disabled {
+    border: none;
+    background: var(--color-elevated);
+    color: var(--color-tertiary);
+    cursor: not-allowed;
+  }
 
   .btn-danger {
     border: 1px solid color-mix(in srgb, var(--color-error) 35%, transparent);
@@ -106,5 +121,14 @@
   }
   .btn-danger:hover {
     border-color: var(--color-error);
+  }
+  .btn-danger:active {
+    background: var(--color-base);
+  }
+  .btn-danger:disabled {
+    border: none;
+    background: var(--color-elevated);
+    color: var(--color-tertiary);
+    cursor: not-allowed;
   }
 }

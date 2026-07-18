@@ -2,9 +2,10 @@
 // desde el dataset semilla verificado (scripts/verify-curriculum-patrones.mjs),
 // por eso queda fuera de la exportación E14 (services/export/exportImport.ts)
 // — el progreso del usuario sobre cada elemento vive en `curriculumProgressRepo`.
-import type { CurriculumDatasetMeta, CurriculumItem } from '../../core/types';
+import type { CurriculumItem } from '../../core/types';
 import { CURRICULUM_DATASET_VERSION, seedCurriculumItems } from '../puzzles/curriculumSeedData';
 import { db, type ElomaxDB } from './db';
+import { ensureSeededCatalog } from './ensureSeededCatalog';
 
 export interface CurriculumItemRepo {
   list(): Promise<CurriculumItem[]>;
@@ -19,19 +20,12 @@ export class DexieCurriculumItemRepo implements CurriculumItemRepo {
   }
 
   async ensureSeeded(): Promise<void> {
-    const count = await this.database.curriculumItems.count();
-    const meta = await this.database.curriculumDatasetMeta.get('catalogo');
-    if (count > 0 && meta?.version === CURRICULUM_DATASET_VERSION) return;
-
-    const nextMeta: CurriculumDatasetMeta = {
-      id: 'catalogo',
+    await ensureSeededCatalog({
+      db: this.database,
+      itemsTable: this.database.curriculumItems,
+      metaTable: this.database.curriculumDatasetMeta,
       version: CURRICULUM_DATASET_VERSION,
-      seededAt: new Date().toISOString(),
-    };
-    await this.database.transaction('rw', this.database.curriculumItems, this.database.curriculumDatasetMeta, async () => {
-      await this.database.curriculumItems.clear();
-      await this.database.curriculumItems.bulkPut(seedCurriculumItems);
-      await this.database.curriculumDatasetMeta.put(nextMeta);
+      seedItems: seedCurriculumItems,
     });
   }
 }

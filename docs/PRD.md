@@ -3,10 +3,10 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.4 |
+| Versión | 0.2.5 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
-| Última actualización | 2026-07-17 |
+| Última actualización | 2026-07-18 |
 | Documentos hermanos | `CONTRIBUTING.md`, `roadmap.md`, `design-system.md`, `adr/`, `evidence/` |
 
 > **Cómo usar este documento.** Es la fuente de verdad de producto. Cada épica tiene requisitos numerados (RF = requisito funcional, RNF = no funcional) con criterios de aceptación. Al construirlo —sea una persona o un agente de IA—: implementar de a una épica, citando los números de requisito en los commits; las reglas de trabajo completas están en `CONTRIBUTING.md`. Si una decisión técnica contradice o excede lo escrito acá, se documenta en un ADR antes de codear. Este documento cambia por pull request y cada cambio se refleja en el changelog.
@@ -202,7 +202,7 @@ La app funciona en navegadores modernos de computadora, celular y tablet. Diseñ
 Instalable (manifest + service worker). Sin conexión funcionan: Radar, Cola, currículo, cálculo comprometido y análisis con motor local. Requieren conexión: bots Maia, importación, tablebases. El estado de conexión se comunica sin bloquear lo que sí funciona.
 
 ### RNF-3 — Rendimiento (P0)
-Interactividad inicial <3 s en un celular de gama media con red 4G. Stockfish corre en Web Worker, nunca en el hilo principal; usa multihilo (SharedArrayBuffer) cuando el hosting sirve las cabeceras COOP/COEP, con fallback a un hilo. Presupuesto de análisis por partida configurable (por defecto: profundidad 18 o 3 s por posición crítica). Módulos cargados perezosamente por épica.
+Interactividad inicial <3 s en un celular de gama media con red 4G. Stockfish corre en Web Worker, nunca en el hilo principal; usa multihilo (SharedArrayBuffer) cuando el hosting sirve las cabeceras COOP/COEP, con fallback a un hilo. Presupuesto de análisis configurable por posición. Valores por defecto, documentados acá porque difieren del borrador original de este RNF ("profundidad 18 o 3 s por posición crítica") — la implementación de E3 evalúa *todas* las posiciones de la partida (RF-3.2), no solo las críticas, y a esa cantidad la prioridad pasó a ser no bloquear la UI por minutos en partidas largas: **profundidad 14** para el análisis de partida completa (`ANALYSIS_DEPTH`, `services/analysis/gameAnalyzer.ts`). Los pipelines offline que sí pueden permitirse más tiempo por posición (posiciones tranquilas, doble solución, Stoyko — todos corren en build time, no en el dispositivo del usuario) usan el mismo criterio entre sí: profundidad 14 de criba + reconfirmación a 17 antes de aceptar una posición al catálogo (`docs/radar-dataset.md`). Módulos cargados perezosamente por épica.
 
 ### RNF-4 — Local-first y propiedad de los datos (P0)
 Todo el estado del usuario vive en IndexedDB del dispositivo. La exportación e importación completas están especificadas como épica propia (E14): un archivo, ≤3 toques, restauración total. Sin analítica de terceros; la telemetría es el propio panel del usuario. La sincronización en la nube es una fase futura (F6) y será opcional y cifrable.

@@ -50,6 +50,7 @@ export const es = {
     introTexto:
       'Sin partidas analizadas todavía, dos partidas cortas contra el motor y 20 posiciones del Radar alcanzan para estimar tu nivel y armar tu primera dieta.',
     introNota: 'Los bots Maia (más humanos) requieren conexión a Lichess; mientras tanto usamos el motor local.',
+    partidaEnCurso: 'Tenés una partida en curso en Jugar. Terminala o rendite antes de empezar el diagnóstico — si no, se pierde.',
     empezar: 'Empezar diagnóstico',
     saltear: 'Empezar sin diagnóstico',
     juego1Titulo: 'Partida 1 de 2',

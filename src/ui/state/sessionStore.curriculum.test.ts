@@ -4,6 +4,7 @@
 // automatizado), que es el estado real de una instalación fresca.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Chess } from 'chess.js';
 import { useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
@@ -75,6 +76,13 @@ describe('sessionStore — bloque de currículo', () => {
 
     const progreso = await db.curriculumProgress.get(item.id);
     expect(progreso?.demostracionesLimpias).toBe(0);
+
+    // El feedback muestra la jugada correcta en SAN, no en UCI crudo.
+    const solucion = item.solucion[0];
+    const chess = new Chess(item.fen);
+    const sanEsperado = chess.move({ from: solucion.slice(0, 2), to: solucion.slice(2, 4), promotion: solucion.slice(4, 5) || undefined }).san;
+    expect(after.curriculumJugadaCorrecta).toBe(sanEsperado);
+    expect(after.curriculumJugadaCorrecta).not.toBe(solucion);
   });
 
   it('recorre todo el currículo vencido y pasa al Radar', async () => {

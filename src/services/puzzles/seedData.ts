@@ -1,10 +1,10 @@
 // GENERADO por scripts/build-radar-dataset.mjs — no editar a mano.
-// Lote radar-97561c841622: puzzles de Lichess (CC0) y posiciones tranquilas de
+// Lote radar-4c8552fff66e: puzzles de Lichess (CC0) y posiciones tranquilas de
 // partidas reales verificadas por Stockfish. Ver docs/radar-dataset.md,
 // ADR-0005 y RF-5.6 para reproducirlo.
 import type { RadarItem } from '../../core/types';
 
-export const RADAR_DATASET_VERSION = "radar-97561c841622";
+export const RADAR_DATASET_VERSION = "radar-4c8552fff66e";
 
 export const seedRadarItems: RadarItem[] = [
   {
@@ -1874,7 +1874,7 @@ export const seedRadarItems: RadarItem[] = [
   },
   {
     "id": "dobsol-01",
-    "fen": "r3k2r/ppp2ppp/2b5/3QP3/4n2q/B1P3P1/P1P2P1P/R3KB1R w KQkq - 1 12",
+    "fen": "2r1k2r/1q2bp1p/2p2np1/p1Pp1N2/8/4BQ2/PPP2PPP/R3K2R w KQk - 0 16",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1882,16 +1882,16 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "d5c6"
+      "f5d6"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "f1b5"
+      "familiar": "f5e7"
     }
   },
   {
     "id": "dobsol-02",
-    "fen": "r2q1rk1/2p2pbp/b2p1np1/1B2n1B1/p3P3/P1N2PN1/1PPQ2PP/2KR3R w - - 1 14",
+    "fen": "rn1q1rk1/1bp1bppp/8/pB1pB3/1P1P4/P1N1Q1n1/2P2PPP/R4RK1 w - - 0 18",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1899,16 +1899,16 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "f3f4"
+      "e3g3"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "b5a6"
+      "familiar": "e5g3"
     }
   },
   {
     "id": "dobsol-03",
-    "fen": "r1b2k2/pp6/4p2p/2bn1B2/8/2P2Q2/Pq3PPP/R4RK1 w - - 0 19",
+    "fen": "rn1qr1k1/p4p1p/2p2p2/1p2N3/3Pp3/2P5/P1P2PPP/R2QR1K1 w - - 0 15",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1916,16 +1916,16 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "f5e6"
+      "e5g4"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "f5e4"
+      "familiar": "d1g4"
     }
   },
   {
     "id": "dobsol-04",
-    "fen": "r1b1k2r/pp1Nqppp/3b4/2pP4/2P2Pn1/8/PP2B1PP/RNBQK2R w KQkq - 1 12",
+    "fen": "rnb1r3/4kpp1/p1pb3p/1p1Bp3/4P3/4BN2/PPP2PPP/2KR3R w - - 0 15",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1933,16 +1933,16 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "d7e5"
+      "d5f7"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "e1g1"
+      "familiar": "d5b3"
     }
   },
   {
     "id": "dobsol-05",
-    "fen": "r1b1Qb1r/pppn2pp/8/3k4/3PpB2/5qP1/PPP2P1P/2KR3R w - - 0 18",
+    "fen": "rnbr2k1/pp2qppp/2p5/8/2B1N3/8/PPP2PPP/R2QR1K1 w - - 5 15",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1950,16 +1950,16 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "e8f7"
+      "d1h5"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "h1e1"
+      "familiar": "c4f7"
     }
   },
   {
     "id": "dobsol-06",
-    "fen": "r1b2b1r/pppn1Qpp/2k5/8/3PpB2/5qP1/PPP2P1P/2KR3R w - - 2 19",
+    "fen": "r1b1k2r/pp2q1pp/2pp1p2/4b3/8/P4Q2/BB1N2PP/R3R1K1 w kq - 0 17",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1967,16 +1967,16 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "f7c4"
+      "d2c4"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "h1e1"
+      "familiar": "b2e5"
     }
   },
   {
     "id": "dobsol-07",
-    "fen": "r1b4r/ppp3pp/2k5/2b5/2Q1pB2/5qP1/PPP2P1P/2KR3R w - - 0 21",
+    "fen": "r3kb1r/ppp1nppp/2n5/4Pb2/2B1pB2/2N5/PPP2PPP/2KR2NR w - - 8 9",
     "tipo": "ofensiva",
     "temas": [
       "doble-solucion",
@@ -1984,11 +1984,28 @@ export const seedRadarItems: RadarItem[] = [
     ],
     "rating": 1500,
     "solucion": [
-      "c4d5"
+      "c3b5"
     ],
     "fuente": "pipeline-doble-solucion",
     "dobleSolucion": {
-      "familiar": "a2a4"
+      "familiar": "g1e2"
+    }
+  },
+  {
+    "id": "dobsol-08",
+    "fen": "N5kr/pp3pp1/2n5/2q4p/2Pp1nbP/P2B1P2/2PQ1KP1/R6R w - - 0 19",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "d2f4"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "f3g4"
     }
   }
 ];

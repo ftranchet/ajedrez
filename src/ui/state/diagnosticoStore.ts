@@ -16,7 +16,12 @@ import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { useGameStore } from './gameStore';
-import { computeDests } from './chessBoardUtils';
+import { computeDests, sanDeLinea } from './chessBoardUtils';
+
+/** Mismo motivo que sessionStore.ts#sanDeJugada: mostrar SAN, no UCI crudo, en el feedback. */
+function sanDeJugada(fen: string, jugadaUci: string): string {
+  return sanDeLinea(fen, [jugadaUci])[0] ?? jugadaUci;
+}
 
 export const DIAGNOSTICO_JUEGO1_NIVEL = 'nivel-2';
 export const DIAGNOSTICO_JUEGO2_NIVEL = 'nivel-4';
@@ -122,6 +127,13 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
     bandaEstimada: null,
 
     async empezarJuego1() {
+      // useGameStore es compartido con la pantalla Jugar (RF-1.3): resetearlo
+      // acá tira sin aviso cualquier partida en curso que haya quedado
+      // abierta en esa pestaña (el store zustand sigue vivo aunque
+      // JugarScreen esté desmontada). HoyScreen ya deshabilita este botón
+      // mientras `useGameStore().phase === 'playing'`; esta comprobación es
+      // el cinturón de seguridad del lado del store, no solo de la UI.
+      if (useGameStore.getState().phase === 'playing') return;
       set({
         phase: 'juego1',
         resultadoJuego1: null,
@@ -180,7 +192,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
         ...boardSnapshot(),
         lastMove: [from, to],
         radarUltimoAcierto: acierto,
-        radarJugadaCorrecta: item.solucion[0],
+        radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
         radarFeedbackTexto: explainFeedback(item, acierto),
         radarSubPhase: 'feedback',
         radarServidos: s.radarServidos + 1,
