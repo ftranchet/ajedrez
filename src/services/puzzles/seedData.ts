@@ -1,10 +1,10 @@
 // GENERADO por scripts/build-radar-dataset.mjs — no editar a mano.
-// Lote radar-5d230615d6be: puzzles de Lichess (CC0) y posiciones tranquilas de
+// Lote radar-6485d21c233a: puzzles de Lichess (CC0) y posiciones tranquilas de
 // partidas reales verificadas por Stockfish. Ver docs/radar-dataset.md,
 // ADR-0005 y RF-5.6 para reproducirlo.
 import type { RadarItem } from '../../core/types';
 
-export const RADAR_DATASET_VERSION = "radar-5d230615d6be";
+export const RADAR_DATASET_VERSION = "radar-6485d21c233a";
 
 export const seedRadarItems: RadarItem[] = [
   {
@@ -14,7 +14,8 @@ export const seedRadarItems: RadarItem[] = [
     "temas": [
       "advantage",
       "endgame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1474,
     "solucion": [
@@ -33,7 +34,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "long",
-      "rookEndgame"
+      "rookEndgame",
+      "reclasificado-motor"
     ],
     "rating": 1599,
     "solucion": [
@@ -70,7 +72,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "hangingPiece",
       "long",
-      "middlegame"
+      "middlegame",
+      "reclasificado-motor"
     ],
     "rating": 1784,
     "solucion": [
@@ -85,14 +88,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-001XA",
     "fen": "2r2rk1/pbq1bppp/8/8/2p1N3/P1Bn2P1/2Q2PBP/1R3RK1 w - - 4 24",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "crushing",
       "discoveredAttack",
       "long",
       "master",
       "middlegame",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1687,
     "solucion": [
@@ -112,7 +116,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "endgame",
       "rookEndgame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1383,
     "solucion": [
@@ -132,7 +137,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "long",
       "rookEndgame",
-      "skewer"
+      "skewer",
+      "reclasificado-motor"
     ],
     "rating": 1115,
     "solucion": [
@@ -190,7 +196,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "hangingPiece",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1377,
     "solucion": [
@@ -203,14 +210,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-001h8",
     "fen": "2r3k1/2r4p/4p1p1/1p1q1pP1/p2P1P1Q/P6R/4bB2/2R3K1 w - - 6 35",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "crushing",
       "deflection",
       "kingsideAttack",
       "long",
       "middlegame",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1780,
     "solucion": [
@@ -229,7 +237,8 @@ export const seedRadarItems: RadarItem[] = [
     "temas": [
       "advantage",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1084,
     "solucion": [
@@ -249,7 +258,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "long",
-      "rookEndgame"
+      "rookEndgame",
+      "reclasificado-motor"
     ],
     "rating": 1921,
     "solucion": [
@@ -290,7 +300,8 @@ export const seedRadarItems: RadarItem[] = [
       "mate",
       "mateIn1",
       "middlegame",
-      "oneMove"
+      "oneMove",
+      "reclasificado-motor"
     ],
     "rating": 819,
     "solucion": [
@@ -301,14 +312,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-001xO",
     "fen": "k1r1b3/p1r1nppp/Bp1qpn2/2Np4/1P1P4/PQR1PN2/5PPP/2R3K1 b - - 1 19",
-    "tipo": "envenenada",
+    "tipo": "genuina",
     "temas": [
       "crushing",
       "master",
       "masterVsMaster",
       "middlegame",
       "sacrifice",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1876,
     "solucion": [
@@ -326,7 +338,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "endgame",
       "fork",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1547,
     "solucion": [
@@ -347,7 +360,8 @@ export const seedRadarItems: RadarItem[] = [
       "deflection",
       "endgame",
       "long",
-      "promotion"
+      "promotion",
+      "reclasificado-motor"
     ],
     "rating": 1197,
     "solucion": [
@@ -390,7 +404,8 @@ export const seedRadarItems: RadarItem[] = [
       "master",
       "mate",
       "mateIn1",
-      "oneMove"
+      "oneMove",
+      "reclasificado-motor"
     ],
     "rating": 1231,
     "solucion": [
@@ -401,14 +416,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-003mh",
     "fen": "4rk1r/1pp2p2/p2p3p/3N4/3P2q1/8/PPP5/1K2Q1NR w - - 2 24",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "advantage",
       "attraction",
       "fork",
       "long",
       "middlegame",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1328,
     "solucion": [
@@ -423,11 +439,12 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-000Sa",
     "fen": "2Q2bk1/5p1p/p5p1/2p3P1/4B3/7P/qPr2P2/2K4R w - - 0 33",
-    "tipo": "ofensiva",
+    "tipo": "genuina",
     "temas": [
       "advantage",
       "endgame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1545,
     "solucion": [
@@ -445,7 +462,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "equality",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1964,
     "solucion": [
@@ -496,7 +514,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "endgame",
       "hangingPiece",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1129,
     "solucion": [
@@ -509,14 +528,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-004RF",
     "fen": "5rk1/5ppp/1p6/1q3P1Q/2pp3P/6R1/6PK/8 w - - 0 31",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "attraction",
       "crushing",
       "discoveredAttack",
       "endgame",
       "long",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1746,
     "solucion": [
@@ -536,7 +556,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "endgame",
       "long",
-      "pawnEndgame"
+      "pawnEndgame",
+      "reclasificado-motor"
     ],
     "rating": 1569,
     "solucion": [
@@ -557,7 +578,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "hangingPiece",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1135,
     "solucion": [
@@ -594,7 +616,8 @@ export const seedRadarItems: RadarItem[] = [
       "mate",
       "mateIn1",
       "oneMove",
-      "opening"
+      "opening",
+      "reclasificado-motor"
     ],
     "rating": 1393,
     "solucion": [
@@ -605,14 +628,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-004kB",
     "fen": "4rr1k/p1Qn2pp/3p1q2/8/8/2P5/PP3PPP/RN3RK1 b - - 0 16",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "kingsideAttack",
       "long",
       "mate",
       "mateIn3",
       "middlegame",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1209,
     "solucion": [
@@ -633,7 +657,8 @@ export const seedRadarItems: RadarItem[] = [
       "mate",
       "mateIn2",
       "operaMate",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1363,
     "solucion": [
@@ -652,7 +677,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "master",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1647,
     "solucion": [
@@ -688,7 +714,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "hangingPiece",
       "long",
-      "quietMove"
+      "quietMove",
+      "reclasificado-motor"
     ],
     "rating": 1279,
     "solucion": [
@@ -703,7 +730,7 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-005do",
     "fen": "5r2/pp1k4/4p1b1/3pP1Np/3P1P1K/8/P7/2R5 w - - 8 43",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "attraction",
       "crushing",
@@ -711,7 +738,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "fork",
       "long",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1433,
     "solucion": [
@@ -731,7 +759,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "master",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1412,
     "solucion": [
@@ -750,7 +779,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "hangingPiece",
       "long",
-      "middlegame"
+      "middlegame",
+      "reclasificado-motor"
     ],
     "rating": 1621,
     "solucion": [
@@ -799,7 +829,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "endgame",
       "hangingPiece",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1836,
     "solucion": [
@@ -812,12 +843,13 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-005f3",
     "fen": "r5k1/2p1pp2/pp4p1/1q5r/5P2/2QP2R1/PP6/1K4R1 w - - 1 33",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "crushing",
       "endgame",
       "sacrifice",
-      "veryLong"
+      "veryLong",
+      "reclasificado-motor"
     ],
     "rating": 1903,
     "solucion": [
@@ -843,7 +875,8 @@ export const seedRadarItems: RadarItem[] = [
       "mate",
       "mateIn2",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1576,
     "solucion": [
@@ -861,7 +894,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "defensiveMove",
       "endgame",
-      "long"
+      "long",
+      "reclasificado-motor"
     ],
     "rating": 1402,
     "solucion": [
@@ -905,7 +939,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "endgame",
       "hangingPiece",
-      "long"
+      "long",
+      "reclasificado-motor"
     ],
     "rating": 1275,
     "solucion": [
@@ -920,14 +955,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-006wz",
     "fen": "2r5/4ppkp/6p1/1p6/1P6/P3B3/1br2PPP/1R1R2K1 w - - 3 23",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "attraction",
       "crushing",
       "endgame",
       "fork",
       "long",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1426,
     "solucion": [
@@ -946,7 +982,8 @@ export const seedRadarItems: RadarItem[] = [
     "temas": [
       "crushing",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1957,
     "solucion": [
@@ -966,7 +1003,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "master",
       "rookEndgame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1815,
     "solucion": [
@@ -1014,7 +1052,8 @@ export const seedRadarItems: RadarItem[] = [
       "fork",
       "hangingPiece",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1074,
     "solucion": [
@@ -1027,7 +1066,7 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00761",
     "fen": "3r2k1/1b4bR/p2P2p1/3p2N1/2p5/2P2N2/PP6/2K5 w - - 0 29",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "attraction",
       "crushing",
@@ -1035,7 +1074,8 @@ export const seedRadarItems: RadarItem[] = [
       "exposedKing",
       "fork",
       "long",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1474,
     "solucion": [
@@ -1056,7 +1096,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "pawnEndgame",
       "short",
-      "zugzwang"
+      "zugzwang",
+      "reclasificado-motor"
     ],
     "rating": 944,
     "solucion": [
@@ -1075,7 +1116,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "long",
-      "rookEndgame"
+      "rookEndgame",
+      "reclasificado-motor"
     ],
     "rating": 1443,
     "solucion": [
@@ -1113,7 +1155,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "hangingPiece",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1295,
     "solucion": [
@@ -1126,14 +1169,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-007en",
     "fen": "rn3rk1/4pp1p/3p2pB/2q4P/3QP1b1/Pp6/1P2B3/1K1R2NR b - - 0 20",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "long",
       "mate",
       "mateIn3",
       "middlegame",
       "queensideAttack",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1792,
     "solucion": [
@@ -1154,7 +1198,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "fork",
       "master",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1110,
     "solucion": [
@@ -1174,7 +1219,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "master",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1149,
     "solucion": [
@@ -1220,7 +1266,8 @@ export const seedRadarItems: RadarItem[] = [
       "fork",
       "hangingPiece",
       "master",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 920,
     "solucion": [
@@ -1233,12 +1280,13 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-009FP",
     "fen": "r1b1k1nr/ppp2pbp/3p1qp1/4p3/2BnP3/N2P2QP/PPP2PP1/R1B1K2R w KQkq - 0 10",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "advantage",
       "opening",
       "short",
-      "trappedPiece"
+      "trappedPiece",
+      "reclasificado-motor"
     ],
     "rating": 1368,
     "solucion": [
@@ -1255,7 +1303,8 @@ export const seedRadarItems: RadarItem[] = [
     "temas": [
       "advantage",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1825,
     "solucion": [
@@ -1274,7 +1323,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "long",
-      "pawnEndgame"
+      "pawnEndgame",
+      "reclasificado-motor"
     ],
     "rating": 1682,
     "solucion": [
@@ -1325,7 +1375,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "hangingPiece",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1289,
     "solucion": [
@@ -1338,14 +1389,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00AhO",
     "fen": "Q1b2rk1/2q2p1p/1p2pbp1/pP6/2P5/P2B1N2/5PPP/3R1RK1 b - - 0 20",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "advantage",
       "clearance",
       "long",
       "master",
       "middlegame",
-      "trappedPiece"
+      "trappedPiece",
+      "reclasificado-motor"
     ],
     "rating": 1233,
     "solucion": [
@@ -1365,7 +1417,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "fork",
       "long",
-      "middlegame"
+      "middlegame",
+      "reclasificado-motor"
     ],
     "rating": 1522,
     "solucion": [
@@ -1386,7 +1439,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "endgame",
       "hangingPiece",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1267,
     "solucion": [
@@ -1432,7 +1486,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "hangingPiece",
       "long",
-      "middlegame"
+      "middlegame",
+      "reclasificado-motor"
     ],
     "rating": 1336,
     "solucion": [
@@ -1447,13 +1502,14 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00BM8",
     "fen": "3r1rk1/pp2bppp/2ppnn2/8/N1P1P3/q1P4P/P2N2PB/R2Q1R1K w - - 1 17",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "advantage",
       "master",
       "middlegame",
       "short",
-      "trappedPiece"
+      "trappedPiece",
+      "reclasificado-motor"
     ],
     "rating": 1583,
     "solucion": [
@@ -1472,7 +1528,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "exposedKing",
       "rookEndgame",
-      "veryLong"
+      "veryLong",
+      "reclasificado-motor"
     ],
     "rating": 1909,
     "solucion": [
@@ -1500,7 +1557,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "hangingPiece",
       "knightEndgame",
-      "long"
+      "long",
+      "reclasificado-motor"
     ],
     "rating": 1472,
     "solucion": [
@@ -1543,7 +1601,8 @@ export const seedRadarItems: RadarItem[] = [
       "hangingPiece",
       "intermezzo",
       "middlegame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1463,
     "solucion": [
@@ -1556,7 +1615,7 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00BrZ",
     "fen": "r6r/pp2kb2/3p1p2/1N1Pp3/3bP3/P2B2P1/1P1Q2PP/7K b - - 7 28",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "attraction",
       "kingsideAttack",
@@ -1565,7 +1624,8 @@ export const seedRadarItems: RadarItem[] = [
       "mateIn3",
       "middlegame",
       "pillsburysMate",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1380,
     "solucion": [
@@ -1584,7 +1644,8 @@ export const seedRadarItems: RadarItem[] = [
     "temas": [
       "advantage",
       "middlegame",
-      "veryLong"
+      "veryLong",
+      "reclasificado-motor"
     ],
     "rating": 1474,
     "solucion": [
@@ -1608,7 +1669,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "pawnEndgame",
       "quietMove",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1638,
     "solucion": [
@@ -1651,7 +1713,8 @@ export const seedRadarItems: RadarItem[] = [
       "hangingPiece",
       "mate",
       "mateIn1",
-      "oneMove"
+      "oneMove",
+      "reclasificado-motor"
     ],
     "rating": 848,
     "solucion": [
@@ -1662,12 +1725,13 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00CXr",
     "fen": "r2k2nr/p3qBb1/1p1p3p/Q5p1/3n1B2/2N2R2/PPP3P1/R5K1 w - - 0 19",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "advantage",
       "long",
       "middlegame",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1908,
     "solucion": [
@@ -1682,13 +1746,14 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-001Wz",
     "fen": "6k1/5ppp/r1p5/p1n1rP2/8/2P2N1P/2P3P1/3R2K1 w - - 0 22",
-    "tipo": "ofensiva",
+    "tipo": "envenenada",
     "temas": [
       "backRankMate",
       "endgame",
       "mate",
       "mateIn2",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1118,
     "solucion": [
@@ -1707,7 +1772,8 @@ export const seedRadarItems: RadarItem[] = [
       "defensiveMove",
       "opening",
       "pin",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1873,
     "solucion": [
@@ -1747,7 +1813,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "hangingPiece",
       "long",
-      "opening"
+      "opening",
+      "reclasificado-motor"
     ],
     "rating": 1794,
     "solucion": [
@@ -1762,13 +1829,14 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00Cwz",
     "fen": "1r5r/5pk1/4p3/3p2PP/N1nP4/n1P5/P3B3/K1R4R b - - 0 34",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "mate",
       "mateIn2",
       "middlegame",
       "sacrifice",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1492,
     "solucion": [
@@ -1787,7 +1855,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "mate",
       "mateIn1",
-      "oneMove"
+      "oneMove",
+      "reclasificado-motor"
     ],
     "rating": 1631,
     "solucion": [
@@ -1803,7 +1872,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "defensiveMove",
       "endgame",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1150,
     "solucion": [
@@ -1854,7 +1924,8 @@ export const seedRadarItems: RadarItem[] = [
       "hangingPiece",
       "mate",
       "mateIn2",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 908,
     "solucion": [
@@ -1867,12 +1938,13 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00DdW",
     "fen": "5rk1/5ppp/4b3/1p1pPpPP/2pP4/b1P5/rqNQKP2/2RRN3 w - - 6 24",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "advantage",
       "middlegame",
       "short",
-      "trappedPiece"
+      "trappedPiece",
+      "reclasificado-motor"
     ],
     "rating": 1693,
     "solucion": [
@@ -1890,7 +1962,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "opening",
       "pin",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 1921,
     "solucion": [
@@ -1908,7 +1981,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "defensiveMove",
       "endgame",
-      "long"
+      "long",
+      "reclasificado-motor"
     ],
     "rating": 1563,
     "solucion": [
@@ -1949,7 +2023,8 @@ export const seedRadarItems: RadarItem[] = [
       "endgame",
       "hangingPiece",
       "master",
-      "short"
+      "short",
+      "reclasificado-motor"
     ],
     "rating": 947,
     "solucion": [
@@ -1962,14 +2037,15 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00F6y",
     "fen": "2k3r1/pppb1prp/1q6/8/Q7/2P1R1P1/P4P1P/4R1K1 w - - 4 24",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "long",
       "mate",
       "mateIn3",
       "middlegame",
       "queensideAttack",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 938,
     "solucion": [
@@ -1989,7 +2065,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "endgame",
       "short",
-      "skewer"
+      "skewer",
+      "reclasificado-motor"
     ],
     "rating": 1455,
     "solucion": [
@@ -2007,7 +2084,8 @@ export const seedRadarItems: RadarItem[] = [
       "crushing",
       "defensiveMove",
       "long",
-      "middlegame"
+      "middlegame",
+      "reclasificado-motor"
     ],
     "rating": 1950,
     "solucion": [
@@ -2041,7 +2119,8 @@ export const seedRadarItems: RadarItem[] = [
       "advantage",
       "hangingPiece",
       "long",
-      "middlegame"
+      "middlegame",
+      "reclasificado-motor"
     ],
     "rating": 1784,
     "solucion": [
@@ -2056,13 +2135,14 @@ export const seedRadarItems: RadarItem[] = [
   {
     "id": "lichess-00GVf",
     "fen": "5k2/3b2q1/pn4p1/1rp2p2/8/8/1P2Q1P1/1K2R2R w - - 4 33",
-    "tipo": "envenenada",
+    "tipo": "ofensiva",
     "temas": [
       "crushing",
       "exposedKing",
       "long",
       "middlegame",
-      "sacrifice"
+      "sacrifice",
+      "reclasificado-motor"
     ],
     "rating": 1559,
     "solucion": [

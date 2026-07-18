@@ -40,11 +40,17 @@ export function parseCsvLine(line) {
   return fields;
 }
 
+// Clasificación GRUESA por etiqueta de tema, solo como arranque de la
+// generación. NO es la clasificación autoritativa: la auditoría 2026-07
+// mostró que `sacrifice`/`trappedPiece` describen un sacrificio *correcto del
+// solucionador*, no una carnada a rechazar, así que este mapeo producía
+// "envenenada" con feedback invertido. La clasificación real del lote
+// publicado la re-deriva el motor en `scripts/reclassify-radar-tipos.mjs`
+// (genuina = material libre verificado; envenenada = una captura que parece
+// ganar material pero el motor condena; el resto, ofensiva). Una regeneración
+// completa del pipeline debería correr esa reclasificación como paso final.
 export function classifyPuzzleThemes(themes) {
   const tags = new Set(themes);
-  // `defensiveMove` es la etiqueta explícita de Lichess para una defensa
-  // precisa. Las dos categorías de oferta de material se infieren de sus
-  // temas más cercanos y quedan trazables en `temas` para revisión posterior.
   if (tags.has('defensiveMove')) return 'defensa';
   if (tags.has('hangingPiece')) return 'genuina';
   if (tags.has('sacrifice') || tags.has('trappedPiece')) return 'envenenada';
@@ -127,11 +133,23 @@ export function interleaveByType(items) {
   return result;
 }
 
-export function validateRadarDataset(items, minPerType) {
+// Cuota mínima por tipo del lote publicado. `ofensiva`/`defensa`/`tranquila`
+// mantienen 20; `genuina` y `envenenada` bajan a 10 porque, tras la
+// reclasificación con motor (auditoría 2026-07, scripts/reclassify-radar-tipos.mjs),
+// no se pueden forzar a 20 desde los puzzles de Lichess sin volver a inventar
+// etiquetas —el punto que rompía la validez de contenido—. Ver
+// docs/radar-dataset.md §Reclasificación con motor.
+export const MIN_POR_TIPO = { ofensiva: 20, defensa: 20, tranquila: 20, genuina: 10, envenenada: 8 };
+
+/** `minPerType` puede ser un número (mismo mínimo para todos los tipos, como
+ * en la generación balanceada) o un objeto por-tipo (como el lote publicado
+ * tras la reclasificación). */
+export function validateRadarDataset(items, minPerType = MIN_POR_TIPO) {
   const errors = [];
   const counts = Object.fromEntries(RADAR_DATASET_TYPES.map((type) => [type, 0]));
   const ids = new Set();
   const fens = new Set();
+  const minDe = (type) => (typeof minPerType === 'number' ? minPerType : (minPerType[type] ?? 0));
 
   for (const item of items) {
     if (!RADAR_DATASET_TYPES.includes(item.tipo)) errors.push(`Tipo de Radar inválido: ${item.tipo}.`);
@@ -143,7 +161,7 @@ export function validateRadarDataset(items, minPerType) {
     if (!Array.isArray(item.solucion) || item.solucion.length === 0) errors.push(`Item sin solución: ${item.id}.`);
   }
   for (const type of RADAR_DATASET_TYPES) {
-    if (counts[type] < minPerType) errors.push(`Faltan posiciones ${type}: ${counts[type]}/${minPerType}.`);
+    if (counts[type] < minDe(type)) errors.push(`Faltan posiciones ${type}: ${counts[type]}/${minDe(type)}.`);
   }
   return { ok: errors.length === 0, errors, counts };
 }

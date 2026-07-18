@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { Chess } from 'chess.js';
 import { StockfishEngine } from './lib/stockfish.mjs';
 import { DEFAULT_QUIET_CONFIG } from './lib/quietPositions.mjs';
-import { datasetVersion, renderSeedDataModule, validateRadarDataset } from './lib/radarDataset.mjs';
+import { MIN_POR_TIPO, datasetVersion, renderSeedDataModule, validateRadarDataset } from './lib/radarDataset.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const SEED_PATH = join(scriptDir, '..', 'src', 'services', 'puzzles', 'seedData.ts');
@@ -64,7 +64,7 @@ async function main() {
     engine.quit();
   }
 
-  const check = validateRadarDataset(items, 20);
+  const check = validateRadarDataset(items, MIN_POR_TIPO);
   if (!check.ok) throw new Error(`Lote inválido tras el backfill:\n- ${check.errors.join('\n- ')}`);
 
   const version = datasetVersion(items);

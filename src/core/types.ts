@@ -131,7 +131,7 @@ export interface RadarItem {
   /** Rating de dificultad, mismo rango que el rating de puzzles de Lichess. */
   rating: number;
   solucion: string[];
-  fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'seed-dev';
+  fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'pipeline-envenenada' | 'seed-dev';
   /**
    * Jugadas UCI adicionales que también cuentan como acierto (RF-5.3). Solo
    * en posiciones tranquilas: la definición de "tranquila" es que no hay un
