@@ -4,16 +4,18 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, GameRecord, Profile, RadarAttempt, Ritmo } from '../../core/types';
+import type { CalibrationRecord, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
 import { brierScore } from '../../core/calibration';
+import { tasaConformismo } from '../../core/dobleSolucion';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
+import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { AnalizarScreen } from './AnalizarScreen';
@@ -29,6 +31,7 @@ export function PanelScreen() {
   const [radarAttempts, setRadarAttempts] = useState<RadarAttempt[] | null>(null);
   const [calibraciones, setCalibraciones] = useState<CalibrationRecord[] | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [dobleSolucionAttempts, setDobleSolucionAttempts] = useState<DobleSolucionAttempt[] | null>(null);
   const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
@@ -44,6 +47,9 @@ export function PanelScreen() {
     });
     void profileRepo.get().then((p) => {
       if (alive) setProfile(p);
+    });
+    void dobleSolucionAttemptRepo.list().then((attempts) => {
+      if (alive) setDobleSolucionAttempts(attempts);
     });
     return () => {
       alive = false;
@@ -94,6 +100,8 @@ export function PanelScreen() {
       <ImportarPartidaSection onImported={() => setImportVersion((v) => v + 1)} />
 
       <RadarSummary attempts={radarAttempts} />
+
+      <DobleSolucionSummary attempts={dobleSolucionAttempts} />
 
       <DatosSection />
     </div>
@@ -160,6 +168,25 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
         {t.panel.radarTasa.replace('{n}', String(recent.length)).replace('{porcentaje}', String(porcentaje))}
       </p>
       <p className="m-0 mt-1 text-sm text-secondary">{t.panel.radarMeta}</p>
+    </section>
+  );
+}
+
+// Doble solución (E5, RF-5.7): tasa de conformismo — cuántas veces, entre
+// las jugadas superior/familiar, el usuario se conformó con la familiar en
+// vez de encontrar la superior. Los intentos "otra" (fallo genuino) no
+// cuentan para esta tasa: no fue ni superior ni un conformismo, fue un error.
+function DobleSolucionSummary({ attempts }: { attempts: DobleSolucionAttempt[] | null }) {
+  if (attempts === null) return null;
+  const tasa = tasaConformismo(attempts.map((a) => a.resultado));
+  return (
+    <section>
+      <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.dobleSolucion}</h2>
+      {tasa === null ? (
+        <p className="m-0 text-secondary">{t.panel.dobleSolucionSinDatos}</p>
+      ) : (
+        <p className="m-0 text-primary">{t.panel.dobleSolucionTasa.replace('{porcentaje}', String(Math.round(tasa * 100)))}</p>
+      )}
     </section>
   );
 }

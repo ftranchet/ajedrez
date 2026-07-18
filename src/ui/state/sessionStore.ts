@@ -21,11 +21,13 @@ import { DEFAULT_PROFILE, dietaPorBanda, type DietaSesion } from '../../core/pre
 import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
+import { clasificarRespuestaDobleSolucion, feedbackConformismo } from '../../core/dobleSolucion';
 import { buildErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
 import { candidataAttemptRepo } from '../../services/storage/candidataAttemptRepo';
+import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/radarProgressRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
@@ -596,7 +598,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
   /** Resuelve la jugada final del usuario en el Radar: única salida, la use
    * `radarUserMove` directo o `radarCandidataDecidir` tras "¿hay algo mejor?" (RF-5.8). */
   async function resolverJugadaRadar(item: RadarItem, jugadaUsuario: string, lastMove: [string, string]) {
-    const acierto = jugadaUsuario === item.solucion[0];
+    // Doble solución (RF-5.7): conformarse con la familiar también cuenta
+    // como acierto (la jugada funciona, no genera tarjeta de error) pero se
+    // registra aparte para medir la tasa de conformismo.
+    const resultadoDS = item.dobleSolucion ? clasificarRespuestaDobleSolucion(item, jugadaUsuario) : null;
+    const acierto = resultadoDS ? resultadoDS !== 'otra' : jugadaUsuario === item.solucion[0];
+    if (resultadoDS) {
+      void dobleSolucionAttemptRepo.save({ id: crypto.randomUUID(), itemId: item.id, resultado: resultadoDS, fecha: new Date().toISOString() });
+    }
     const pedirConfianza = shouldSampleConfidence();
     set({
       ...boardSnapshot(),
@@ -604,7 +613,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarUltimoAcierto: acierto,
       radarJugadaCorrecta: item.solucion[0],
       radarJugadaUsuario: jugadaUsuario,
-      radarFeedbackTexto: explainFeedback(item, acierto),
+      radarFeedbackTexto: resultadoDS === 'familiar' ? feedbackConformismo(item) : explainFeedback(item, acierto),
       radarPedirConfianza: pedirConfianza,
       radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
     });

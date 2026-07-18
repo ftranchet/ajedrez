@@ -131,7 +131,15 @@ export interface RadarItem {
   /** Rating de dificultad, mismo rango que el rating de puzzles de Lichess. */
   rating: number;
   solucion: string[];
-  fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'seed-dev';
+  fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'seed-dev';
+  /**
+   * Subtipo anti-Einstellung (RF-5.7): además de la jugada superior (ya en
+   * `solucion[0]`), una jugada "familiar" verificada por el motor (MultiPV)
+   * que también gana con claridad pero es objetivamente peor. Ambas cuentan
+   * como acierto; el sistema registra por separado si el usuario se
+   * conformó con la familiar en vez de encontrar la superior.
+   */
+  dobleSolucion?: { familiar: string };
 }
 
 /**
@@ -155,6 +163,38 @@ export interface RadarAttempt {
   tipo: TipoRadar;
   rating: number;
   acierto: boolean;
+  fecha: string; // ISO 8601
+}
+
+/**
+ * Resultado de una respuesta sobre un ítem de doble solución (RF-5.7,
+ * subtipo anti-Einstellung del Radar): si el usuario encontró la jugada
+ * superior, se conformó con la familiar (también gana, pero es peor), o
+ * jugó otra cosa (fallo genuino, igual que cualquier otro ítem del Radar).
+ */
+export type ResultadoDobleSolucion = 'superior' | 'familiar' | 'otra';
+
+/** Registro de una respuesta sobre un ítem de doble solución, para medir la tasa de conformismo (RF-5.7). */
+export interface DobleSolucionAttempt {
+  id: string;
+  itemId: string;
+  resultado: ResultadoDobleSolucion;
+  fecha: string; // ISO 8601
+}
+
+/**
+ * Registro de un intento de Cálculo comprometido (E7, RF-7.1): la línea
+ * completa se declaró antes de mover en el tablero, y se puntúa entera, no
+ * solo la primera jugada.
+ */
+export interface CompromisoAttempt {
+  id: string;
+  itemId: string;
+  /** Cantidad de plies de la línea pedida (RF-7.1: 3 a 7). */
+  profundidad: number;
+  correcta: boolean;
+  /** Índice (0-based) de la primera jugada que no coincidió; null si toda la línea fue correcta. */
+  primerErrorEn: number | null;
   fecha: string; // ISO 8601
 }
 

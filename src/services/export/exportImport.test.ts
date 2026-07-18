@@ -18,6 +18,8 @@ beforeEach(async () => {
   await db.curriculumProgress.clear();
   await db.profile.clear();
   await db.candidataAttempts.clear();
+  await db.compromisoAttempts.clear();
+  await db.dobleSolucionAttempts.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -83,6 +85,8 @@ describe('exportAllData / importAllData', () => {
     });
     await db.profile.put({ id: 'principal', bandaElo: 'avanzado', diagnosticoCompletadoEn: new Date().toISOString() });
     await db.candidataAttempts.put({ id: 'cand-1', itemId: 'radar-1', cambio: true, resultado: 'mejoro', fecha: new Date().toISOString() });
+    await db.compromisoAttempts.put({ id: 'comp-1', itemId: 'radar-1', profundidad: 3, correcta: true, primerErrorEn: null, fecha: new Date().toISOString() });
+    await db.dobleSolucionAttempts.put({ id: 'ds-1', itemId: 'radar-1', resultado: 'familiar', fecha: new Date().toISOString() });
 
     const zip = await exportAllData();
     expect(zip.byteLength).toBeGreaterThan(0);
@@ -96,6 +100,8 @@ describe('exportAllData / importAllData', () => {
     await db.curriculumProgress.clear();
     await db.profile.clear();
     await db.candidataAttempts.clear();
+    await db.compromisoAttempts.clear();
+    await db.dobleSolucionAttempts.clear();
     expect(await db.games.count()).toBe(0);
 
     const outcome = await importAllData(zip);
@@ -114,6 +120,8 @@ describe('exportAllData / importAllData', () => {
     expect((await db.curriculumProgress.get('patron-mate-pasillo-1'))?.demostracionesLimpias).toBe(1);
     expect((await db.profile.get('principal'))?.bandaElo).toBe('avanzado');
     expect((await db.candidataAttempts.get('cand-1'))?.resultado).toBe('mejoro');
+    expect((await db.compromisoAttempts.get('comp-1'))?.correcta).toBe(true);
+    expect((await db.dobleSolucionAttempts.get('ds-1'))?.resultado).toBe('familiar');
   });
 
   it('rechaza un archivo que no es un zip de ELOmax', async () => {

@@ -1,7 +1,18 @@
 // Exportación e importación de datos (E14): lógica pura de armado y
 // validación del paquete. La mecánica de archivo (.zip) vive en
 // services/export — acá no hay File, Blob ni fetch (CONTRIBUTING regla 4).
-import type { CalibrationRecord, CandidataAttempt, CurriculumProgress, ErrorCard, GameRecord, Profile, RadarAttempt, RadarProgress } from './types';
+import type {
+  CalibrationRecord,
+  CandidataAttempt,
+  CompromisoAttempt,
+  CurriculumProgress,
+  DobleSolucionAttempt,
+  ErrorCard,
+  GameRecord,
+  Profile,
+  RadarAttempt,
+  RadarProgress,
+} from './types';
 import { SCHEMA_VERSION } from '../services/storage/db';
 import { DEFAULT_PROFILE } from './prescriptor';
 
@@ -21,6 +32,8 @@ export interface ExportBundle {
   curriculumProgress: CurriculumProgress[];
   profile: Profile;
   candidataAttempts: CandidataAttempt[];
+  compromisoAttempts: CompromisoAttempt[];
+  dobleSolucionAttempts: DobleSolucionAttempt[];
 }
 
 export interface ExportSourceData {
@@ -32,6 +45,8 @@ export interface ExportSourceData {
   curriculumProgress: CurriculumProgress[];
   profile: Profile;
   candidataAttempts: CandidataAttempt[];
+  compromisoAttempts: CompromisoAttempt[];
+  dobleSolucionAttempts: DobleSolucionAttempt[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -46,6 +61,8 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     curriculumProgress: data.curriculumProgress,
     profile: data.profile,
     candidataAttempts: data.candidataAttempts,
+    compromisoAttempts: data.compromisoAttempts,
+    dobleSolucionAttempts: data.dobleSolucionAttempts,
   };
 }
 
@@ -92,6 +109,14 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.candidataAttempts !== undefined && !Array.isArray(obj.candidataAttempts)) {
     return { ok: false, error: 'El historial de la regla de candidatas no tiene la forma esperada.' };
   }
+  // Tampoco cálculo comprometido (E7, RF-7.1).
+  if (obj.compromisoAttempts !== undefined && !Array.isArray(obj.compromisoAttempts)) {
+    return { ok: false, error: 'El historial de cálculo comprometido no tiene la forma esperada.' };
+  }
+  // Ni doble solución (RF-5.7).
+  if (obj.dobleSolucionAttempts !== undefined && !Array.isArray(obj.dobleSolucionAttempts)) {
+    return { ok: false, error: 'El historial de doble solución no tiene la forma esperada.' };
+  }
   return {
     ok: true,
     bundle: {
@@ -104,6 +129,8 @@ export function validateImportBundle(raw: unknown): ImportResult {
       curriculumProgress: (obj.curriculumProgress ?? []) as CurriculumProgress[],
       profile: (obj.profile ?? DEFAULT_PROFILE) as Profile,
       candidataAttempts: (obj.candidataAttempts ?? []) as CandidataAttempt[],
+      compromisoAttempts: (obj.compromisoAttempts ?? []) as CompromisoAttempt[],
+      dobleSolucionAttempts: (obj.dobleSolucionAttempts ?? []) as DobleSolucionAttempt[],
     },
   };
 }

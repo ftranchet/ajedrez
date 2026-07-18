@@ -67,8 +67,9 @@ export function Board(props: BoardProps) {
     });
   }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor]);
 
+  // 25% de opacidad para piezas fantasma, design system §3.4/§6.5.
   const blindClass =
-    props.blindMode === 'coordenadas' ? '[&_piece]:opacity-0' : props.blindMode === 'fantasma' ? '[&_piece]:opacity-20' : '';
+    props.blindMode === 'coordenadas' ? '[&_piece]:opacity-0' : props.blindMode === 'fantasma' ? '[&_piece]:opacity-25' : '';
 
   return <div ref={el} className={`aspect-square h-full w-full ${blindClass}`} />;
 }

@@ -263,4 +263,175 @@ describe('migración de esquema Dexie', () => {
     expect(await current.candidataAttempts.count()).toBe(0);
     current.close();
   });
+
+  it('migra de v7 a v8 sin perder partidas (cálculo comprometido, Fase 4)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v7 = new Dexie(name);
+    v7.version(1).stores({ games: 'id, fecha' });
+    v7.version(2).stores({ games: 'id, fecha, fuente' });
+    v7.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    v7.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+    });
+    v7.version(5).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+    });
+    v7.version(6).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+    });
+    v7.version(7).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+    });
+    await v7.table('games').add({
+      id: 'g6',
+      pgn: '1. Nc3 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-17T00:00:00.000Z',
+    });
+    v7.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g6')).toMatchObject({ id: 'g6', pgn: '1. Nc3 *' });
+    expect(await current.compromisoAttempts.count()).toBe(0);
+    current.close();
+  });
+
+  it('migra de v8 a v9 sin perder partidas (doble solución, Fase 4)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    const v8 = new Dexie(name);
+    v8.version(1).stores({ games: 'id, fecha' });
+    v8.version(2).stores({ games: 'id, fecha, fuente' });
+    v8.version(3).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+    });
+    v8.version(4).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+    });
+    v8.version(5).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+    });
+    v8.version(6).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+    });
+    v8.version(7).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+    });
+    v8.version(8).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+    });
+    await v8.table('games').add({
+      id: 'g7',
+      pgn: '1. g3 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-17T00:00:00.000Z',
+    });
+    v8.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g7')).toMatchObject({ id: 'g7', pgn: '1. g3 *' });
+    expect(await current.dobleSolucionAttempts.count()).toBe(0);
+    current.close();
+  });
 });

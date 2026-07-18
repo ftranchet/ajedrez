@@ -12,6 +12,8 @@ const empty = {
   curriculumProgress: [],
   profile: DEFAULT_PROFILE,
   candidataAttempts: [],
+  compromisoAttempts: [],
+  dobleSolucionAttempts: [],
 };
 
 describe('buildExportBundle', () => {

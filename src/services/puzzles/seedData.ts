@@ -1,10 +1,10 @@
 // GENERADO por scripts/build-radar-dataset.mjs — no editar a mano.
-// Lote radar-84639d96e9b3: puzzles de Lichess (CC0) y posiciones tranquilas de
+// Lote radar-97561c841622: puzzles de Lichess (CC0) y posiciones tranquilas de
 // partidas reales verificadas por Stockfish. Ver docs/radar-dataset.md,
 // ADR-0005 y RF-5.6 para reproducirlo.
 import type { RadarItem } from '../../core/types';
 
-export const RADAR_DATASET_VERSION = "radar-84639d96e9b3";
+export const RADAR_DATASET_VERSION = "radar-97561c841622";
 
 export const seedRadarItems: RadarItem[] = [
   {
@@ -1871,5 +1871,124 @@ export const seedRadarItems: RadarItem[] = [
       "e7d8"
     ],
     "fuente": "lichess-cc0"
+  },
+  {
+    "id": "dobsol-01",
+    "fen": "r3k2r/ppp2ppp/2b5/3QP3/4n2q/B1P3P1/P1P2P1P/R3KB1R w KQkq - 1 12",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "d5c6"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "f1b5"
+    }
+  },
+  {
+    "id": "dobsol-02",
+    "fen": "r2q1rk1/2p2pbp/b2p1np1/1B2n1B1/p3P3/P1N2PN1/1PPQ2PP/2KR3R w - - 1 14",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "f3f4"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "b5a6"
+    }
+  },
+  {
+    "id": "dobsol-03",
+    "fen": "r1b2k2/pp6/4p2p/2bn1B2/8/2P2Q2/Pq3PPP/R4RK1 w - - 0 19",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "f5e6"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "f5e4"
+    }
+  },
+  {
+    "id": "dobsol-04",
+    "fen": "r1b1k2r/pp1Nqppp/3b4/2pP4/2P2Pn1/8/PP2B1PP/RNBQK2R w KQkq - 1 12",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "d7e5"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "e1g1"
+    }
+  },
+  {
+    "id": "dobsol-05",
+    "fen": "r1b1Qb1r/pppn2pp/8/3k4/3PpB2/5qP1/PPP2P1P/2KR3R w - - 0 18",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "e8f7"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "h1e1"
+    }
+  },
+  {
+    "id": "dobsol-06",
+    "fen": "r1b2b1r/pppn1Qpp/2k5/8/3PpB2/5qP1/PPP2P1P/2KR3R w - - 2 19",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "f7c4"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "h1e1"
+    }
+  },
+  {
+    "id": "dobsol-07",
+    "fen": "r1b4r/ppp3pp/2k5/2b5/2Q1pB2/5qP1/PPP2P1P/2KR3R w - - 0 21",
+    "tipo": "ofensiva",
+    "temas": [
+      "doble-solucion",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "c4d5"
+    ],
+    "fuente": "pipeline-doble-solucion",
+    "dobleSolucion": {
+      "familiar": "a2a4"
+    }
   }
 ];

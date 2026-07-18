@@ -5,9 +5,11 @@ import Dexie, { type Table } from 'dexie';
 import type {
   CalibrationRecord,
   CandidataAttempt,
+  CompromisoAttempt,
   CurriculumDatasetMeta,
   CurriculumItem,
   CurriculumProgress,
+  DobleSolucionAttempt,
   ErrorCard,
   GameRecord,
   Profile,
@@ -19,7 +21,7 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 9;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -34,6 +36,8 @@ export class ElomaxDB extends Dexie {
   curriculumProgress!: Table<CurriculumProgress, string>;
   profile!: Table<Profile, string>;
   candidataAttempts!: Table<CandidataAttempt, string>;
+  compromisoAttempts!: Table<CompromisoAttempt, string>;
+  dobleSolucionAttempts!: Table<DobleSolucionAttempt, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -133,6 +137,43 @@ export class ElomaxDB extends Dexie {
       curriculumProgress: 'id, fsrs.due, updatedAt',
       profile: 'id',
       candidataAttempts: 'id, itemId, fecha',
+    });
+
+    // v8 — Fase 4 (E7): cálculo comprometido (RF-7.1). Tabla nueva y chica;
+    // puramente aditiva.
+    this.version(8).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+    });
+
+    // v9 — Fase 4 (E5): doble solución (RF-5.7). Tabla nueva y chica;
+    // puramente aditiva.
+    this.version(9).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
     });
   }
 }

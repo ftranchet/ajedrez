@@ -1,7 +1,9 @@
 // El Radar (E5): selector de posiciones sin etiquetar. RF-5.1 exige que
 // ningún patrón trivial prediga el tipo, y RF-5.5 que la dificultad se
 // adapte para mantener la tasa de acierto en la banda 60–80% (zona de
-// fallo 20–40%, Bjork). Nunca doble solución todavía (roadmap Fase 1).
+// fallo 20–40%, Bjork). El subtipo doble solución (RF-5.7) se selecciona
+// igual que cualquier otro ítem — su lógica de puntuación vive en
+// core/dobleSolucion.ts, no acá.
 import type { CategoriaError, RadarItem, TipoRadar } from './types';
 
 export interface RadarSelectionState {

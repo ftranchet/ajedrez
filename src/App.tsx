@@ -1,17 +1,22 @@
-// Shell de la app: 3 destinos (Hoy / Jugar / Panel). Layouts responsive del
-// design system §4: nav inferior en celular, lateral fina en escritorio.
-// El cambio de orientación re-acomoda sin recargar ni perder estado (RNF-1).
+// Shell de la app: 4 destinos (Hoy / Jugar / Cálculo / Panel). Layouts
+// responsive del design system §4: nav inferior en celular, lateral fina en
+// escritorio. El cambio de orientación re-acomoda sin recargar ni perder
+// estado (RNF-1). "Cálculo" (E7, RF-7.1) se suma en Fase 4: su patrón de
+// interacción (línea completa sin mover el tablero) no encaja como submodo
+// de otra pantalla, así que pasa a ser su propio destino.
 import { useState } from 'react';
 import { HoyScreen } from './ui/screens/HoyScreen';
 import { JugarScreen } from './ui/screens/JugarScreen';
+import { CalculoScreen } from './ui/screens/CalculoScreen';
 import { PanelScreen } from './ui/screens/PanelScreen';
 import { t } from './ui/i18n/es';
 
-type Tab = 'hoy' | 'jugar' | 'panel';
+type Tab = 'hoy' | 'jugar' | 'calculo' | 'panel';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'hoy', label: t.nav.hoy },
   { id: 'jugar', label: t.nav.jugar },
+  { id: 'calculo', label: t.nav.calculo },
   { id: 'panel', label: t.nav.panel },
 ];
 
@@ -33,6 +38,7 @@ export default function App() {
       <main className="min-h-0 flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
         {tab === 'hoy' && <HoyScreen />}
         {tab === 'jugar' && <JugarScreen />}
+        {tab === 'calculo' && <CalculoScreen />}
         {tab === 'panel' && <PanelScreen />}
       </main>
 
