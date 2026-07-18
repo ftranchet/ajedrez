@@ -20,6 +20,8 @@ beforeEach(async () => {
   await db.candidataAttempts.clear();
   await db.compromisoAttempts.clear();
   await db.dobleSolucionAttempts.clear();
+  await db.stoykoAttempts.clear();
+  await db.triageAttempts.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -87,6 +89,8 @@ describe('exportAllData / importAllData', () => {
     await db.candidataAttempts.put({ id: 'cand-1', itemId: 'radar-1', cambio: true, resultado: 'mejoro', fecha: new Date().toISOString() });
     await db.compromisoAttempts.put({ id: 'comp-1', itemId: 'radar-1', profundidad: 3, correcta: true, primerErrorEn: null, fecha: new Date().toISOString() });
     await db.dobleSolucionAttempts.put({ id: 'ds-1', itemId: 'radar-1', resultado: 'familiar', fecha: new Date().toISOString() });
+    await db.stoykoAttempts.put({ id: 'st-1', itemId: 'stoyko-01', candidatas: [{ jugada: 'e2e4', evaluacion: '=' }], acierto: true, confianzaDeclarada: 70, tiempoMs: 12000, fecha: new Date().toISOString() });
+    await db.triageAttempts.put({ id: 'tr-1', itemId: 'radar-1', tipo: 'ofensiva', decisionUsuario: 'calcular', decisionCorrecta: 'calcular', correcta: true, tiempoMs: 900, fecha: new Date().toISOString() });
 
     const zip = await exportAllData();
     expect(zip.byteLength).toBeGreaterThan(0);
@@ -102,6 +106,8 @@ describe('exportAllData / importAllData', () => {
     await db.candidataAttempts.clear();
     await db.compromisoAttempts.clear();
     await db.dobleSolucionAttempts.clear();
+    await db.stoykoAttempts.clear();
+    await db.triageAttempts.clear();
     expect(await db.games.count()).toBe(0);
 
     const outcome = await importAllData(zip);
@@ -122,6 +128,9 @@ describe('exportAllData / importAllData', () => {
     expect((await db.candidataAttempts.get('cand-1'))?.resultado).toBe('mejoro');
     expect((await db.compromisoAttempts.get('comp-1'))?.correcta).toBe(true);
     expect((await db.dobleSolucionAttempts.get('ds-1'))?.resultado).toBe('familiar');
+    expect((await db.stoykoAttempts.get('st-1'))?.candidatas[0].jugada).toBe('e2e4');
+    expect((await db.stoykoAttempts.get('st-1'))?.tiempoMs).toBe(12000);
+    expect((await db.triageAttempts.get('tr-1'))?.correcta).toBe(true);
   });
 
   it('rechaza un archivo que no es un zip de ELOmax', async () => {

@@ -380,3 +380,40 @@ export interface StoykoDatasetMeta {
   version: string;
   seededAt: string; // ISO 8601
 }
+
+/**
+ * Registro completo de un ejercicio de Stoyko (E7, RF-7.2/7.3). Antes solo se
+ * guardaba el acierto en `calibrationRecords`; acá queda el intento entero —
+ * las candidatas que el usuario anotó con su evaluación, el tiempo que le
+ * llevó (RF-7.3, cronómetro silencioso) y su confianza declarada— para poder
+ * auditarlo y, a futuro, medir la calidad/cobertura de las candidatas.
+ */
+export interface StoykoAttempt {
+  id: string;
+  itemId: string;
+  /** Jugadas candidatas que el usuario consideró, cada una con su evaluación. */
+  candidatas: { jugada: string; evaluacion: EvalSymbol }[];
+  acierto: boolean;
+  confianzaDeclarada: number; // 0–100
+  /** Milisegundos desde que se sirvió la posición hasta declarar (RF-7.3, nunca visible). */
+  tiempoMs: number;
+  fecha: string; // ISO 8601
+}
+
+/**
+ * Registro de un ejercicio de Triage de reloj (E9, RF-9.2/9.3): la decisión
+ * rápida "¿pide cálculo o alcanza?", si fue correcta, y cuánto tardó en
+ * decidir (la latencia es justamente lo que Triage entrena). Antes la decisión
+ * se evaluaba en memoria y no se persistía nada.
+ */
+export interface TriageAttempt {
+  id: string;
+  itemId: string;
+  tipo: TipoRadar;
+  decisionUsuario: 'calcular' | 'alcanza';
+  decisionCorrecta: 'calcular' | 'alcanza';
+  correcta: boolean;
+  /** Milisegundos desde que se sirvió la posición hasta decidir. */
+  tiempoMs: number;
+  fecha: string; // ISO 8601
+}

@@ -27,6 +27,7 @@ import { altaErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
+import { triageAttemptRepo } from '../../services/storage/triageAttemptRepo';
 import { candidataAttemptRepo } from '../../services/storage/candidataAttemptRepo';
 import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/radarProgressRepo';
@@ -147,6 +148,8 @@ interface SessionState {
 }
 
 let chess = new Chess();
+/** Marca de tiempo al servir el ítem de Triage, para la latencia de la decisión (RF-9.2). */
+let triageInicioMs = 0;
 
 function boardSnapshot() {
   return {
@@ -250,6 +253,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       return;
     }
     chess = new Chess(item.fen);
+    triageInicioMs = Date.now(); // para la latencia de la decisión (RF-9.2)
     set({
       triageSubPhase: 'decidiendo',
       triageUltimaCorrecta: null,
@@ -515,6 +519,18 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const item = s.triageQueue[s.triageIndex];
       const correcta = decisionCorrecta(item.tipo);
       set({ triageSubPhase: 'feedback', triageUltimaCorrecta: decision === correcta, triageDecisionCorrecta: correcta });
+      // Persistir la decisión, si fue correcta y la latencia (RF-9.2/9.3):
+      // antes la decisión se evaluaba en memoria y no quedaba registro.
+      void triageAttemptRepo.save({
+        id: crypto.randomUUID(),
+        itemId: item.id,
+        tipo: item.tipo,
+        decisionUsuario: decision,
+        decisionCorrecta: correcta,
+        correcta: decision === correcta,
+        tiempoMs: Date.now() - triageInicioMs,
+        fecha: new Date().toISOString(),
+      });
     },
 
     triageContinuar() {

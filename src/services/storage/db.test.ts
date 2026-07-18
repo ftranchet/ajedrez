@@ -544,4 +544,54 @@ describe('migración de esquema Dexie', () => {
     expect(await current.stoykoDatasetMeta.count()).toBe(0);
     current.close();
   });
+
+  it('migra de v10 a v11 sin perder partidas (historial de Stoyko y Triage, Fase 4)', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+
+    // Un v10 fresco con el esquema completo: alcanza para simular una
+    // instalación en la versión anterior a las tablas de intentos.
+    const v10 = new Dexie(name);
+    v10.version(10).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
+    });
+    await v10.open();
+    await v10.table('games').add({
+      id: 'g10',
+      pgn: '1. d4 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: false,
+      fecha: '2026-07-18T00:00:00.000Z',
+    });
+    v10.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('g10')).toMatchObject({ id: 'g10', pgn: '1. d4 *' });
+    // Las tablas nuevas quedan disponibles y vacías.
+    expect(await current.stoykoAttempts.count()).toBe(0);
+    expect(await current.triageAttempts.count()).toBe(0);
+    // Y se puede escribir en ellas.
+    await current.stoykoAttempts.add({ id: 's1', itemId: 'stoyko-01', candidatas: [], acierto: true, confianzaDeclarada: 60, tiempoMs: 1000, fecha: '2026-07-18T00:00:00.000Z' });
+    await current.triageAttempts.add({ id: 't1', itemId: 'r1', tipo: 'ofensiva', decisionUsuario: 'calcular', decisionCorrecta: 'calcular', correcta: true, tiempoMs: 800, fecha: '2026-07-18T00:00:00.000Z' });
+    expect(await current.stoykoAttempts.count()).toBe(1);
+    expect(await current.triageAttempts.count()).toBe(1);
+    current.close();
+  });
 });

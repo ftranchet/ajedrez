@@ -24,6 +24,7 @@ beforeEach(async () => {
   await db.stoykoItems.clear();
   await db.stoykoDatasetMeta.clear();
   await db.calibrationRecords.clear();
+  await db.stoykoAttempts.clear();
   await db.profile.clear();
   await db.stoykoItems.put(item);
   await db.stoykoDatasetMeta.put({ id: 'catalogo', version: STOYKO_DATASET_VERSION, seededAt: new Date().toISOString() });
@@ -108,6 +109,16 @@ describe('stoykoStore', () => {
 
     const profile = await db.profile.get('principal');
     expect(profile?.stoykoUltimaCompletadaEn).toBe(records[0].fecha);
+
+    // Persiste el intento entero (RF-7.2/7.3): candidatas con evaluación,
+    // confianza y tiempo (cronómetro silencioso), no solo el acierto.
+    const attempts = await db.stoykoAttempts.toArray();
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({ itemId: item.id, acierto: true, confianzaDeclarada: 80 });
+    expect(attempts[0].candidatas.map((c) => c.jugada)).toEqual(['d2d4', 'f1c4']);
+    expect(attempts[0].candidatas[1].evaluacion).toBe('±');
+    expect(typeof attempts[0].tiempoMs).toBe('number');
+    expect(attempts[0].tiempoMs).toBeGreaterThanOrEqual(0);
   });
 
   it('no acierta si ninguna candidata coincide con la línea del motor', async () => {

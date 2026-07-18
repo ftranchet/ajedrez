@@ -13,6 +13,7 @@ import { Chess } from 'chess.js';
 import type { EvalSymbol, StoykoItem } from '../../core/types';
 import { stoykoAcierto, stoykoDisponible, stoykoProximaDisponibleEn, type Candidata } from '../../core/stoyko';
 import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
+import { stoykoAttemptRepo } from '../../services/storage/stoykoAttemptRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
@@ -147,6 +148,19 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
       contexto: 'stoyko',
       confianzaDeclarada: valor,
       acierto,
+      fecha: ahora,
+    });
+    // Persistir el intento entero (RF-7.2/7.3): las candidatas con su
+    // evaluación, el tiempo (cronómetro silencioso, `inicioMs` que antes se
+    // seteaba y nunca se usaba) y la confianza. Antes solo quedaba el acierto
+    // en calibración; el resto se perdía.
+    await stoykoAttemptRepo.save({
+      id: crypto.randomUUID(),
+      itemId: item.id,
+      candidatas: s.candidatas,
+      acierto,
+      confianzaDeclarada: valor,
+      tiempoMs: s.inicioMs !== null ? Date.now() - s.inicioMs : 0,
       fecha: ahora,
     });
     const profile = await profileRepo.get();

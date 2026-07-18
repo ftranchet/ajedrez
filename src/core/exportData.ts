@@ -12,6 +12,8 @@ import type {
   Profile,
   RadarAttempt,
   RadarProgress,
+  StoykoAttempt,
+  TriageAttempt,
 } from './types';
 import { SCHEMA_VERSION } from '../services/storage/db';
 import { DEFAULT_PROFILE } from './prescriptor';
@@ -34,6 +36,8 @@ export interface ExportBundle {
   candidataAttempts: CandidataAttempt[];
   compromisoAttempts: CompromisoAttempt[];
   dobleSolucionAttempts: DobleSolucionAttempt[];
+  stoykoAttempts: StoykoAttempt[];
+  triageAttempts: TriageAttempt[];
 }
 
 export interface ExportSourceData {
@@ -47,6 +51,8 @@ export interface ExportSourceData {
   candidataAttempts: CandidataAttempt[];
   compromisoAttempts: CompromisoAttempt[];
   dobleSolucionAttempts: DobleSolucionAttempt[];
+  stoykoAttempts: StoykoAttempt[];
+  triageAttempts: TriageAttempt[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -63,6 +69,8 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     candidataAttempts: data.candidataAttempts,
     compromisoAttempts: data.compromisoAttempts,
     dobleSolucionAttempts: data.dobleSolucionAttempts,
+    stoykoAttempts: data.stoykoAttempts,
+    triageAttempts: data.triageAttempts,
   };
 }
 
@@ -172,6 +180,13 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.dobleSolucionAttempts !== undefined && !Array.isArray(obj.dobleSolucionAttempts)) {
     return { ok: false, error: 'El historial de doble solución no tiene la forma esperada.' };
   }
+  // Ni el historial de Stoyko (E7) o Triage (E9), agregados en esquema v11.
+  if (obj.stoykoAttempts !== undefined && !Array.isArray(obj.stoykoAttempts)) {
+    return { ok: false, error: 'El historial de Stoyko no tiene la forma esperada.' };
+  }
+  if (obj.triageAttempts !== undefined && !Array.isArray(obj.triageAttempts)) {
+    return { ok: false, error: 'El historial de Triage no tiene la forma esperada.' };
+  }
   // Validación por-registro de las entidades críticas (RF-14.2): como la
   // restauración reemplaza el estado local entero, un solo registro corrupto
   // rechaza el paquete en vez de escribirse sobre datos buenos.
@@ -198,6 +213,8 @@ export function validateImportBundle(raw: unknown): ImportResult {
       candidataAttempts: (obj.candidataAttempts ?? []) as CandidataAttempt[],
       compromisoAttempts: (obj.compromisoAttempts ?? []) as CompromisoAttempt[],
       dobleSolucionAttempts: (obj.dobleSolucionAttempts ?? []) as DobleSolucionAttempt[],
+      stoykoAttempts: (obj.stoykoAttempts ?? []) as StoykoAttempt[],
+      triageAttempts: (obj.triageAttempts ?? []) as TriageAttempt[],
     },
   };
 }

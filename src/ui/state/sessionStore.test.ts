@@ -29,6 +29,7 @@ beforeEach(async () => {
   await db.curriculumItems.clear();
   await db.curriculumDatasetMeta.clear();
   await db.curriculumProgress.clear();
+  await db.triageAttempts.clear();
   await db.profile.clear();
   // Este archivo prueba Cola y Radar; el bloque de currículo (Fase 3) tiene
   // sus propios tests en sessionStore.curriculum.test.ts. Marcarlo
@@ -357,5 +358,59 @@ describe('sessionStore — volver()', () => {
 
     useSessionStore.getState().volver();
     expect(useSessionStore.getState().dueCount).toBeNull();
+  });
+});
+
+describe('sessionStore — Triage (E9)', () => {
+  it('triageDecidir persiste la decisión, si fue correcta y la latencia (RF-9.2/9.3)', async () => {
+    // Poner el store directo en el bloque de Triage con una posición ofensiva
+    // (decisión correcta = "calcular"): montar la fuga de tiempo real que lo
+    // activa es caro y ya está cubierto por e2e/triage.spec.ts.
+    const item = {
+      id: 'triage-1',
+      fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3',
+      tipo: 'ofensiva' as const,
+      temas: [],
+      rating: 1500,
+      solucion: ['f1c4'],
+      fuente: 'seed-dev' as const,
+    };
+    useSessionStore.setState({ phase: 'triage', triageQueue: [item], triageIndex: 0, triageSubPhase: 'decidiendo' });
+
+    useSessionStore.getState().triageDecidir('calcular'); // correcto para 'ofensiva'
+    expect(useSessionStore.getState().triageUltimaCorrecta).toBe(true);
+
+    // Dexie escribe async; esperar un tick antes de leer.
+    await new Promise((r) => setTimeout(r, 0));
+    const attempts = await db.triageAttempts.toArray();
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({
+      itemId: 'triage-1',
+      tipo: 'ofensiva',
+      decisionUsuario: 'calcular',
+      decisionCorrecta: 'calcular',
+      correcta: true,
+    });
+    expect(typeof attempts[0].tiempoMs).toBe('number');
+  });
+
+  it('registra una decisión equivocada como incorrecta', async () => {
+    const item = {
+      id: 'triage-2',
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      tipo: 'tranquila' as const,
+      temas: [],
+      rating: 1500,
+      solucion: ['e2e4'],
+      fuente: 'seed-dev' as const,
+    };
+    useSessionStore.setState({ phase: 'triage', triageQueue: [item], triageIndex: 0, triageSubPhase: 'decidiendo' });
+
+    useSessionStore.getState().triageDecidir('calcular'); // 'tranquila' → correcto sería 'alcanza'
+    expect(useSessionStore.getState().triageUltimaCorrecta).toBe(false);
+
+    await new Promise((r) => setTimeout(r, 0));
+    const attempts = await db.triageAttempts.toArray();
+    expect(attempts[0]).toMatchObject({ correcta: false, decisionUsuario: 'calcular', decisionCorrecta: 'alcanza' });
   });
 });

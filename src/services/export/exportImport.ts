@@ -13,6 +13,8 @@ import { profileRepo } from '../storage/profileRepo';
 import { candidataAttemptRepo } from '../storage/candidataAttemptRepo';
 import { compromisoAttemptRepo } from '../storage/compromisoAttemptRepo';
 import { dobleSolucionAttemptRepo } from '../storage/dobleSolucionAttemptRepo';
+import { stoykoAttemptRepo } from '../storage/stoykoAttemptRepo';
+import { triageAttemptRepo } from '../storage/triageAttemptRepo';
 import { db } from '../storage/db';
 
 function pgnFileName(gameId: string): string {
@@ -32,6 +34,8 @@ export async function exportAllData(): Promise<Uint8Array> {
     candidataAttempts: await candidataAttemptRepo.list(),
     compromisoAttempts: await compromisoAttemptRepo.list(),
     dobleSolucionAttempts: await dobleSolucionAttemptRepo.list(),
+    stoykoAttempts: await stoykoAttemptRepo.list(),
+    triageAttempts: await triageAttemptRepo.list(),
   };
   const bundle = buildExportBundle(data);
 
@@ -47,6 +51,8 @@ export async function exportAllData(): Promise<Uint8Array> {
     'candidataAttempts.json': strToU8(JSON.stringify(bundle.candidataAttempts, null, 2)),
     'compromisoAttempts.json': strToU8(JSON.stringify(bundle.compromisoAttempts, null, 2)),
     'dobleSolucionAttempts.json': strToU8(JSON.stringify(bundle.dobleSolucionAttempts, null, 2)),
+    'stoykoAttempts.json': strToU8(JSON.stringify(bundle.stoykoAttempts, null, 2)),
+    'triageAttempts.json': strToU8(JSON.stringify(bundle.triageAttempts, null, 2)),
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
@@ -94,6 +100,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const candidataAttemptsRaw = unzipped['candidataAttempts.json'];
   const compromisoAttemptsRaw = unzipped['compromisoAttempts.json'];
   const dobleSolucionAttemptsRaw = unzipped['dobleSolucionAttempts.json'];
+  const stoykoAttemptsRaw = unzipped['stoykoAttempts.json'];
+  const triageAttemptsRaw = unzipped['triageAttempts.json'];
   if (!manifestRaw || !gamesRaw || !errorCardsRaw || !calibrationRaw) {
     return { ok: false, error: 'Faltan archivos dentro del .zip (¿es una exportación de ELOmax?).' };
   }
@@ -118,6 +126,9 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       compromisoAttempts: compromisoAttemptsRaw ? JSON.parse(strFromU8(compromisoAttemptsRaw)) : [],
       // Ni doble solución (RF-5.7).
       dobleSolucionAttempts: dobleSolucionAttemptsRaw ? JSON.parse(strFromU8(dobleSolucionAttemptsRaw)) : [],
+      // Ni el historial de Stoyko (E7) o Triage (E9), agregados en esquema v11.
+      stoykoAttempts: stoykoAttemptsRaw ? JSON.parse(strFromU8(stoykoAttemptsRaw)) : [],
+      triageAttempts: triageAttemptsRaw ? JSON.parse(strFromU8(triageAttemptsRaw)) : [],
     };
   } catch {
     return { ok: false, error: 'Algún archivo dentro del .zip no es JSON válido.' };
@@ -148,6 +159,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       db.candidataAttempts,
       db.compromisoAttempts,
       db.dobleSolucionAttempts,
+      db.stoykoAttempts,
+      db.triageAttempts,
     ],
     async () => {
       await Promise.all([
@@ -161,6 +174,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
         db.candidataAttempts.clear(),
         db.compromisoAttempts.clear(),
         db.dobleSolucionAttempts.clear(),
+        db.stoykoAttempts.clear(),
+        db.triageAttempts.clear(),
       ]);
       if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
       if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
@@ -172,6 +187,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       if (bundle.candidataAttempts.length > 0) await db.candidataAttempts.bulkPut(bundle.candidataAttempts);
       if (bundle.compromisoAttempts.length > 0) await db.compromisoAttempts.bulkPut(bundle.compromisoAttempts);
       if (bundle.dobleSolucionAttempts.length > 0) await db.dobleSolucionAttempts.bulkPut(bundle.dobleSolucionAttempts);
+      if (bundle.stoykoAttempts.length > 0) await db.stoykoAttempts.bulkPut(bundle.stoykoAttempts);
+      if (bundle.triageAttempts.length > 0) await db.triageAttempts.bulkPut(bundle.triageAttempts);
     },
   );
 

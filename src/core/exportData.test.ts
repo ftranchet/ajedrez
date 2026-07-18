@@ -14,6 +14,8 @@ const empty = {
   candidataAttempts: [],
   compromisoAttempts: [],
   dobleSolucionAttempts: [],
+  stoykoAttempts: [],
+  triageAttempts: [],
 };
 
 describe('buildExportBundle', () => {

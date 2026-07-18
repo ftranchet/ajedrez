@@ -17,13 +17,15 @@ import type {
   RadarDatasetMeta,
   RadarItem,
   RadarProgress,
+  StoykoAttempt,
   StoykoDatasetMeta,
   StoykoItem,
+  TriageAttempt,
 } from '../../core/types';
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -42,6 +44,8 @@ export class ElomaxDB extends Dexie {
   dobleSolucionAttempts!: Table<DobleSolucionAttempt, string>;
   stoykoItems!: Table<StoykoItem, string>;
   stoykoDatasetMeta!: Table<StoykoDatasetMeta, string>;
+  stoykoAttempts!: Table<StoykoAttempt, string>;
+  triageAttempts!: Table<TriageAttempt, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -203,6 +207,32 @@ export class ElomaxDB extends Dexie {
       dobleSolucionAttempts: 'id, itemId, fecha',
       stoykoItems: 'id',
       stoykoDatasetMeta: 'id',
+    });
+
+    // v11 — Fase 4 (E7/E9): el intento de Stoyko (candidatas, evaluaciones,
+    // tiempo, confianza) y el de Triage de reloj (decisión, si fue correcta,
+    // latencia) pasan a persistirse — antes se evaluaban en memoria y se
+    // perdían (`inicioMs` de Stoyko ni siquiera se leía). Dos tablas nuevas y
+    // chicas, incluidas en la exportación (RF-14.1). Puramente aditiva.
+    this.version(11).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
+      stoykoAttempts: 'id, itemId, fecha',
+      triageAttempts: 'id, itemId, fecha',
     });
   }
 }
