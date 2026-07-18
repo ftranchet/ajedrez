@@ -62,12 +62,22 @@ El comando genera `src/services/puzzles/seedData.ts`. Su versión es un hash del
 - **Jugadas aceptables (RF-5.3, corrección de auditoría 2026-07):** como una posición tranquila se acepta justamente porque *no* tiene un golpe único, casi siempre hay varias jugadas prácticamente equivalentes. El pipeline guarda en `jugadasAceptables` todas las que están dentro de `maxAcceptableGapCp` (50 cp) de la mejor, y el entrenamiento cuenta cualquiera de ellas como acierto — exigir la primera jugada exacta marcaba fallo (y generaba una tarjeta de error espuria) una segunda jugada igual de buena. Las tranquilas ya embebidas se enriquecieron con `scripts/backfill-tranquilas-aceptables.mjs`, que re-corre MultiPV a profundidad 14 anclando en la jugada canónica ya validada sin cambiarla.
 - El generador aborta si no alcanza la cuota de los cinco tipos, si duplica FEN/ID o si algún item no tiene solución.
 
-### Deuda conocida (auditoría 2026-07)
+## Reclasificación de tipos con el motor (RF-5.1, corrección de auditoría 2026-07)
 
-Dos problemas de **validez de contenido** quedan registrados acá para no perderlos; su corrección de fondo excede lo que se puede hacer sin decisiones de producto y/o los archivos fuente de Lichess (no versionados):
+El mapeo por etiqueta de tema (`classifyPuzzleThemes`) resultó **semánticamente inválido** para las categorías de oferta de material: `sacrifice`/`trappedPiece` describen un sacrificio *correcto del solucionador* (la jugada que hay que jugar), no una carnada a rechazar. En el lote viejo, 10 de 20 `envenenada` tenían una captura como `solucion[0]`, y el feedback ("detectaste la trampa y no capturaste") quedaba invertido.
 
-1. **Escala de rating heterogénea.** El `rating` mezcla tres cosas que no miden lo mismo: el rating de puzzle de Lichess (tácticas), el Elo promedio de los jugadores de la partida (tranquilas) y un 1500 fijo (doble solución). El selector adaptativo (RF-5.5) los trata como una sola escala de dificultad, así que la convergencia a la banda 60–80% no es del todo confiable hasta unificar la escala. Normalizarla es una decisión de producto pendiente.
-2. **`sacrifice → envenenada` es semánticamente inválido.** El tema `sacrifice` de Lichess describe un sacrificio *correcto del solucionador* (la jugada que hay que jugar), no una carnada que haya que rechazar. En el lote actual, **10 de 20** posiciones `envenenada` tienen una captura/sacrificio como `solucion[0]`, y el feedback de "detectaste la trampa y no capturaste" queda invertido. La corrección real —re-derivar `genuina`/`envenenada`/`ofensiva` con el motor, o generar posiciones de "carnada envenenada" con un pipeline propio como el de tranquilas— vacía o rehace el bucket `envenenada` y afecta la promesa de "cinco tipos" de RF-5.1: es una decisión de producto, no solo de código.
+El lote publicado ahora re-deriva el tipo de cada puzzle con Stockfish local (`scripts/reclassify-radar-tipos.mjs`, profundidad 14), no por etiqueta:
+
+- **defensa** — tema `defensiveMove` (etiqueta explícita y fiable de Lichess).
+- **genuina** — la solución captura material que queda de arriba sin recaptura adecuada (pieza realmente colgada).
+- **envenenada** — hay una captura que *parece* ganar material (neto ≥1 a 1 ply) pero el motor la condena (≥ el margen de trampa) **y la solución la declina** (no es una captura). Los puzzles tácticos casi no cumplen esto (su solución suele ser activa), así que —igual que las tranquilas— la envenenada se **genera aparte** por autojuego: `scripts/mine-envenenada.mjs` (criba a 14 + reconfirmación a 17, 1 por partida) y se agrega con `scripts/finalize-envenenada.mjs`. `fuente: 'pipeline-envenenada'`, rating fijo 1500.
+- **ofensiva** — el resto (combinaciones, sacrificios, golpes forzados).
+
+`classifyPuzzleThemes` queda como un fallback grueso solo para arrancar la generación; la clasificación autoritativa del lote es la del motor. `validateRadarDataset` usa mínimos por-tipo (`MIN_POR_TIPO`): `genuina`/`envenenada` no se pueden forzar a 20 desde puzzles sin volver a inventar etiquetas.
+
+### Deuda conocida restante (auditoría 2026-07)
+
+**Escala de rating heterogénea.** El `rating` todavía mezcla cosas que no miden lo mismo: el rating de puzzle de Lichess (tácticas), el Elo promedio de los jugadores de la partida (tranquilas) y un 1500 fijo (doble solución y envenenada de autojuego). El selector adaptativo (RF-5.5) los trata como una sola escala, así que la convergencia a la banda 60–80% no es del todo confiable hasta unificar la escala. Normalizarla es una decisión de producto pendiente.
 
 ## Validación de uso real
 
