@@ -1,0 +1,42 @@
+[
+  {
+    "id": "final-oposicion-1",
+    "tipo": "final",
+    "patternKey": "final-rey-peon",
+    "nombre": "Oposición: rey y peón contra rey",
+    "fen": "8/4k3/8/4K3/4P3/8/8/8 b - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
+  },
+  {
+    "id": "final-cuadrado-1",
+    "tipo": "final",
+    "patternKey": "final-cuadrado",
+    "nombre": "Regla del cuadrado",
+    "fen": "7k/8/8/8/2P5/8/8/4K3 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
+  },
+  {
+    "id": "final-lucena-1",
+    "tipo": "final",
+    "patternKey": "final-lucena",
+    "nombre": "Lucena: construir el puente",
+    "fen": "2K5/k1P5/8/8/8/8/5r2/3R4 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
+  },
+  {
+    "id": "final-philidor-1",
+    "tipo": "final",
+    "patternKey": "final-philidor",
+    "nombre": "Philidor: sostener las tablas",
+    "fen": "8/4k3/r7/4K3/4P3/8/8/7R b - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "tablas",
+    "ladoUsuario": "b"
+  }
+]

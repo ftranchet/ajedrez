@@ -35,6 +35,7 @@ beforeEach(async () => {
   await db.profile.clear();
   await db.candidataAttempts.clear();
   await db.dobleSolucionAttempts.clear();
+  await db.sessions.clear();
   await db.radarItems.put(item);
   await db.radarDatasetMeta.put({ id: 'catalogo', version: RADAR_DATASET_VERSION, seededAt: new Date().toISOString() });
   await db.curriculumProgress.bulkPut(

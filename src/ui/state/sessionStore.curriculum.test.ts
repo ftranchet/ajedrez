@@ -26,6 +26,7 @@ beforeEach(async () => {
   await db.curriculumItems.clear();
   await db.curriculumDatasetMeta.clear();
   await db.curriculumProgress.clear();
+  await db.sessions.clear();
   await db.profile.clear();
 });
 

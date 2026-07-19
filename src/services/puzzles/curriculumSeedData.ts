@@ -4,8 +4,9 @@
 // memoria). Set inicial deliberadamente chico y 100% verificado; ampliarlo
 // es trabajo futuro (ver docs/roadmap.md, Fase 3).
 import type { CurriculumItem } from '../../core/types';
+import finalesCatalogo from '../../config/finales-catalogo.json' with { type: 'json' };
 
-export const CURRICULUM_DATASET_VERSION = 'curriculo-patrones-v1';
+export const CURRICULUM_DATASET_VERSION = 'curriculo-patrones-finales-v2';
 
 export const seedCurriculumItems: CurriculumItem[] = [
   {
@@ -72,4 +73,5 @@ export const seedCurriculumItems: CurriculumItem[] = [
     fen: '4q3/8/8/4k3/8/8/8/R5K1 w - - 0 1',
     solucion: ['a1e1'],
   },
+  ...(finalesCatalogo as CurriculumItem[]),
 ];

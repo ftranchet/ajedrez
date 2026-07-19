@@ -4,13 +4,13 @@ Este documento describe cómo se genera el catálogo offline del Radar de ELOmax
 
 ## Lote publicado
 
-`radar-84639d96e9b3` contiene 100 posiciones: 20 ofensivas, 20 defensivas, 20 tranquilas, 20 de oferta genuina y 20 de oferta envenenada. Las 80 tácticas se tomaron del export oficial de puzzles de Lichess; las 20 tranquilas se extrajeron de partidas estándar reales y se verificaron con Stockfish 18.
+El catálogo vigente, `radar-e5a6c2d9788c`, contiene 116 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 16 generadas por autojuego (8 de doble solución y 8 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 9 de oferta envenenada.
 
 Los exports de base de datos de Lichess son CC0 y su formato oficial explica que el FEN del puzzle es anterior a la jugada de armado; por eso el pipeline aplica la primera UCI antes de guardar la posición que ve el usuario. Fuente: [Lichess open database](https://database.lichess.org/).
 
 ## Subtipo doble solución (RF-5.7)
 
-Sobre ese lote base, `radar-4c8552fff66e` agrega 8 posiciones con el subtipo anti-Einstellung (RF-5.7): una jugada "familiar" que también gana con claridad, pero es objetivamente peor que la superior. No se sacaron del export de puzzles de Lichess (curados justamente para tener una sola solución: minar ese catálogo con MultiPV de Stockfish, sobre 15 posiciones probadas, dio 0 candidatas) ni de partidas reales (sin acceso de red en este entorno de desarrollo — ver limitación documentada en `docs/roadmap.md`, Fase 2).
+Sobre el lote base, el catálogo vigente agrega 8 posiciones con el subtipo anti-Einstellung (RF-5.7): una jugada "familiar" que también gana con claridad, pero es objetivamente peor que la superior. No se sacaron del export de puzzles de Lichess (curados justamente para tener una sola solución: minar ese catálogo con MultiPV de Stockfish, sobre 15 posiciones probadas, dio 0 candidatas) ni de partidas reales (sin acceso de red en este entorno de desarrollo — ver limitación documentada en `docs/roadmap.md`, Fase 2).
 
 En su lugar, `scripts/mine-doble-solucion.mjs` genera posiciones por autojuego del motor local (profundidad 7, para variedad realista sin gastar tiempo de más) y criba cada una con MultiPV a profundidad 14 — mismo estándar que las tranquilas. Esa criba sola resultó insuficiente para esta afirmación más fina ("esta jugada específica es la segunda mejor", no solo "la mejor es buena"): la reconfirmación a profundidad 17, automatizada dentro del propio script, descarta cualquier candidata que no sostenga el margen o cambie de jugada "mejor"/"segunda mejor" a mayor profundidad.
 
@@ -75,9 +75,9 @@ El lote publicado ahora re-deriva el tipo de cada puzzle con Stockfish local (`s
 
 `classifyPuzzleThemes` queda como un fallback grueso solo para arrancar la generación; la clasificación autoritativa del lote es la del motor. `validateRadarDataset` usa mínimos por-tipo (`MIN_POR_TIPO`): `genuina`/`envenenada` no se pueden forzar a 20 desde puzzles sin volver a inventar etiquetas.
 
-### Deuda conocida restante (auditoría 2026-07)
+### Escala de dificultad normalizada (ADR-0007)
 
-**Escala de rating heterogénea.** El `rating` todavía mezcla cosas que no miden lo mismo: el rating de puzzle de Lichess (tácticas), el Elo promedio de los jugadores de la partida (tranquilas) y un 1500 fijo (doble solución y envenenada de autojuego). El selector adaptativo (RF-5.5) los trata como una sola escala, así que la convergencia a la banda 60–80% no es del todo confiable hasta unificar la escala. Normalizarla es una decisión de producto pendiente.
+El `rating` crudo mezcla magnitudes que no son comparables: rating de puzzle de Lichess, Elo promedio de los jugadores de una partida y un 1500 fijo para contenido generado. Se conserva para trazabilidad, pero el selector adaptativo (RF-5.5) ya no lo usa como una escala única: calcula un percentil 0–100 dentro de cada `fuente`, con percentil medio para empates y 50 para cohortes constantes. El progreso personal y cada intento nuevo guardan esa dificultad normalizada. La migración a esquema v12 reinicia únicamente el centro adaptativo en 50 y conserva todo el historial previo. La decisión y sus límites están documentados en [ADR-0007](adr/0007-dificultad-normalizada-radar.md).
 
 ## Validación de uso real
 
@@ -85,6 +85,6 @@ La validación técnica no reemplaza el criterio humano de salida de Fase 1. Dur
 
 1. Los fallos reaparecen al comienzo de sesiones posteriores desde la Cola.
 2. El Panel muestra la tasa de las últimas 50 respuestas; tras suficiente práctica debe acercarse y mantenerse en 60–80%.
-3. Una exportación e importación en otro dispositivo conserva tarjetas, calibración, progreso adaptativo y el historial de respuestas del Radar.
+3. Una exportación e importación en otro dispositivo conserva tarjetas, calibración, progreso adaptativo, sesiones/bloques y el historial de respuestas del Radar.
 
 Las respuestas del Radar se guardan localmente y se exportan, para que esta validación pueda auditarse sin telemetría de terceros.

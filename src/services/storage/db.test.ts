@@ -594,4 +594,42 @@ describe('migración de esquema Dexie', () => {
     expect(await current.triageAttempts.count()).toBe(1);
     current.close();
   });
+
+  it('migra de v11 a v12: normaliza el centro del Radar y crea sesiones', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v11 = new Dexie(name);
+    v11.version(11).stores({
+      radarProgress: 'id, updatedAt',
+      radarAttempts: 'id, fecha, tipo, rating',
+      stoykoAttempts: 'id, itemId, fecha',
+      triageAttempts: 'id, itemId, fecha',
+    });
+    await v11.open();
+    await v11.table('radarProgress').add({
+      id: 'principal',
+      historialTipos: ['ofensiva'],
+      historialIds: ['r1'],
+      ratingCentro: 1640,
+      aciertosRecientes: [true, false],
+      updatedAt: '2026-07-18T00:00:00.000Z',
+    });
+    v11.close();
+
+    const current = new ElomaxDB(name);
+    const progress = await current.radarProgress.get('principal');
+    expect(progress?.dificultadCentro).toBe(50);
+    expect(progress?.historialIds).toEqual(['r1']);
+    expect(progress?.aciertosRecientes).toEqual([true, false]);
+    expect(await current.sessions.count()).toBe(0);
+    await current.sessions.add({
+      id: 's1',
+      fechaInicio: '2026-07-19T10:00:00.000Z',
+      estado: 'completada',
+      bloques: [],
+      fechaFin: '2026-07-19T10:10:00.000Z',
+      duracionMs: 600_000,
+    });
+    expect(await current.sessions.count()).toBe(1);
+    current.close();
+  });
 });

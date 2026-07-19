@@ -11,6 +11,7 @@
   "scripts": {
     "postinstall": "node scripts/copy-engine.mjs",
     "build:radar-dataset": "node scripts/build-radar-dataset.mjs",
+    "verify:finales": "node scripts/verify-curriculum-finales.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

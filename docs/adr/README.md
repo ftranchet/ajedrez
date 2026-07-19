@@ -16,3 +16,5 @@ Un ADR documenta una decisión con costo de reversa alto: qué se decidió, en q
 | 0004 | Oponentes humano-realistas: Maia vía bots de Lichess | Aceptado |
 | 0005 | Datos de entrenamiento: dataset de puzzles de Lichess (CC0) | Aceptado |
 | 0006 | Licencia del proyecto: GPLv3 | Aceptado |
+| 0007 | Dificultad normalizada del Radar | Aceptado |
+| 0008 | Demostración offline de finales contra Stockfish | Aceptado |

@@ -7,6 +7,7 @@ import { useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
 import { newCurriculumProgress } from '../../core/curriculum';
+import { clasificarCambioCandidata } from '../../core/candidatas';
 
 beforeEach(async () => {
   await db.games.clear();
@@ -21,6 +22,7 @@ beforeEach(async () => {
   await db.curriculumProgress.clear();
   await db.profile.clear();
   await db.candidataAttempts.clear();
+  await db.sessions.clear();
   // Currículo automatizado, como en sessionStore.test.ts: estos tests solo prueban el Radar.
   await db.curriculumProgress.bulkPut(
     seedCurriculumItems.map((item) => ({ ...newCurriculumProgress(item.id), demostracionesLimpias: 3 })),
@@ -100,9 +102,11 @@ describe('sessionStore — regla de candidatas (RF-5.8)', () => {
 
     // Jugar deliberadamente algo distinto de la solución como primer intento.
     s.radarEval('igual');
-    const [from, destinos] = s.dests.entries().next().value as [string, string[]];
-    const to = destinos.find((d) => from + d !== item.solucion[0]) ?? destinos[0];
-    if (from + to === item.solucion[0]) return; // esa posición no tiene alternativa; no es el caso a probar
+    const alternativa = [...s.dests.entries()]
+      .flatMap(([origen, destinos]) => destinos.map((destino) => [origen, destino] as const))
+      .find(([origen, destino]) => clasificarCambioCandidata(item, origen + destino, item.solucion[0]) === 'mejoro');
+    expect(alternativa, 'la posición muestreada debe ofrecer al menos una jugada legal incorrecta').toBeDefined();
+    const [from, to] = alternativa!;
     await s.radarUserMove(from as never, to as never);
 
     s = useSessionStore.getState();

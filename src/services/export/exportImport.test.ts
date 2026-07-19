@@ -22,6 +22,7 @@ beforeEach(async () => {
   await db.dobleSolucionAttempts.clear();
   await db.stoykoAttempts.clear();
   await db.triageAttempts.clear();
+  await db.sessions.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -91,6 +92,14 @@ describe('exportAllData / importAllData', () => {
     await db.dobleSolucionAttempts.put({ id: 'ds-1', itemId: 'radar-1', resultado: 'familiar', fecha: new Date().toISOString() });
     await db.stoykoAttempts.put({ id: 'st-1', itemId: 'stoyko-01', candidatas: [{ jugada: 'e2e4', evaluacion: '=' }], acierto: true, confianzaDeclarada: 70, tiempoMs: 12000, fecha: new Date().toISOString() });
     await db.triageAttempts.put({ id: 'tr-1', itemId: 'radar-1', tipo: 'ofensiva', decisionUsuario: 'calcular', decisionCorrecta: 'calcular', correcta: true, tiempoMs: 900, fecha: new Date().toISOString() });
+    await db.sessions.put({
+      id: 'ses-1',
+      fechaInicio: '2026-07-19T10:00:00.000Z',
+      fechaFin: '2026-07-19T10:15:00.000Z',
+      estado: 'completada',
+      duracionMs: 900_000,
+      bloques: [{ tipo: 'radar', planificados: 8, completados: 8, estado: 'completado' }],
+    });
 
     const zip = await exportAllData();
     expect(zip.byteLength).toBeGreaterThan(0);
@@ -108,6 +117,7 @@ describe('exportAllData / importAllData', () => {
     await db.dobleSolucionAttempts.clear();
     await db.stoykoAttempts.clear();
     await db.triageAttempts.clear();
+    await db.sessions.clear();
     expect(await db.games.count()).toBe(0);
 
     const outcome = await importAllData(zip);
@@ -131,6 +141,7 @@ describe('exportAllData / importAllData', () => {
     expect((await db.stoykoAttempts.get('st-1'))?.candidatas[0].jugada).toBe('e2e4');
     expect((await db.stoykoAttempts.get('st-1'))?.tiempoMs).toBe(12000);
     expect((await db.triageAttempts.get('tr-1'))?.correcta).toBe(true);
+    expect((await db.sessions.get('ses-1'))?.duracionMs).toBe(900_000);
   });
 
   it('rechaza un archivo que no es un zip de ELOmax', async () => {
