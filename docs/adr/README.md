@@ -20,3 +20,4 @@ Un ADR documenta una decisión con costo de reversa alto: qué se decidió, en q
 | 0008 | Demostración offline de finales contra Stockfish | Aceptado |
 | 0009 | Batería de transferencia reservada y sin feedback por ítem | Aceptado |
 | 0010 | Detector de sobreajuste con rating real | Aceptado |
+| 0011 | Adherencia basada en proceso y métricas de verdad | Aceptado |

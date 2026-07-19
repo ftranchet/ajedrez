@@ -4,6 +4,7 @@ import {
   activitySummary,
   completeSessionRecord,
   recordSessionItem,
+  processStreak,
   startSessionRecord,
   transitionSessionBlock,
 } from './session';
@@ -60,6 +61,7 @@ describe('registro de sesión', () => {
       sesiones: 0,
       minutos: 0,
       items: 0,
+      racha: 0,
     });
   });
 
@@ -76,6 +78,32 @@ describe('registro de sesión', () => {
       sesiones: 1,
       minutos: 15,
       items: 1,
+      racha: 1,
     });
+  });
+
+  it('cuenta días consecutivos de sesiones completas, no volumen ni abandonos (RF-13.1)', () => {
+    const completed = (id: string, day: number) => completeSessionRecord(
+      startSessionRecord([{ tipo: 'radar', planificados: 1 }], new Date(`2026-07-${day}T10:00:00.000Z`), id),
+      new Date(`2026-07-${day}T10:10:00.000Z`),
+    );
+    const records = [
+      completed('hoy-1', 19),
+      completed('hoy-2', 19), // dos sesiones el mismo día siguen valiendo un día
+      completed('ayer', 18),
+      completed('anteayer', 17),
+      completed('corte', 15),
+      abandonSessionRecord(startSessionRecord([{ tipo: 'radar', planificados: 1 }], new Date('2026-07-16T10:00:00.000Z'), 'abandonada')),
+    ];
+    expect(processStreak(records, new Date('2026-07-19T20:00:00.000Z'))).toBe(3);
+  });
+
+  it('conserva la racha de ayer durante hoy, pero no una racha ya cortada', () => {
+    const yesterday = completeSessionRecord(
+      startSessionRecord([{ tipo: 'radar', planificados: 1 }], new Date('2026-07-18T10:00:00.000Z'), 'ayer'),
+      new Date('2026-07-18T10:10:00.000Z'),
+    );
+    expect(processStreak([yesterday], new Date('2026-07-19T08:00:00.000Z'))).toBe(1);
+    expect(processStreak([yesterday], new Date('2026-07-20T08:00:00.000Z'))).toBe(0);
   });
 });

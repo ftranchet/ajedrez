@@ -81,6 +81,39 @@ export interface ActivitySummary {
   sesiones: number;
   minutos: number;
   items: number;
+  /** Días consecutivos con al menos una sesión completada (RF-13.1). */
+  racha: number;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Índice de día calendario local, inmune a cambios de horario de verano. */
+function localDayIndex(date: Date): number {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
+}
+
+/**
+ * Racha de proceso: un día suma si hubo al menos una sesión completada. Una
+ * segunda sesión el mismo día, más ítems o más aciertos no agregan nada.
+ * Si hoy aún no se entrenó, la racha de ayer sigue visible sin presión falsa.
+ */
+export function processStreak(records: SessionRecord[], now: Date = new Date()): number {
+  const today = localDayIndex(now);
+  const completedDays = new Set(
+    records
+      .filter((record) => record.estado === 'completada')
+      .map((record) => localDayIndex(new Date(record.fechaFin ?? record.fechaInicio)))
+      .filter((day) => Number.isFinite(day) && day <= today),
+  );
+  if (completedDays.size === 0) return 0;
+  let day = completedDays.has(today) ? today : today - 1;
+  if (!completedDays.has(day)) return 0;
+  let streak = 0;
+  while (completedDays.has(day)) {
+    streak++;
+    day--;
+  }
+  return streak;
 }
 
 export function activitySummary(
@@ -100,5 +133,6 @@ export function activitySummary(
       (sum, r) => sum + r.bloques.reduce((blockSum, b) => blockSum + b.completados, 0),
       0,
     ),
+    racha: processStreak(records, now),
   };
 }
