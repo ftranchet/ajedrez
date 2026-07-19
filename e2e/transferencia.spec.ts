@@ -17,6 +17,7 @@ test('transferencia: guarda, pausa y reanuda sin crear entrenamiento', async ({ 
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.getByRole('button', { name: 'Panel' }).last().click();
+  await page.getByRole('radio', { name: 'Medición' }).click();
   await page.getByRole('heading', { name: 'Batería de transferencia' }).waitFor();
   await page.getByRole('button', { name: 'Empezar medición' }).click();
 

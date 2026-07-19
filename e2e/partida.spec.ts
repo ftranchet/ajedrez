@@ -59,10 +59,12 @@ test.describe('partida contra el motor', () => {
     await page.getByRole('button', { name: 'Sí, abandonar' }).click();
     await page.getByText('Partida guardada en tu dispositivo').waitFor();
 
-    // Recargar (cierre del navegador) → sigue en el Panel
+    // Recargar (cierre del navegador) conserva la ruta Jugar; la partida
+    // persiste y aparece al abrir Partidas y datos.
     await page.reload();
-    await page.getByText('Tu sesión de hoy').waitFor();
+    await page.getByRole('heading', { name: 'Jugar' }).waitFor();
     await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+    await page.getByRole('radio', { name: 'Partidas y datos' }).click();
     await page.getByText('Partidas guardadas').waitFor();
     await expect(page.locator('ul li').first()).toContainText('0-1');
   });

@@ -67,6 +67,7 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   await page.getByText('Tu sesión de hoy').waitFor();
 
   await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+  await page.getByRole('radio', { name: 'Partidas y datos' }).click();
   await page.getByRole('button', { name: 'Analizar' }).first().click();
   await page.getByText('Fase 1 — tu análisis').waitFor();
 

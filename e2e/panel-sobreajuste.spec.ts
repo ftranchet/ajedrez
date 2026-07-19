@@ -46,6 +46,7 @@ test('Panel: alerta de sobreajuste y sugiere más partidas con análisis', async
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+  await page.getByRole('radio', { name: 'Medición' }).click();
   await page.getByRole('heading', { name: 'Transferencia al juego' }).waitFor();
   await expect(page.getByText('Alerta de sobreajuste:', { exact: false })).toBeVisible();
   await expect(page.getByText('priorizá partidas rápidas o clásicas', { exact: false })).toBeVisible();

@@ -6,6 +6,7 @@ test('experimento n=1: configura, inicia y persiste un diseño ABAB', async ({ p
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+  await page.getByRole('radio', { name: 'Medición' }).click();
   await page.getByRole('heading', { name: 'Experimento n=1' }).waitFor();
   await page.getByRole('button', { name: 'Configurar experimento' }).click();
 

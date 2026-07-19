@@ -13,7 +13,8 @@
   /* Texto (jerarquía de 4 niveles) */
   --color-primary: #ece5da;
   --color-secondary: #a89c8c;
-  --color-tertiary: #6f6353;
+  /* 4.56:1 o más también sobre elevated: apto para texto pequeño AA. */
+  --color-tertiary: #998a77;
   --color-on-accent: #1a1105;
 
   /* Acento y semánticos */

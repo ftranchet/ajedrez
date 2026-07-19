@@ -1,8 +1,8 @@
-# Design System — ELOmax (v2)
+# Design System — ELOmax (v2.1)
 
 Documento vivo. Los tokens de esta página son la única fuente de estilos: se implementan en la configuración de Tailwind y ningún componente usa valores sueltos. Cambiar la estética = cambiar tokens acá, con entrada en el changelog.
 
-> **Cambios v2:** jerarquía de texto de 4 niveles, variantes `-hover`/`-subtle`, anillo de foco, especificación completa de tablero y piezas (§3), estados obligatorios por componente (§5), tipografía con más carácter (Newsreader en lugar de Fraunces, Instrument Sans en lugar de Inter), y layout validado de la pantalla "Tu sesión de hoy" y flujo del Radar (§4.1–4.2). Las decisiones se validaron con una referencia visual renderizada y un prototipo interactivo, versionados en `docs/prototipos/` (ver su README).
+> **Cambios v2.1:** contraste AA también para texto terciario pequeño, navegación móvil con segunda señal visual, rutas persistentes por hash compatibles con GitHub Pages, control segmentado único y arquitectura del Panel en Resumen / Medición / Partidas y datos.
 
 ## 1. Dirección estética: "Sala de estudio"
 
@@ -34,7 +34,7 @@ Principios visuales:
 |---|---|---|
 | `text-primary` | `#ece5da` | Texto principal |
 | `text-secondary` | `#a89c8c` | Apoyo, porqués del Prescriptor |
-| `text-tertiary` | `#6f6353` | Metadatos, timestamps, deshabilitado |
+| `text-tertiary` | `#998a77` | Metadatos, timestamps, deshabilitado; AA aun sobre `bg-elevated` |
 | `text-on-accent` | `#1a1105` | Texto sobre `accent` (botón primario) |
 
 #### Acento y semánticos
@@ -59,7 +59,7 @@ Reglas de estado (aplican a todo componente):
 - **disabled**: `text-tertiary` sobre `bg-elevated`, sin borde, `cursor: not-allowed`. Nunca opacidad sola.
 - **selected**: `accent-subtle` + borde `accent` de 1.5 px. Nunca relleno pleno de accent (eso es solo del botón primario).
 
-Contraste: `text-primary`/`text-secondary` sobre los tres fondos y `text-on-accent` sobre `accent` cumplen AA. `text-tertiary` solo para texto no esencial.
+Contraste: `text-primary`/`text-secondary` sobre los tres fondos, `text-tertiary` sobre `bg-elevated` y `text-on-accent` sobre `accent` cumplen AA. `text-tertiary` sigue reservado para metadatos y contenido auxiliar por jerarquía, no por falta de contraste.
 
 ### 2.2 Tipografía
 
@@ -117,6 +117,8 @@ Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina fuera del tabl
 
 Rotación re-acomoda sin recargar (RNF-1); entrada por teclado en notación algebraica en escritorio.
 
+La navegación persiste cada destino como hash (`#/hoy`, `#/jugar`, `#/calculo`, `#/panel`) para admitir enlaces directos, recarga e historial aun bajo GitHub Pages. Al cambiar de pantalla, el contenido vuelve arriba y el foco pasa al título principal. En celular, el destino activo combina fondo, texto y una barra superior: nunca depende solo del color.
+
 ### 4.1 Pantalla "Tu sesión de hoy" (decisión)
 Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque de la sesión es una tarjeta destacada con borde `accent`, su porqué y el único botón primario de la pantalla ("Empezar sesión"); los bloques restantes se listan debajo como tarjetas secundarias. Encabezado: fecha en `font-mono` tertiary + título en `font-display` + duración total. Alternativa "línea de tiempo" descartada como default; queda documentada como variante B en el prototipo (`docs/prototipos/sesion-de-hoy.dc.html`).
 
@@ -127,6 +129,16 @@ Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque
 4. FeedbackPanel con porqué obligatorio + nota de Cola si hubo fallo; jugada del usuario y jugada correcta reveladas con velos `success`/`error` sobre el tablero.
 5. Cierre de bloque: resumen sobrio en `font-display`, sin confeti.
 
+### 4.3 Panel
+
+El Panel separa tres intenciones mediante un control segmentado:
+
+- **Resumen:** verdad, próximo paso y actividad. El próximo paso aparece inmediatamente después de las métricas principales en celular y en la columna derecha en escritorio.
+- **Medición:** transferencia, experimento N=1 y señales de sobreajuste.
+- **Partidas y datos:** historial, análisis pendiente, importación, exportación y restauración.
+
+Cada vista conserva una sola acción primaria. En escritorio puede aprovechar hasta dos columnas; en celular mantiene una secuencia vertical guiada por prioridad.
+
 ## 5. Componentes núcleo
 
 Cada componente lista sus **estados obligatorios**; un componente sin todos sus estados especificados no se considera terminado.
@@ -135,6 +147,7 @@ Cada componente lista sus **estados obligatorios**; un componente sin todos sus 
 |---|---|---|
 | `Board` | interactivo / solo lectura / a ciegas | envoltorio de chessground; ver §3 |
 | `Button` | default / hover / pressed / focus / disabled | primario (accent pleno, único por pantalla), secundario (borde), peligro (fondo `-subtle`, para acciones irreversibles como rendirse) |
+| `SegmentedControl` | default / seleccionado / focus | selección mutuamente excluyente con semántica `radiogroup`, foco único y flechas/Home/End; `accent-subtle` + borde `accent`, nunca relleno pleno |
 | `SessionCard` | pendiente / en curso / completado / salteado | siempre con su porqué en `text-secondary`; en curso = borde `accent`; completado = tachado + opacidad .75; salteado = borde punteado |
 | `EvalPicker` | default / seleccionado | 3 chips "mejor blancas / igual / mejor negras" (RF-5.2, evaluación rápida del Radar antes de jugar); selección = `accent-subtle` + borde `accent` |
 | `EvalScalePicker` | default / seleccionado | 5 chips `+− ± = ∓ −+` en `font-mono` (RF-3.1c, escala de evaluación de la fase 1 del análisis); mismo criterio de selección que `EvalPicker` |

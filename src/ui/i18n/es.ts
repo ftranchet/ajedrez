@@ -5,6 +5,7 @@ export const es = {
     nombre: 'ELOmax',
   },
   nav: {
+    principal: 'Navegación principal',
     hoy: 'Hoy',
     jugar: 'Jugar',
     calculo: 'Cálculo',
@@ -46,6 +47,7 @@ export const es = {
     ciegasCoordenadas: 'Solo coordenadas: seguís acertando limpio, así que ahora jugás de memoria.',
   },
   finales: {
+    modosLabel: 'Modo de juego',
     modoPartida: 'Partida libre',
     modoFinales: 'Finales teóricos',
     titulo: 'Finales teóricos',
@@ -137,6 +139,7 @@ export const es = {
     otraPosicion: 'Otra posición',
     modoLineaComprometida: 'Línea comprometida',
     modoStoyko: 'Stoyko semanal',
+    modosLabel: 'Modo de cálculo',
   },
   stoyko: {
     cargando: 'Buscando una posición…',
@@ -160,6 +163,7 @@ export const es = {
   jugar: {
     titulo: 'Jugar',
     subtitulo: 'Partida local contra el motor',
+    configuracionTitulo: 'Configuración elegida',
     notaMotor: 'Motor local con fuerza limitada. Su resistencia no es humana: en la Fase 2 llegan los bots Maia, que se equivocan como personas.',
     nivel: 'Nivel del motor',
     color: 'Tu color',
@@ -256,6 +260,21 @@ export const es = {
   },
   panel: {
     titulo: 'Panel',
+    subtitulo: 'Tu progreso, las mediciones y tus partidas, sin mezclar actividad con mejora.',
+    vistasLabel: 'Sección del Panel',
+    vistaResumen: 'Resumen',
+    vistaMedicion: 'Medición',
+    vistaPartidasDatos: 'Partidas y datos',
+    cargando: 'Cargando el Panel',
+    proximoPasoTitulo: 'Tu próximo paso',
+    proximoPasoDiagnostico: 'Completá el diagnóstico para que las sesiones y las métricas partan de una línea base propia.',
+    proximoPasoPartida: 'Jugá una partida para empezar a conectar el entrenamiento con decisiones reales.',
+    proximoPasoAnalisis: 'Ya tenés partidas guardadas. Analizá una para convertir sus errores en entrenamiento útil.',
+    irAHoy: 'Ir al diagnóstico',
+    irAJugar: 'Jugar una partida',
+    verPartidas: 'Ver partidas para analizar',
+    medicionComoLeerTitulo: 'Cómo leer estas mediciones',
+    medicionComoLeer: 'Transferencia, sobreajuste y experimentos necesitan semanas y partidas comparables. Un estado “sin datos” es una limitación honesta, no una tarea atrasada.',
     verdadTitulo: 'Panel de verdad',
     verdadBanda: 'Banda de Elo',
     verdadRating: 'Rating de partidas rápidas y clásicas',

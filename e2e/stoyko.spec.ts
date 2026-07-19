@@ -43,7 +43,7 @@ test('Stoyko semanal: anotar la jugada del motor entre las candidatas acierta y 
   await page.getByText('Tu sesión de hoy').waitFor();
 
   await page.locator('nav:visible button', { hasText: 'Cálculo' }).first().click();
-  await page.getByRole('button', { name: 'Stoyko semanal' }).click();
+  await page.getByRole('radio', { name: 'Stoyko semanal' }).click();
 
   const board = page.locator('cg-board');
   await board.waitFor({ timeout: 15_000 });
@@ -86,7 +86,7 @@ test('Stoyko semanal: ya hecho esta semana, avisa el enfriamiento en vez de serv
   await page.getByText('Tu sesión de hoy').waitFor();
 
   await page.locator('nav:visible button', { hasText: 'Cálculo' }).first().click();
-  await page.getByRole('button', { name: 'Stoyko semanal' }).click();
+  await page.getByRole('radio', { name: 'Stoyko semanal' }).click();
 
   await page.getByText('Ya hiciste tu Stoyko de esta semana').waitFor({ timeout: 10_000 });
 });
