@@ -14,7 +14,11 @@ import {
   dificultadNormalizada,
   esRespuestaCorrectaRadar,
   explainFeedback,
+  explainOwnErrorFeedback,
+  isOwnErrorRadarItem,
+  ownErrorRadarItems,
   recordServed,
+  scheduleOwnErrorRadarSlots,
   selectNextRadarItem,
   type RadarSelectionState,
 } from '../../core/radar';
@@ -101,6 +105,10 @@ interface SessionState {
 
   // Radar (E5)
   radarPool: RadarItem[];
+  /** Ítems efímeros provenientes de errores de partidas propias (RF-5.9). */
+  radarOwnErrorItems: RadarItem[];
+  /** Posiciones 0-based sorteadas para intercalarlos sin patrón fijo. */
+  radarOwnErrorSlots: number[];
   radarSelState: RadarSelectionState;
   radarItem: RadarItem | null;
   radarSubPhase: RadarSubPhase;
@@ -252,6 +260,17 @@ export const useSessionStore = create<SessionState>((set, get) => {
     });
   }
 
+  /** Selecciona catálogo o error propio según el lugar sorteado de RF-5.9. */
+  function selectRadarItemForCurrentPosition(selectionState: RadarSelectionState): RadarItem | null {
+    const s = get();
+    const ownErrorTurn = s.radarOwnErrorSlots.includes(s.radarServidos);
+    if (ownErrorTurn) {
+      const ownItem = selectNextRadarItem(s.radarOwnErrorItems, selectionState, Math.random);
+      if (ownItem) return ownItem;
+    }
+    return selectNextRadarItem(s.radarPool, selectionState, Math.random);
+  }
+
   function loadColaCard(card: ErrorCard | null) {
     if (!card) {
       // Cola terminada: pasar al currículo (RF-11.2: repasos vencidos primero).
@@ -350,9 +369,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
   }
 
   async function beginRadar() {
-    const pool = get().radarPool;
     const selState = get().radarSelState;
-    const item = selectNextRadarItem(pool, selState, Math.random);
+    const item = selectRadarItemForCurrentPosition(selState);
     const nextSelState = item ? recordServed(selState, item) : selState;
     set({ phase: 'radar', radarSelState: nextSelState });
     await radarProgressRepo.save(progressFromState(nextSelState, get().radarAciertosRecientes));
@@ -387,6 +405,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     triageDecisionCorrecta: null,
 
     radarPool: [],
+    radarOwnErrorItems: [],
+    radarOwnErrorSlots: [],
     radarSelState: RADAR_INITIAL_STATE,
     radarItem: null,
     radarSubPhase: 'evaluando',
@@ -442,6 +462,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       ]);
       const due = dueErrorCards(allCards);
       const dieta = dietaPorBanda(profile.bandaElo, allCards, games);
+      // La Cola vencida conserva prioridad absoluta. Solo las tarjetas de
+      // partidas propias que no se sirvieron ahí pueden reaparecer en Radar.
+      const ownErrorItems = ownErrorRadarItems(allCards, due.map((card) => card.id));
+      const ownErrorSlots = scheduleOwnErrorRadarSlots(dieta.radarCount, ownErrorItems.length, Math.random);
       const curriculumDue = interleaveByPattern(
         dueCurriculumItems(curriculumItems, new Map(curriculumProgressList.map((p) => [p.id, p] as const)))
           .filter((item) => item.tipo === 'patron'),
@@ -458,6 +482,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
         dieta,
         sessionRecord,
         radarPool: pool,
+        radarOwnErrorItems: ownErrorItems,
+        radarOwnErrorSlots: ownErrorSlots,
         colaCards: due,
         colaIndex: 0,
         dueCount: due.length,
@@ -494,6 +520,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
         triageQueue: [],
         triageIndex: 0,
         radarItem: null,
+        radarOwnErrorItems: [],
+        radarOwnErrorSlots: [],
         radarServidos: 0,
         radarAciertosRecientes: [],
         radarSelState: RADAR_INITIAL_STATE,
@@ -672,7 +700,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     async radarContinuar() {
       const s = get();
-      const selState = adjustDifficulty(s.radarSelState, s.radarUltimoAcierto ?? false, tasaAciertoReciente(s.radarAciertosRecientes));
+      // Un error propio no tiene rating calibrado contra el catálogo: su
+      // resultado no mueve el centro adaptativo de RF-5.5.
+      const selState = isOwnErrorRadarItem(s.radarItem)
+        ? s.radarSelState
+        : adjustDifficulty(s.radarSelState, s.radarUltimoAcierto ?? false, tasaAciertoReciente(s.radarAciertosRecientes));
       const servidos = s.radarServidos;
       if (servidos >= s.dieta.radarCount) {
         // El ajuste de dificultad de esta última respuesta también se
@@ -683,7 +715,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
         await finishTrackedSession();
         return;
       }
-      const item = selectNextRadarItem(s.radarPool, selState, Math.random);
+      // El contador ya fue incrementado al finalizar la respuesta, por lo
+      // que apunta al lugar 0-based de la próxima posición.
+      const item = selectRadarItemForCurrentPosition(selState);
       const nextSelState = item ? recordServed(selState, item) : selState;
       set({ radarSelState: nextSelState });
       await radarProgressRepo.save(progressFromState(nextSelState, get().radarAciertosRecientes));
@@ -695,9 +729,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
     // Capturado antes del set() de abajo: loadRadarItem (llamado más tarde,
     // al pasar al siguiente ítem) recién ahí resetea radarEvalGuess a null.
     const evalGuess = get().radarEvalGuess ?? undefined;
+    const ownError = isOwnErrorRadarItem(item);
     set((s) => ({
       radarServidos: s.radarServidos + 1,
-      radarAciertosRecientes: [...s.radarAciertosRecientes, acierto].slice(-VENTANA_TASA_ACIERTO),
+      // La tasa 60–80% mide solo el catálogo cuya dificultad puede ajustar.
+      radarAciertosRecientes: ownError
+        ? s.radarAciertosRecientes
+        : [...s.radarAciertosRecientes, acierto].slice(-VENTANA_TASA_ACIERTO),
     }));
     updateTrackedSession((record) => recordSessionItem(record, 'radar'));
     const state = get();
@@ -707,12 +745,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
       itemId: item.id,
       tipo: item.tipo,
       rating: item.rating,
-      dificultadNormalizada: dificultadNormalizada(item, state.radarPool),
+      dificultadNormalizada: ownError ? undefined : dificultadNormalizada(item, state.radarPool),
+      origenContenido: ownError ? 'error-propio' : 'catalogo',
+      errorCardId: ownError ? item.errorCardId : undefined,
       acierto,
       evalGuess,
       fecha: new Date().toISOString(),
     });
-    if (!acierto) {
+    if (!acierto && !ownError) {
       // Dedup por identidad + tope diario (RF-4.1/4.5): si ya hay una tarjeta
       // de esta posición se refuerza en vez de duplicar; superado el tope
       // diario de tarjetas nuevas, se omite para no avalanchar la Cola.
@@ -747,7 +787,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarUltimoAcierto: acierto,
       radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
       radarJugadaUsuario: jugadaUsuario,
-      radarFeedbackTexto: resultadoDS === 'familiar' ? feedbackConformismo(item) : explainFeedback(item, acierto),
+      radarFeedbackTexto: isOwnErrorRadarItem(item)
+        ? explainOwnErrorFeedback(acierto)
+        : resultadoDS === 'familiar'
+          ? feedbackConformismo(item)
+          : explainFeedback(item, acierto),
       radarPedirConfianza: pedirConfianza,
       radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
     });

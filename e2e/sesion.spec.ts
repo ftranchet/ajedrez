@@ -168,6 +168,86 @@ test.describe('sesión simple: Radar', () => {
     await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 10_000 });
     await expect(page.getByText('Posición 2 de')).toBeVisible();
   });
+
+  test('RF-5.9: recicla un error propio no vencido y conserva su calendario de Cola', async ({ page }) => {
+    await page.addInitScript(() => {
+      Math.random = () => 0;
+    });
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page);
+    await page.evaluate((fen) => {
+      return new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('errorCards', 'readwrite');
+          tx.objectStore('errorCards').put({
+            id: 'e2e-own-error',
+            fen,
+            ladoAMover: 'b',
+            jugadaUsuario: 'd5d8',
+            jugadaCorrecta: 'd5h5',
+            categoria: 'tactico',
+            origen: 'partida',
+            fsrs: {
+              due: '2100-01-01T00:00:00.000Z',
+              stability: 5,
+              difficulty: 5,
+              elapsedDays: 0,
+              scheduledDays: 30,
+              reps: 2,
+              lapses: 0,
+              learningSteps: 0,
+              state: 'review',
+              lastReview: '2026-07-01T00:00:00.000Z',
+            },
+            creadaEn: '2026-06-01T00:00:00.000Z',
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }, radarFixture.fen);
+
+    await page.reload();
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await page.getByRole('button', { name: 'Empezar sesión' }).click();
+    await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Igual' }).click();
+    const board = page.locator('cg-board');
+    await clickSquare(page, board, 'd', 5);
+    await clickSquare(page, board, 'h', 5);
+    await page.getByRole('button', { name: 'No, mantener esta' }).click();
+    await page.getByRole('button', { name: 'Confirmar' }).click();
+
+    await page.getByText('Esta posición volvió de un error de una partida tuya.').waitFor();
+    const persisted = await page.evaluate(() => {
+      return new Promise<{ origin?: string; errorCardId?: string; due?: string }>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction(['radarAttempts', 'errorCards'], 'readonly');
+          const attemptReq = tx.objectStore('radarAttempts').getAll();
+          const cardReq = tx.objectStore('errorCards').get('e2e-own-error');
+          tx.oncomplete = () => {
+            const attempt = attemptReq.result[0];
+            resolve({ origin: attempt?.origenContenido, errorCardId: attempt?.errorCardId, due: cardReq.result?.fsrs?.due });
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    });
+    expect(persisted).toEqual({
+      origin: 'error-propio',
+      errorCardId: 'e2e-own-error',
+      due: '2100-01-01T00:00:00.000Z',
+    });
+  });
 });
 
 test.describe('sesión simple: Cola', () => {

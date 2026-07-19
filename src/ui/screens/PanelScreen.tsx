@@ -342,15 +342,36 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
       </section>
     );
   }
-  const recent = attempts.slice(0, 50);
-  const porcentaje = Math.round((recent.filter((attempt) => attempt.acierto).length / recent.length) * 100);
+  // Los intentos históricos sin origen son catálogo. Los errores propios no
+  // entran en la meta 60–80% porque no tienen dificultad calibrada (RF-5.9).
+  const recent = attempts.filter((attempt) => attempt.origenContenido !== 'error-propio').slice(0, 50);
+  const ownErrors = attempts.filter((attempt) => attempt.origenContenido === 'error-propio').slice(0, 50);
+  const porcentaje = recent.length > 0
+    ? Math.round((recent.filter((attempt) => attempt.acierto).length / recent.length) * 100)
+    : null;
+  const ownErrorPercentage = ownErrors.length > 0
+    ? Math.round((ownErrors.filter((attempt) => attempt.acierto).length / ownErrors.length) * 100)
+    : null;
   return (
     <section>
       <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.radar}</h2>
-      <p className="m-0 text-primary">
-        {t.panel.radarTasa.replace('{n}', String(recent.length)).replace('{porcentaje}', String(porcentaje))}
-      </p>
-      <p className="m-0 mt-1 text-sm text-secondary">{t.panel.radarMeta}</p>
+      {porcentaje === null ? (
+        <p className="m-0 text-secondary">{t.panel.radarSinCatalogo}</p>
+      ) : (
+        <>
+          <p className="m-0 text-primary">
+            {t.panel.radarTasa.replace('{n}', String(recent.length)).replace('{porcentaje}', String(porcentaje))}
+          </p>
+          <p className="m-0 mt-1 text-sm text-secondary">{t.panel.radarMeta}</p>
+        </>
+      )}
+      {ownErrorPercentage === null ? null : (
+        <p className="m-0 mt-2 text-sm text-secondary">
+          {t.panel.radarErroresPropios
+            .replace('{n}', String(ownErrors.length))
+            .replace('{porcentaje}', String(ownErrorPercentage))}
+        </p>
+      )}
     </section>
   );
 }
