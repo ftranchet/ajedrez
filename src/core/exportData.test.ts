@@ -18,6 +18,7 @@ const empty = {
   triageAttempts: [],
   sessions: [],
   transferMeasurements: [],
+  n1Experiments: [],
 };
 
 describe('buildExportBundle', () => {
@@ -92,5 +93,22 @@ describe('validateImportBundle', () => {
     raw.sessions[0].bloques = 'no-es-array';
     const result = validateImportBundle(raw);
     expect(result.ok).toBe(false);
+  });
+
+  it('rechaza un experimento n=1 corrupto antes de restaurar', () => {
+    const bundle = buildExportBundle(empty);
+    const raw = JSON.parse(JSON.stringify(bundle));
+    raw.n1Experiments = [{
+      id: 'n1-corrupto',
+      estado: 'activo',
+      creadoEn: '2026-07-19T00:00:00.000Z',
+      modalidadA: 'radar',
+      modalidadB: 'radar',
+      dosisSemanalA: 20,
+      dosisSemanalB: 20,
+      lineaBase: { erroresGravesPorPartida: null, partidasAnalizadas: 0, rating: null, registradaEn: '2026-07-19T00:00:00.000Z' },
+      fases: [],
+    }];
+    expect(validateImportBundle(raw).ok).toBe(false);
   });
 });

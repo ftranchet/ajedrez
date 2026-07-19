@@ -17,6 +17,7 @@ import { stoykoAttemptRepo } from '../storage/stoykoAttemptRepo';
 import { triageAttemptRepo } from '../storage/triageAttemptRepo';
 import { sessionRepo } from '../storage/sessionRepo';
 import { transferMeasurementRepo } from '../storage/transferMeasurementRepo';
+import { n1ExperimentRepo } from '../storage/n1ExperimentRepo';
 import { db } from '../storage/db';
 
 function pgnFileName(gameId: string): string {
@@ -40,6 +41,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     triageAttempts: await triageAttemptRepo.list(),
     sessions: await sessionRepo.list(),
     transferMeasurements: await transferMeasurementRepo.list(),
+    n1Experiments: await n1ExperimentRepo.list(),
   };
   const bundle = buildExportBundle(data);
 
@@ -59,6 +61,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     'triageAttempts.json': strToU8(JSON.stringify(bundle.triageAttempts, null, 2)),
     'sessions.json': strToU8(JSON.stringify(bundle.sessions, null, 2)),
     'transferMeasurements.json': strToU8(JSON.stringify(bundle.transferMeasurements, null, 2)),
+    'n1Experiments.json': strToU8(JSON.stringify(bundle.n1Experiments, null, 2)),
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
@@ -110,6 +113,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const triageAttemptsRaw = unzipped['triageAttempts.json'];
   const sessionsRaw = unzipped['sessions.json'];
   const transferMeasurementsRaw = unzipped['transferMeasurements.json'];
+  const n1ExperimentsRaw = unzipped['n1Experiments.json'];
   if (!manifestRaw || !gamesRaw || !errorCardsRaw || !calibrationRaw) {
     return { ok: false, error: 'Faltan archivos dentro del .zip (¿es una exportación de ELOmax?).' };
   }
@@ -139,6 +143,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       triageAttempts: triageAttemptsRaw ? JSON.parse(strFromU8(triageAttemptsRaw)) : [],
       sessions: sessionsRaw ? JSON.parse(strFromU8(sessionsRaw)) : [],
       transferMeasurements: transferMeasurementsRaw ? JSON.parse(strFromU8(transferMeasurementsRaw)) : [],
+      n1Experiments: n1ExperimentsRaw ? JSON.parse(strFromU8(n1ExperimentsRaw)) : [],
     };
   } catch {
     return { ok: false, error: 'Algún archivo dentro del .zip no es JSON válido.' };
@@ -173,6 +178,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       db.triageAttempts,
       db.sessions,
       db.transferMeasurements,
+      db.n1Experiments,
     ],
     async () => {
       await Promise.all([
@@ -190,6 +196,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
         db.triageAttempts.clear(),
         db.sessions.clear(),
         db.transferMeasurements.clear(),
+        db.n1Experiments.clear(),
       ]);
       if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
       if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
@@ -205,6 +212,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       if (bundle.triageAttempts.length > 0) await db.triageAttempts.bulkPut(bundle.triageAttempts);
       if (bundle.sessions.length > 0) await db.sessions.bulkPut(bundle.sessions);
       if (bundle.transferMeasurements.length > 0) await db.transferMeasurements.bulkPut(bundle.transferMeasurements);
+      if (bundle.n1Experiments.length > 0) await db.n1Experiments.bulkPut(bundle.n1Experiments);
     },
   );
 

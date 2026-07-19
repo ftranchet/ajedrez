@@ -9,6 +9,7 @@ import type {
   DobleSolucionAttempt,
   ErrorCard,
   GameRecord,
+  N1Experiment,
   Profile,
   RadarAttempt,
   RadarProgress,
@@ -42,6 +43,7 @@ export interface ExportBundle {
   triageAttempts: TriageAttempt[];
   sessions: SessionRecord[];
   transferMeasurements: TransferMeasurement[];
+  n1Experiments: N1Experiment[];
 }
 
 export interface ExportSourceData {
@@ -59,6 +61,7 @@ export interface ExportSourceData {
   triageAttempts: TriageAttempt[];
   sessions: SessionRecord[];
   transferMeasurements: TransferMeasurement[];
+  n1Experiments: N1Experiment[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -79,6 +82,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     triageAttempts: data.triageAttempts,
     sessions: data.sessions,
     transferMeasurements: data.transferMeasurements,
+    n1Experiments: data.n1Experiments,
   };
 }
 
@@ -179,6 +183,55 @@ function esTransferMeasurementValida(x: unknown): boolean {
   );
 }
 
+function esN1ExperimentValido(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  const modalities = ['radar', 'calculo', 'partidas-analisis'];
+  const expectedPhases = [
+    ['A1', 'A'],
+    ['B1', 'B'],
+    ['A2', 'A'],
+    ['B2', 'B'],
+  ] as const;
+  const validOutcome = (outcome: unknown): boolean =>
+    isObj(outcome) &&
+    (outcome.erroresGravesPorPartida === null ||
+      (typeof outcome.erroresGravesPorPartida === 'number' && Number.isFinite(outcome.erroresGravesPorPartida) && outcome.erroresGravesPorPartida >= 0)) &&
+    Number.isInteger(outcome.partidasAnalizadas) && Number(outcome.partidasAnalizadas) >= 0 &&
+    (outcome.rating === null || (typeof outcome.rating === 'number' && Number.isFinite(outcome.rating)));
+  const basicShape = (
+    typeof x.id === 'string' &&
+    (x.estado === 'activo' || x.estado === 'completado') &&
+    typeof x.creadoEn === 'string' && Number.isFinite(Date.parse(x.creadoEn)) &&
+    modalities.includes(String(x.modalidadA)) &&
+    modalities.includes(String(x.modalidadB)) &&
+    x.modalidadA !== x.modalidadB &&
+    Number.isInteger(x.dosisSemanalA) && Number(x.dosisSemanalA) >= 1 && Number(x.dosisSemanalA) <= 100 &&
+    Number.isInteger(x.dosisSemanalB) && Number(x.dosisSemanalB) >= 1 && Number(x.dosisSemanalB) <= 100 &&
+    validOutcome(x.lineaBase) && isObj(x.lineaBase) && typeof x.lineaBase.registradaEn === 'string' &&
+    Array.isArray(x.fases) &&
+    x.fases.length === 4
+  );
+  if (!basicShape || !Array.isArray(x.fases)) return false;
+  const phasesValid = x.fases.every((phase, index) => {
+    if (!isObj(phase)) return false;
+    const expected = expectedPhases[index];
+    const expectedModality = expected[1] === 'A' ? x.modalidadA : x.modalidadB;
+    const start = typeof phase.inicio === 'string' ? Date.parse(phase.inicio) : Number.NaN;
+    const end = typeof phase.fin === 'string' ? Date.parse(phase.fin) : Number.NaN;
+    const snapshotValid = phase.snapshot === undefined || (
+      validOutcome(phase.snapshot) && isObj(phase.snapshot) &&
+      Number.isInteger(phase.snapshot.dosisReal) && Number(phase.snapshot.dosisReal) >= 0 &&
+      typeof phase.snapshot.cerradaEn === 'string'
+    );
+    return phase.id === expected[0] && phase.condicion === expected[1] && phase.modalidad === expectedModality &&
+      Number.isFinite(start) && Number.isFinite(end) && start < end && snapshotValid;
+  });
+  if (!phasesValid) return false;
+  return x.estado === 'completado'
+    ? x.fases.every((phase) => isObj(phase) && phase.snapshot !== undefined)
+    : x.fases.some((phase) => isObj(phase) && phase.snapshot === undefined);
+}
+
 /**
  * Valida la forma de un paquete importado antes de tocar la base de datos
  * (RF-14.2). No migra todavía versiones de esquema anteriores a la actual:
@@ -242,6 +295,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.transferMeasurements !== undefined && !Array.isArray(obj.transferMeasurements)) {
     return { ok: false, error: 'Las baterías de transferencia no tienen la forma esperada.' };
   }
+  if (obj.n1Experiments !== undefined && !Array.isArray(obj.n1Experiments)) {
+    return { ok: false, error: 'Los experimentos n=1 no tienen la forma esperada.' };
+  }
   // Validación por-registro de las entidades críticas (RF-14.2): como la
   // restauración reemplaza el estado local entero, un solo registro corrupto
   // rechaza el paquete en vez de escribirse sobre datos buenos.
@@ -259,6 +315,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   if (!((obj.transferMeasurements ?? []) as unknown[]).every(esTransferMeasurementValida)) {
     return { ok: false, error: 'Alguna batería de transferencia del respaldo está corrupta o incompleta.' };
+  }
+  if (!((obj.n1Experiments ?? []) as unknown[]).every(esN1ExperimentValido)) {
+    return { ok: false, error: 'Algún experimento n=1 del respaldo está corrupto o incompleto.' };
   }
   return {
     ok: true,
@@ -278,6 +337,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       triageAttempts: (obj.triageAttempts ?? []) as TriageAttempt[],
       sessions: (obj.sessions ?? []) as SessionRecord[],
       transferMeasurements: (obj.transferMeasurements ?? []) as TransferMeasurement[],
+      n1Experiments: (obj.n1Experiments ?? []) as N1Experiment[],
     },
   };
 }

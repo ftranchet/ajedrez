@@ -12,6 +12,7 @@ import type {
   DobleSolucionAttempt,
   ErrorCard,
   GameRecord,
+  N1Experiment,
   Profile,
   RadarAttempt,
   RadarDatasetMeta,
@@ -27,7 +28,7 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -50,6 +51,7 @@ export class ElomaxDB extends Dexie {
   triageAttempts!: Table<TriageAttempt, string>;
   sessions!: Table<SessionRecord, string>;
   transferMeasurements!: Table<TransferMeasurement, string>;
+  n1Experiments!: Table<N1Experiment, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -299,6 +301,32 @@ export class ElomaxDB extends Dexie {
       triageAttempts: 'id, itemId, fecha',
       sessions: 'id, fechaInicio, estado',
       transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+    });
+
+    // v14 — modo experimento n=1 (RF-12.4): configuración ABAB, línea base
+    // y snapshots de cada fase. Tabla personal nueva, puramente aditiva.
+    this.version(14).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
+      stoykoAttempts: 'id, itemId, fecha',
+      triageAttempts: 'id, itemId, fecha',
+      sessions: 'id, fechaInicio, estado',
+      transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+      n1Experiments: 'id, creadoEn, estado',
     });
   }
 }
