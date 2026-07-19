@@ -495,3 +495,44 @@ export interface TransferMeasurement {
   completedAt: string | null; // ISO 8601; null mientras está en curso
   responses: TransferResponse[];
 }
+
+/** Modalidades comparables en un experimento individual ABAB (RF-12.4). */
+export type N1Modality = 'radar' | 'calculo' | 'partidas-analisis';
+
+export interface N1OutcomeSnapshot {
+  /** Errores grave/error del usuario por partida analizada en la ventana. */
+  erroresGravesPorPartida: number | null;
+  partidasAnalizadas: number;
+  /** Último Elo real de rápida/clásica disponible al cierre. */
+  rating: number | null;
+}
+
+export interface N1PhaseSnapshot extends N1OutcomeSnapshot {
+  /** Dosis observada en unidades propias de la modalidad del bloque. */
+  dosisReal: number;
+  cerradaEn: string;
+}
+
+export interface N1ExperimentPhase {
+  id: 'A1' | 'B1' | 'A2' | 'B2';
+  condicion: 'A' | 'B';
+  modalidad: N1Modality;
+  inicio: string;
+  fin: string;
+  snapshot?: N1PhaseSnapshot;
+}
+
+/** Experimento n=1 de ocho semanas: cuatro bloques fijos de 14 días. */
+export interface N1Experiment {
+  id: string;
+  estado: 'activo' | 'completado';
+  creadoEn: string;
+  modalidadA: N1Modality;
+  modalidadB: N1Modality;
+  /** Objetivos semanales; cada bloque planifica dos veces esta dosis. */
+  dosisSemanalA: number;
+  dosisSemanalB: number;
+  lineaBase: N1OutcomeSnapshot & { registradaEn: string };
+  fases: N1ExperimentPhase[];
+  completadoEn?: string;
+}

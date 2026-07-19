@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
+import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from '../../core/panel';
@@ -13,6 +13,7 @@ import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
 import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
 import { detectOverfitting } from '../../core/overfitting';
+import { currentN1Phase } from '../../core/n1Experiment';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -21,11 +22,13 @@ import { profileRepo } from '../../services/storage/profileRepo';
 import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
+import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { AnalizarScreen } from './AnalizarScreen';
 import { TransferScreen } from './TransferScreen';
+import { N1ExperimentScreen } from './N1ExperimentScreen';
 import { t } from '../i18n/es';
 
 function formatJugadas(n: number): string {
@@ -41,7 +44,9 @@ export function PanelScreen() {
   const [dobleSolucionAttempts, setDobleSolucionAttempts] = useState<DobleSolucionAttempt[] | null>(null);
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
   const [transferMeasurements, setTransferMeasurements] = useState<TransferMeasurement[] | null>(null);
+  const [n1Experiments, setN1Experiments] = useState<N1Experiment[] | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [n1Open, setN1Open] = useState(false);
   const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
@@ -67,6 +72,9 @@ export function PanelScreen() {
     void transferMeasurementRepo.list().then((records) => {
       if (alive) setTransferMeasurements(records);
     });
+    void n1ExperimentRepo.list().then((records) => {
+      if (alive) setN1Experiments(records);
+    });
     return () => {
       alive = false;
     };
@@ -75,6 +83,9 @@ export function PanelScreen() {
   if (analysisPhase !== 'inactivo') return <AnalizarScreen />;
   if (transferOpen) {
     return <TransferScreen onClose={() => { setTransferOpen(false); setImportVersion((version) => version + 1); }} />;
+  }
+  if (n1Open) {
+    return <N1ExperimentScreen onClose={() => { setN1Open(false); setImportVersion((version) => version + 1); }} />;
   }
 
   return (
@@ -88,6 +99,8 @@ export function PanelScreen() {
       <TransferPanel measurements={transferMeasurements} onOpen={() => setTransferOpen(true)} />
 
       <OverfittingPanel games={games} attempts={radarAttempts} />
+
+      <N1ExperimentPanel experiments={n1Experiments} onOpen={() => setN1Open(true)} />
 
       <CalibrationPanel records={calibraciones} />
 
@@ -137,6 +150,36 @@ export function PanelScreen() {
 
       <DatosSection onImported={() => setImportVersion((v) => v + 1)} />
     </div>
+  );
+}
+
+function N1ExperimentPanel({
+  experiments,
+  onOpen,
+}: {
+  experiments: N1Experiment[] | null;
+  onOpen: () => void;
+}) {
+  if (experiments === null) return null;
+  const latest = experiments[0];
+  const phase = latest ? currentN1Phase(latest) : null;
+  let status: string = t.n1.panelSinExperimento;
+  if (latest?.estado === 'completado') status = t.n1.panelCompletado;
+  else if (phase) {
+    status = t.n1.panelActivo
+      .replace('{fase}', phase.id)
+      .replace('{modalidad}', t.n1.modalidades[phase.modalidad]);
+  }
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-info/40 bg-surface p-4">
+      <div>
+        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.n1.panelTitulo}</h2>
+        <p className="m-0 mt-1 text-sm text-secondary">{status}</p>
+      </div>
+      <button onClick={onOpen} className={latest ? 'btn-secondary' : 'btn-primary'}>
+        {latest ? t.n1.abrir : t.n1.configurar}
+      </button>
+    </section>
   );
 }
 

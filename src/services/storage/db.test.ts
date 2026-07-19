@@ -662,4 +662,44 @@ describe('migración de esquema Dexie', () => {
     expect(await current.transferMeasurements.count()).toBe(1);
     current.close();
   });
+
+  it('migra de v13 a v14 sin perder mediciones y crea los experimentos n=1', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v13 = new Dexie(name);
+    v13.version(13).stores({
+      games: 'id, fecha, fuente',
+      transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+    });
+    await v13.open();
+    await v13.table('transferMeasurements').add({
+      id: 'm13',
+      datasetVersion: 'transfer-v1',
+      startedAt: '2026-07-19T11:00:00.000Z',
+      completedAt: null,
+      responses: [],
+    });
+    v13.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.transferMeasurements.get('m13')).toMatchObject({ id: 'm13' });
+    expect(await current.n1Experiments.count()).toBe(0);
+    await current.n1Experiments.add({
+      id: 'n1-migration',
+      estado: 'activo',
+      creadoEn: '2026-07-19T12:00:00.000Z',
+      modalidadA: 'radar',
+      modalidadB: 'partidas-analisis',
+      dosisSemanalA: 20,
+      dosisSemanalB: 2,
+      lineaBase: {
+        erroresGravesPorPartida: null,
+        partidasAnalizadas: 0,
+        rating: null,
+        registradaEn: '2026-07-19T12:00:00.000Z',
+      },
+      fases: [],
+    });
+    expect(await current.n1Experiments.count()).toBe(1);
+    current.close();
+  });
 });
