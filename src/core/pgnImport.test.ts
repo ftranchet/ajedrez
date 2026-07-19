@@ -37,4 +37,27 @@ describe('parsePastedPgn', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.pgn).toBe(PGN_SIN_RESULTADO);
   });
+
+  it('extrae ratings y fecha reales de los headers para medir transferencia', () => {
+    const pgn = '[Date "2025.12.31"]\n[WhiteElo "1512"]\n[BlackElo "1498"]\n\n1. e4 e5 *';
+    expect(parsePastedPgn(pgn)).toEqual({
+      ok: true,
+      pgn,
+      resultado: '*',
+      plyCount: 2,
+      whiteElo: 1512,
+      blackElo: 1498,
+      playedAt: '2025-12-31T12:00:00.000Z',
+    });
+  });
+
+  it('ignora ratings y fechas inválidos en vez de inventar valores', () => {
+    const result = parsePastedPgn('[Date "2025.02.31"]\n[WhiteElo "?"]\n[BlackElo "99999"]\n\n1. e4 e5 *');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.whiteElo).toBeUndefined();
+      expect(result.blackElo).toBeUndefined();
+      expect(result.playedAt).toBeUndefined();
+    }
+  });
 });

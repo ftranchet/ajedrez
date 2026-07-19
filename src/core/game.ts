@@ -28,6 +28,8 @@ export interface BuildGameArgs {
   id?: string;
   /** Lado que jugó el usuario (partidas locales contra el motor, RF-9.1). */
   jugadorColor?: Color;
+  /** Elo del usuario en esta partida, cuando existe una fuente real. */
+  ratingUsuario?: number;
 }
 
 export function buildGameRecord(args: BuildGameArgs): GameRecord {
@@ -41,6 +43,7 @@ export function buildGameRecord(args: BuildGameArgs): GameRecord {
     analizada: false,
     fecha: args.fecha ?? new Date().toISOString(),
     ...(args.jugadorColor ? { jugadorColor: args.jugadorColor } : {}),
+    ...(args.ratingUsuario !== undefined ? { ratingUsuario: args.ratingUsuario } : {}),
   };
 }
 

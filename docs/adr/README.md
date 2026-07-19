@@ -19,3 +19,4 @@ Un ADR documenta una decisión con costo de reversa alto: qué se decidió, en q
 | 0007 | Dificultad normalizada del Radar | Aceptado |
 | 0008 | Demostración offline de finales contra Stockfish | Aceptado |
 | 0009 | Batería de transferencia reservada y sin feedback por ítem | Aceptado |
+| 0010 | Detector de sobreajuste con rating real | Aceptado |
