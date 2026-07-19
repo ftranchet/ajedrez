@@ -312,12 +312,13 @@ test.describe('sesión simple: Cola', () => {
 });
 
 test.describe('exportación e importación (E14)', () => {
-  test('exportar mis datos descarga un .zip, alcanzable en 2 toques desde Hoy', async ({ page }) => {
+  test('exportar mis datos descarga un .zip, alcanzable en 3 toques desde Hoy', async ({ page }) => {
     await page.goto('./');
     await page.getByText('Tu sesión de hoy').waitFor();
 
-    // Toque 1: Panel. Toque 2: Exportar mis datos.
+    // Toque 1: Panel. Toque 2: Partidas y datos. Toque 3: Exportar.
     await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+    await page.getByRole('radio', { name: 'Partidas y datos' }).click();
     await page.getByText('Tus datos').waitFor();
 
     const downloadPromise = page.waitForEvent('download');

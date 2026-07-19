@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import type { Color, EvalSymbol } from '../../core/types';
 import { Board } from '../components/Board';
 import { Chip } from '../components/Chip';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { useCompromisoStore } from '../state/compromisoStore';
 import { useStoykoStore } from '../state/stoykoStore';
@@ -27,33 +28,21 @@ export function CalculoScreen() {
         <p className="m-0 text-sm text-secondary">{t.calculo.subtitulo}</p>
       </div>
 
-      <div className="mx-auto flex w-full max-w-md gap-1 rounded-lg border border-subtle bg-surface p-1 sm:mx-0 sm:max-w-xs">
-        <ModoBoton activo={modo === 'comprometida'} onClick={() => setModo('comprometida')}>
-          {t.calculo.modoLineaComprometida}
-        </ModoBoton>
-        <ModoBoton activo={modo === 'stoyko'} onClick={() => setModo('stoyko')}>
-          {t.calculo.modoStoyko}
-        </ModoBoton>
-      </div>
+      <SegmentedControl
+        label={t.calculo.modosLabel}
+        value={modo}
+        options={[
+          { value: 'comprometida', label: t.calculo.modoLineaComprometida },
+          { value: 'stoyko', label: t.calculo.modoStoyko },
+        ]}
+        onChange={setModo}
+        className="mx-auto w-full max-w-md sm:mx-0 sm:max-w-xs"
+      />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start">
         {modo === 'comprometida' ? <LineaComprometida /> : <Stoyko />}
       </div>
     </div>
-  );
-}
-
-function ModoBoton({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-current={activo ? 'page' : undefined}
-      className={`min-h-10 flex-1 rounded-md text-sm font-semibold transition-colors duration-[120ms] ${
-        activo ? 'bg-accent text-on-accent' : 'text-secondary hover:bg-elevated'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

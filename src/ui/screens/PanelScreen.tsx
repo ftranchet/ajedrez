@@ -26,6 +26,8 @@ import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { SectionHeading } from '../components/SectionHeading';
 import { AnalizarScreen } from './AnalizarScreen';
 import { TransferScreen } from './TransferScreen';
 import { N1ExperimentScreen } from './N1ExperimentScreen';
@@ -34,6 +36,8 @@ import { t } from '../i18n/es';
 function formatJugadas(n: number): string {
   return `${n} ${n === 1 ? t.panel.jugadaCorta : t.panel.jugadasCortas}`;
 }
+
+type PanelView = 'resumen' | 'medicion' | 'partidas-datos';
 
 export function PanelScreen() {
   const analysisPhase = useAnalysisStore((s) => s.phase);
@@ -47,33 +51,30 @@ export function PanelScreen() {
   const [n1Experiments, setN1Experiments] = useState<N1Experiment[] | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [n1Open, setN1Open] = useState(false);
+  const [view, setView] = useState<PanelView>('resumen');
   const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    void gameRepo.list().then((g) => {
-      if (alive) setGames(g);
-    });
-    void radarAttemptRepo.list().then((attempts) => {
-      if (alive) setRadarAttempts(attempts);
-    });
-    void calibrationRepo.list().then((c) => {
-      if (alive) setCalibraciones(c);
-    });
-    void profileRepo.get().then((p) => {
-      if (alive) setProfile(p);
-    });
-    void dobleSolucionAttemptRepo.list().then((attempts) => {
-      if (alive) setDobleSolucionAttempts(attempts);
-    });
-    void sessionRepo.list().then((records) => {
-      if (alive) setSessions(records);
-    });
-    void transferMeasurementRepo.list().then((records) => {
-      if (alive) setTransferMeasurements(records);
-    });
-    void n1ExperimentRepo.list().then((records) => {
-      if (alive) setN1Experiments(records);
+    void Promise.all([
+      gameRepo.list(),
+      radarAttemptRepo.list(),
+      calibrationRepo.list(),
+      profileRepo.get(),
+      dobleSolucionAttemptRepo.list(),
+      sessionRepo.list(),
+      transferMeasurementRepo.list(),
+      n1ExperimentRepo.list(),
+    ]).then(([g, radar, calibration, loadedProfile, doble, loadedSessions, transfer, experiments]) => {
+      if (!alive) return;
+      setGames(g);
+      setRadarAttempts(radar);
+      setCalibraciones(calibration);
+      setProfile(loadedProfile);
+      setDobleSolucionAttempts(doble);
+      setSessions(loadedSessions);
+      setTransferMeasurements(transfer);
+      setN1Experiments(experiments);
     });
     return () => {
       alive = false;
@@ -88,69 +89,217 @@ export function PanelScreen() {
     return <N1ExperimentScreen onClose={() => { setN1Open(false); setImportVersion((version) => version + 1); }} />;
   }
 
+  const loading = games === null || radarAttempts === null || calibraciones === null || profile === null ||
+    dobleSolucionAttempts === null || sessions === null || transferMeasurements === null || n1Experiments === null;
+
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <h1 className="m-0 font-display text-3xl font-medium">{t.panel.titulo}</h1>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <header>
+        <h1 className="m-0 font-display text-3xl font-medium">{t.panel.titulo}</h1>
+        <p className="m-0 mt-1 text-secondary">{t.panel.subtitulo}</p>
+      </header>
 
-      <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
+      <SegmentedControl
+        label={t.panel.vistasLabel}
+        value={view}
+        options={[
+          { value: 'resumen', label: t.panel.vistaResumen },
+          { value: 'medicion', label: t.panel.vistaMedicion },
+          { value: 'partidas-datos', label: t.panel.vistaPartidasDatos },
+        ]}
+        onChange={setView}
+        className="w-full lg:max-w-2xl"
+      />
 
-      <TruthCelebrationPanel games={games} />
-
-      <TransferPanel measurements={transferMeasurements} onOpen={() => setTransferOpen(true)} />
-
-      <OverfittingPanel games={games} attempts={radarAttempts} />
-
-      <N1ExperimentPanel experiments={n1Experiments} onOpen={() => setN1Open(true)} />
-
-      <CalibrationPanel records={calibraciones} />
-
-      <ActivityPanel records={sessions} />
-
-      <section>
-        <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.partidas}</h2>
-        {games === null ? null : games.length === 0 ? (
-          <p className="m-0 text-secondary">{t.panel.sinPartidas}</p>
-        ) : (
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {games.map((g) => {
-              const jugadas = plyCountFromPgn(g.pgn);
-              return (
-                <li key={g.id} className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface px-4 py-3">
-                  <div className="flex items-baseline justify-between">
-                    <span className="font-mono text-sm text-secondary">
-                      {new Date(g.fecha).toLocaleDateString('es-AR')}
-                    </span>
-                    <span className="text-sm text-tertiary">{formatJugadas(Math.ceil(jugadas / 2))}</span>
-                    <span className="font-mono text-sm text-primary">{g.resultado}</span>
-                  </div>
-                  {g.ratingUsuario === undefined ? null : (
-                    <span className="font-mono text-xs text-tertiary">{t.panel.partidaRating.replace('{rating}', String(g.ratingUsuario))}</span>
-                  )}
-                  {g.analizada ? (
-                    <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
-                  ) : jugadas === 0 ? (
-                    <span className="text-xs text-tertiary">{t.analisis.muyCortaParaAnalizar}</span>
-                  ) : (
-                    <button onClick={() => void useAnalysisStore.getState().iniciar(g.id)} className="btn-secondary">
-                      {t.analisis.analizar}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <ImportarPartidaSection onImported={() => setImportVersion((v) => v + 1)} />
-
-      <RadarSummary attempts={radarAttempts} />
-
-      <DobleSolucionSummary attempts={dobleSolucionAttempts} />
-
-      <DatosSection onImported={() => setImportVersion((v) => v + 1)} />
+      {loading ? <PanelSkeleton /> : view === 'resumen' ? (
+        <ResumenView
+          games={games}
+          calibraciones={calibraciones}
+          profile={profile}
+          sessions={sessions}
+          radarAttempts={radarAttempts}
+          dobleSolucionAttempts={dobleSolucionAttempts}
+          onView={setView}
+        />
+      ) : view === 'medicion' ? (
+        <MedicionView
+          games={games}
+          radarAttempts={radarAttempts}
+          transferMeasurements={transferMeasurements}
+          n1Experiments={n1Experiments}
+          onTransfer={() => setTransferOpen(true)}
+          onN1={() => setN1Open(true)}
+        />
+      ) : (
+        <PartidasDatosView
+          games={games}
+          onImported={() => setImportVersion((version) => version + 1)}
+        />
+      )}
     </div>
   );
+}
+
+function PanelSkeleton() {
+  return (
+    <div aria-label={t.panel.cargando} className="grid gap-4 lg:grid-cols-2">
+      {[0, 1, 2].map((item) => (
+        <div key={item} className="h-36 rounded-lg border border-subtle bg-surface" />
+      ))}
+    </div>
+  );
+}
+
+function ResumenView({
+  games,
+  calibraciones,
+  profile,
+  sessions,
+  radarAttempts,
+  dobleSolucionAttempts,
+  onView,
+}: {
+  games: GameRecord[];
+  calibraciones: CalibrationRecord[];
+  profile: Profile;
+  sessions: SessionRecord[];
+  radarAttempts: RadarAttempt[];
+  dobleSolucionAttempts: DobleSolucionAttempt[];
+  onView: (view: PanelView) => void;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:items-start">
+      <div className="flex flex-col gap-4">
+        <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
+        <div className="lg:hidden">
+          <NextStepPanel games={games} profile={profile} onView={onView} />
+        </div>
+        <TruthCelebrationPanel games={games} />
+        <CalibrationPanel records={calibraciones} />
+      </div>
+      <aside className="flex flex-col gap-4">
+        <div className="hidden lg:block">
+          <NextStepPanel games={games} profile={profile} onView={onView} />
+        </div>
+        <ActivityPanel records={sessions} />
+        <RadarSummary attempts={radarAttempts} />
+        <DobleSolucionSummary attempts={dobleSolucionAttempts} />
+      </aside>
+    </div>
+  );
+}
+
+function MedicionView({
+  games,
+  radarAttempts,
+  transferMeasurements,
+  n1Experiments,
+  onTransfer,
+  onN1,
+}: {
+  games: GameRecord[];
+  radarAttempts: RadarAttempt[];
+  transferMeasurements: TransferMeasurement[];
+  n1Experiments: N1Experiment[];
+  onTransfer: () => void;
+  onN1: () => void;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+      <div className="flex flex-col gap-4">
+        <TransferPanel measurements={transferMeasurements} onOpen={onTransfer} />
+        <N1ExperimentPanel experiments={n1Experiments} onOpen={onN1} />
+      </div>
+      <div className="flex flex-col gap-4">
+        <OverfittingPanel games={games} attempts={radarAttempts} />
+        <section className="rounded-lg border border-subtle bg-surface p-4">
+          <SectionHeading>{t.panel.medicionComoLeerTitulo}</SectionHeading>
+          <p className="m-0 mt-2 text-secondary">{t.panel.medicionComoLeer}</p>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function PartidasDatosView({ games, onImported }: { games: GameRecord[]; onImported: () => void }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] lg:items-start">
+      <GamesSection games={games} />
+      <aside className="flex flex-col gap-4">
+        <ImportarPartidaSection onImported={onImported} />
+        <DatosSection onImported={onImported} />
+      </aside>
+    </div>
+  );
+}
+
+function GamesSection({ games }: { games: GameRecord[] }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionHeading>{t.panel.partidas}</SectionHeading>
+      {games.length === 0 ? (
+        <p className="m-0 rounded-lg border border-subtle bg-surface p-4 text-secondary">{t.panel.sinPartidas}</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {games.map((game) => {
+            const jugadas = plyCountFromPgn(game.pgn);
+            return (
+              <li key={game.id} className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface px-4 py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-mono text-sm text-secondary">{new Date(game.fecha).toLocaleDateString('es-AR')}</span>
+                  <span className="text-sm text-tertiary">{formatJugadas(Math.ceil(jugadas / 2))}</span>
+                  <span className="font-mono text-sm text-primary">{game.resultado}</span>
+                </div>
+                {game.ratingUsuario === undefined ? null : (
+                  <span className="font-mono text-xs text-tertiary">{t.panel.partidaRating.replace('{rating}', String(game.ratingUsuario))}</span>
+                )}
+                {game.analizada ? (
+                  <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
+                ) : jugadas === 0 ? (
+                  <span className="text-xs text-tertiary">{t.analisis.muyCortaParaAnalizar}</span>
+                ) : (
+                  <button onClick={() => void useAnalysisStore.getState().iniciar(game.id)} className="btn-secondary">
+                    {t.analisis.analizar}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function NextStepPanel({ games, profile, onView }: { games: GameRecord[]; profile: Profile; onView: (view: PanelView) => void }) {
+  if (!profile.diagnosticoCompletadoEn) {
+    return (
+      <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+        <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
+        <p className="m-0 text-primary">{t.panel.proximoPasoDiagnostico}</p>
+        <a href="#/hoy" className="btn-primary text-center no-underline">{t.panel.irAHoy}</a>
+      </section>
+    );
+  }
+  if (games.length === 0) {
+    return (
+      <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+        <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
+        <p className="m-0 text-primary">{t.panel.proximoPasoPartida}</p>
+        <a href="#/jugar" className="btn-primary text-center no-underline">{t.panel.irAJugar}</a>
+      </section>
+    );
+  }
+  if (!games.some((game) => game.analizada)) {
+    return (
+      <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+        <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
+        <p className="m-0 text-primary">{t.panel.proximoPasoAnalisis}</p>
+        <button onClick={() => onView('partidas-datos')} className="btn-primary">{t.panel.verPartidas}</button>
+      </section>
+    );
+  }
+  return null;
 }
 
 function N1ExperimentPanel({
@@ -173,10 +322,10 @@ function N1ExperimentPanel({
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-info/40 bg-surface p-4">
       <div>
-        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.n1.panelTitulo}</h2>
+        <SectionHeading>{t.n1.panelTitulo}</SectionHeading>
         <p className="m-0 mt-1 text-sm text-secondary">{status}</p>
       </div>
-      <button onClick={onOpen} className={latest ? 'btn-secondary' : 'btn-primary'}>
+      <button onClick={onOpen} className="btn-secondary">
         {latest ? t.n1.abrir : t.n1.configurar}
       </button>
     </section>
@@ -189,7 +338,7 @@ function OverfittingPanel({ games, attempts }: { games: GameRecord[] | null; att
   const alert = result.status === 'overfitting';
   return (
     <section className={`flex flex-col gap-2 rounded-lg border p-4 ${alert ? 'border-error/35 bg-error-subtle' : 'border-subtle bg-surface'}`}>
-      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.sobreajusteTitulo}</h2>
+      <SectionHeading>{t.panel.sobreajusteTitulo}</SectionHeading>
       {result.status === 'insufficient' ? (
         <p className="m-0 text-sm text-secondary">{t.panel.sobreajusteInsuficiente}</p>
       ) : result.status === 'overfitting' ? (
@@ -235,7 +384,7 @@ function TransferPanel({
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
       <div>
-        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.transfer.titulo}</h2>
+        <SectionHeading>{t.transfer.titulo}</SectionHeading>
         <p className="m-0 mt-1 text-primary">{t.transfer.descripcion}</p>
       </div>
       <p className="m-0 text-sm text-secondary">{t.transfer.metodologia}</p>
@@ -293,7 +442,7 @@ function CalibrationPanel({ records }: { records: CalibrationRecord[] | null }) 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
       <div>
-        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.calibracionTitulo}</h2>
+        <SectionHeading>{t.panel.calibracionTitulo}</SectionHeading>
         <p className="m-0 mt-1 text-sm text-secondary">{t.panel.calibracionAyuda}</p>
       </div>
       {curve.length === 0 ? (
@@ -350,7 +499,7 @@ function ActivityPanel({ records }: { records: SessionRecord[] | null }) {
   return (
     <section className="flex flex-col gap-2 rounded-md border border-subtle bg-surface p-3">
       <div>
-        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.actividadTitulo}</h2>
+        <SectionHeading>{t.panel.actividadTitulo}</SectionHeading>
         <p className="m-0 mt-1 text-xs text-secondary">{t.panel.actividadPeriodo}</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -370,7 +519,7 @@ function TruthCelebrationPanel({ games }: { games: GameRecord[] | null }) {
   if (!improvement) return null;
   return (
     <section className="flex flex-col gap-1 rounded-lg border border-success/35 bg-success-subtle p-4">
-      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.mejoraRealTitulo}</h2>
+      <SectionHeading>{t.panel.mejoraRealTitulo}</SectionHeading>
       <p className="m-0 text-primary">
         {t.panel.mejoraRealErrores.replace('{porcentaje}', String(Math.round(improvement.porcentaje)))}
       </p>
@@ -415,25 +564,32 @@ function PanelDeVerdad({
     .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
-      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.verdadTitulo}</h2>
-      <div className="flex flex-col gap-1">
-        <span className="text-sm text-secondary">{latestRatedGame ? t.panel.verdadRating : t.panel.verdadBanda}</span>
-        <span className="font-mono text-lg text-primary">
-          {latestRatedGame?.ratingUsuario ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico)}
-        </span>
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-sm text-secondary">{t.panel.verdadErroresGraves}</span>
-        <span className="font-mono text-lg text-primary">
-          {mediaErroresGraves === null ? t.panel.verdadSinPartidas : mediaErroresGraves.toFixed(1)}
-        </span>
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-sm text-secondary">{t.panel.verdadCalibracion}</span>
-        <span className="font-mono text-lg text-primary">{brier === null ? t.panel.verdadSinCalibracion : brier.toFixed(2)}</span>
+    <section className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading>{t.panel.verdadTitulo}</SectionHeading>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <TruthMetric
+          label={latestRatedGame ? t.panel.verdadRating : t.panel.verdadBanda}
+          value={String(latestRatedGame?.ratingUsuario ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico))}
+        />
+        <TruthMetric
+          label={t.panel.verdadErroresGraves}
+          value={mediaErroresGraves === null ? t.panel.verdadSinPartidas : mediaErroresGraves.toFixed(1)}
+        />
+        <TruthMetric
+          label={t.panel.verdadCalibracion}
+          value={brier === null ? t.panel.verdadSinCalibracion : brier.toFixed(2)}
+        />
       </div>
     </section>
+  );
+}
+
+function TruthMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-h-24 flex-col justify-between gap-2 rounded-md bg-elevated p-3 sm:min-h-28">
+      <span className="text-sm text-secondary">{label}</span>
+      <strong className="font-display text-2xl font-medium leading-tight text-primary">{value}</strong>
+    </div>
   );
 }
 
@@ -441,8 +597,8 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
   if (attempts === null) return null;
   if (attempts.length === 0) {
     return (
-      <section>
-        <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.radar}</h2>
+      <section className="rounded-lg border border-subtle bg-surface p-4">
+        <SectionHeading className="mb-2">{t.panel.radar}</SectionHeading>
         <p className="m-0 text-secondary">{t.panel.radarSinRespuestas}</p>
       </section>
     );
@@ -458,8 +614,8 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
     ? Math.round((ownErrors.filter((attempt) => attempt.acierto).length / ownErrors.length) * 100)
     : null;
   return (
-    <section>
-      <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.radar}</h2>
+    <section className="rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading className="mb-2">{t.panel.radar}</SectionHeading>
       {porcentaje === null ? (
         <p className="m-0 text-secondary">{t.panel.radarSinCatalogo}</p>
       ) : (
@@ -489,8 +645,8 @@ function DobleSolucionSummary({ attempts }: { attempts: DobleSolucionAttempt[] |
   if (attempts === null) return null;
   const tasa = tasaConformismo(attempts.map((a) => a.resultado));
   return (
-    <section>
-      <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.dobleSolucion}</h2>
+    <section className="rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading className="mb-2">{t.panel.dobleSolucion}</SectionHeading>
       {tasa === null ? (
         <p className="m-0 text-secondary">{t.panel.dobleSolucionSinDatos}</p>
       ) : (
@@ -559,8 +715,8 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="m-0 mb-1 text-sm tracking-wider text-tertiary uppercase">{t.panel.importarPgnTitulo}</h2>
+    <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading className="mb-1">{t.panel.importarPgnTitulo}</SectionHeading>
       <p className="m-0 text-sm text-secondary">{t.panel.importarPgnConsigna}</p>
       <textarea
         value={pgn}
@@ -667,8 +823,8 @@ function DatosSection({ onImported }: { onImported: () => void }) {
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="m-0 mb-1 text-sm tracking-wider text-tertiary uppercase">{t.panel.datos}</h2>
+    <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading className="mb-1">{t.panel.datos}</SectionHeading>
       <button onClick={() => void handleExport()} disabled={exportando} className="btn-secondary">
         {exportando ? t.panel.exportando : t.panel.exportar}
       </button>

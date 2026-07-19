@@ -49,7 +49,7 @@ test('finales: promocionar contra Stockfish registra una demostración limpia', 
   );
 
   await page.locator('nav:visible button', { hasText: 'Jugar' }).first().click();
-  await page.getByRole('button', { name: 'Finales teóricos' }).click();
+  await page.getByRole('radio', { name: 'Finales teóricos' }).click();
   await page.getByText('Final de promoción').waitFor();
   await page.getByRole('button', { name: 'Jugar este final' }).click();
 

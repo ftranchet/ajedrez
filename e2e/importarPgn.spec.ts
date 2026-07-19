@@ -10,6 +10,7 @@ test('importar PGN: un texto inválido avisa y un PGN válido aparece en el Pane
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+  await page.getByRole('radio', { name: 'Partidas y datos' }).click();
   await page.getByText('Importar PGN').waitFor();
 
   // Texto inválido: no debe crear ninguna partida ni romper la pantalla.

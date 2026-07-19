@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { Chip } from '../components/Chip';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { SectionHeading } from '../components/SectionHeading';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import { useFinalesStore } from '../state/finalesStore';
@@ -154,51 +156,76 @@ function Setup({ onFinales }: { onFinales: () => void }) {
   const [color, setColor] = useState<Color | 'random'>('w');
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <div className="grid grid-cols-2 gap-2">
-        <Chip selected onClick={() => {}}>{t.finales.modoPartida}</Chip>
-        <Chip selected={false} onClick={onFinales}>{t.finales.modoFinales}</Chip>
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+      <SegmentedControl
+        label={t.finales.modosLabel}
+        value="partida"
+        options={[
+          { value: 'partida', label: t.finales.modoPartida },
+          { value: 'finales', label: t.finales.modoFinales },
+        ]}
+        onChange={(value) => { if (value === 'finales') onFinales(); }}
+        className="lg:max-w-md"
+      />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <section className="flex flex-col gap-4">
+          <header>
+            <h1 className="m-0 font-display text-3xl font-medium">{t.jugar.titulo}</h1>
+            <p className="mt-1 mb-0 text-secondary">{t.jugar.subtitulo}</p>
+          </header>
+
+          <fieldset className="m-0 border-0 p-0">
+            <legend className="mb-2 p-0 text-sm text-secondary">{t.jugar.nivel}</legend>
+            <div className="flex flex-col gap-2">
+              {ENGINE_LEVELS.map((l) => (
+                <Chip key={l.id} selected={levelId === l.id} onClick={() => setLevelId(l.id)}>
+                  {t.jugar.niveles[l.id] ?? l.id}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="m-0 border-0 p-0">
+            <legend className="mb-2 p-0 text-sm text-secondary">{t.jugar.color}</legend>
+            <div className="flex gap-2">
+              <Chip selected={color === 'w'} onClick={() => setColor('w')}>{t.jugar.blancas}</Chip>
+              <Chip selected={color === 'b'} onClick={() => setColor('b')}>{t.jugar.negras}</Chip>
+              <Chip selected={color === 'random'} onClick={() => setColor('random')}>{t.jugar.aleatorio}</Chip>
+            </div>
+          </fieldset>
+
+          {s.engineError && (
+            <p className="m-0 rounded-md border border-error/35 bg-error-subtle p-3 text-sm text-primary">
+              {t.jugar.errorMotor}
+            </p>
+          )}
+
+          <button
+            onClick={() => void s.start(levelId, color)}
+            disabled={s.phase === 'loading'}
+            className="btn-primary"
+          >
+            {s.phase === 'loading' ? t.jugar.cargandoMotor : t.jugar.empezar}
+          </button>
+        </section>
+
+        <aside className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
+          <SectionHeading>{t.jugar.configuracionTitulo}</SectionHeading>
+          <dl className="m-0 flex flex-col gap-3">
+            <div>
+              <dt className="text-sm text-secondary">{t.jugar.nivel}</dt>
+              <dd className="m-0 mt-1 text-primary">{t.jugar.niveles[levelId] ?? levelId}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-secondary">{t.jugar.color}</dt>
+              <dd className="m-0 mt-1 text-primary">
+                {color === 'w' ? t.jugar.blancas : color === 'b' ? t.jugar.negras : t.jugar.aleatorio}
+              </dd>
+            </div>
+          </dl>
+          <p className="m-0 text-sm text-secondary">{t.jugar.notaMotor}</p>
+        </aside>
       </div>
-      <header>
-        <h1 className="m-0 font-display text-3xl font-medium">{t.jugar.titulo}</h1>
-        <p className="mt-1 mb-0 text-secondary">{t.jugar.subtitulo}</p>
-      </header>
-
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="mb-2 p-0 text-sm text-secondary">{t.jugar.nivel}</legend>
-        <div className="flex flex-col gap-2">
-          {ENGINE_LEVELS.map((l) => (
-            <Chip key={l.id} selected={levelId === l.id} onClick={() => setLevelId(l.id)}>
-              {t.jugar.niveles[l.id] ?? l.id}
-            </Chip>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="mb-2 p-0 text-sm text-secondary">{t.jugar.color}</legend>
-        <div className="flex gap-2">
-          <Chip selected={color === 'w'} onClick={() => setColor('w')}>{t.jugar.blancas}</Chip>
-          <Chip selected={color === 'b'} onClick={() => setColor('b')}>{t.jugar.negras}</Chip>
-          <Chip selected={color === 'random'} onClick={() => setColor('random')}>{t.jugar.aleatorio}</Chip>
-        </div>
-      </fieldset>
-
-      {s.engineError && (
-        <p className="m-0 rounded-md border border-error/35 bg-error-subtle p-3 text-sm text-primary">
-          {t.jugar.errorMotor}
-        </p>
-      )}
-
-      <button
-        onClick={() => void s.start(levelId, color)}
-        disabled={s.phase === 'loading'}
-        className="btn-primary"
-      >
-        {s.phase === 'loading' ? t.jugar.cargandoMotor : t.jugar.empezar}
-      </button>
-
-      <p className="m-0 text-sm text-tertiary">{t.jugar.notaMotor}</p>
     </div>
   );
 }
@@ -214,11 +241,17 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
 
   if (s.phase === 'lista' || s.phase === 'cargando') {
     return (
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <div className="grid grid-cols-2 gap-2">
-          <Chip selected={false} onClick={onPartida}>{t.finales.modoPartida}</Chip>
-          <Chip selected onClick={() => {}}>{t.finales.modoFinales}</Chip>
-        </div>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <SegmentedControl
+          label={t.finales.modosLabel}
+          value="finales"
+          options={[
+            { value: 'partida', label: t.finales.modoPartida },
+            { value: 'finales', label: t.finales.modoFinales },
+          ]}
+          onChange={(value) => { if (value === 'partida') onPartida(); }}
+          className="lg:max-w-md"
+        />
         <header>
           <h1 className="m-0 font-display text-3xl font-medium">{t.finales.titulo}</h1>
           <p className="mt-1 mb-0 text-secondary">{t.finales.subtitulo}</p>
