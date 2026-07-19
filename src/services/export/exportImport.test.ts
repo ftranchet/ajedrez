@@ -23,6 +23,7 @@ beforeEach(async () => {
   await db.stoykoAttempts.clear();
   await db.triageAttempts.clear();
   await db.sessions.clear();
+  await db.transferMeasurements.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -100,6 +101,13 @@ describe('exportAllData / importAllData', () => {
       duracionMs: 900_000,
       bloques: [{ tipo: 'radar', planificados: 8, completados: 8, estado: 'completado' }],
     });
+    await db.transferMeasurements.put({
+      id: 'transfer-1',
+      datasetVersion: 'transfer-v1',
+      startedAt: '2026-07-19T11:00:00.000Z',
+      completedAt: null,
+      responses: [{ itemId: 'transfer-01', move: 'e2e4', correct: true, tiempoMs: 5000, fecha: '2026-07-19T11:00:05.000Z' }],
+    });
 
     const zip = await exportAllData();
     expect(zip.byteLength).toBeGreaterThan(0);
@@ -118,6 +126,7 @@ describe('exportAllData / importAllData', () => {
     await db.stoykoAttempts.clear();
     await db.triageAttempts.clear();
     await db.sessions.clear();
+    await db.transferMeasurements.clear();
     expect(await db.games.count()).toBe(0);
 
     const outcome = await importAllData(zip);
@@ -142,6 +151,7 @@ describe('exportAllData / importAllData', () => {
     expect((await db.stoykoAttempts.get('st-1'))?.tiempoMs).toBe(12000);
     expect((await db.triageAttempts.get('tr-1'))?.correcta).toBe(true);
     expect((await db.sessions.get('ses-1'))?.duracionMs).toBe(900_000);
+    expect((await db.transferMeasurements.get('transfer-1'))?.responses).toHaveLength(1);
   });
 
   it('rechaza un archivo que no es un zip de ELOmax', async () => {

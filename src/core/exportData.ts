@@ -15,6 +15,7 @@ import type {
   SessionRecord,
   StoykoAttempt,
   TriageAttempt,
+  TransferMeasurement,
 } from './types';
 import { SCHEMA_VERSION } from '../services/storage/db';
 import { DEFAULT_PROFILE } from './prescriptor';
@@ -40,6 +41,7 @@ export interface ExportBundle {
   stoykoAttempts: StoykoAttempt[];
   triageAttempts: TriageAttempt[];
   sessions: SessionRecord[];
+  transferMeasurements: TransferMeasurement[];
 }
 
 export interface ExportSourceData {
@@ -56,6 +58,7 @@ export interface ExportSourceData {
   stoykoAttempts: StoykoAttempt[];
   triageAttempts: TriageAttempt[];
   sessions: SessionRecord[];
+  transferMeasurements: TransferMeasurement[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -75,6 +78,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     stoykoAttempts: data.stoykoAttempts,
     triageAttempts: data.triageAttempts,
     sessions: data.sessions,
+    transferMeasurements: data.transferMeasurements,
   };
 }
 
@@ -155,6 +159,26 @@ function esSessionRecordValido(x: unknown): boolean {
   );
 }
 
+function esTransferMeasurementValida(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  return (
+    typeof x.id === 'string' &&
+    typeof x.datasetVersion === 'string' &&
+    typeof x.startedAt === 'string' &&
+    (x.completedAt === null || typeof x.completedAt === 'string') &&
+    Array.isArray(x.responses) &&
+    x.responses.every(
+      (response) =>
+        isObj(response) &&
+        typeof response.itemId === 'string' &&
+        typeof response.move === 'string' &&
+        typeof response.correct === 'boolean' &&
+        typeof response.tiempoMs === 'number' &&
+        typeof response.fecha === 'string',
+    )
+  );
+}
+
 /**
  * Valida la forma de un paquete importado antes de tocar la base de datos
  * (RF-14.2). No migra todavía versiones de esquema anteriores a la actual:
@@ -215,6 +239,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.sessions !== undefined && !Array.isArray(obj.sessions)) {
     return { ok: false, error: 'El historial de sesiones no tiene la forma esperada.' };
   }
+  if (obj.transferMeasurements !== undefined && !Array.isArray(obj.transferMeasurements)) {
+    return { ok: false, error: 'Las baterías de transferencia no tienen la forma esperada.' };
+  }
   // Validación por-registro de las entidades críticas (RF-14.2): como la
   // restauración reemplaza el estado local entero, un solo registro corrupto
   // rechaza el paquete en vez de escribirse sobre datos buenos.
@@ -229,6 +256,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   if (!((obj.sessions ?? []) as unknown[]).every(esSessionRecordValido)) {
     return { ok: false, error: 'Alguna sesión del respaldo está corrupta o incompleta.' };
+  }
+  if (!((obj.transferMeasurements ?? []) as unknown[]).every(esTransferMeasurementValida)) {
+    return { ok: false, error: 'Alguna batería de transferencia del respaldo está corrupta o incompleta.' };
   }
   return {
     ok: true,
@@ -247,6 +277,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       stoykoAttempts: (obj.stoykoAttempts ?? []) as StoykoAttempt[],
       triageAttempts: (obj.triageAttempts ?? []) as TriageAttempt[],
       sessions: (obj.sessions ?? []) as SessionRecord[],
+      transferMeasurements: (obj.transferMeasurements ?? []) as TransferMeasurement[],
     },
   };
 }

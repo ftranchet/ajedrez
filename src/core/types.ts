@@ -450,3 +450,37 @@ export interface TriageAttempt {
   tiempoMs: number;
   fecha: string; // ISO 8601
 }
+
+/**
+ * Posición del instrumento de transferencia (RF-12.2). Es contenido de
+ * evaluación, no de entrenamiento: ningún flujo puede revelar la solución,
+ * crear una tarjeta con ella ni incorporarla al Radar/currículo.
+ */
+export interface TransferItem {
+  id: string;
+  fen: string;
+  acceptedMoves: string[];
+  source: 'pipeline-transfer';
+  verificationDepth: number;
+}
+
+/** Una respuesta de una toma, registrada sin feedback por posición. */
+export interface TransferResponse {
+  itemId: string;
+  move: string;
+  correct: boolean;
+  tiempoMs: number;
+  fecha: string; // ISO 8601
+}
+
+/**
+ * Una toma completa (o reanudable) de la batería fija de 30 posiciones.
+ * `datasetVersion` hace comparables únicamente tomas del mismo instrumento.
+ */
+export interface TransferMeasurement {
+  id: string;
+  datasetVersion: string;
+  startedAt: string; // ISO 8601
+  completedAt: string | null; // ISO 8601; null mientras está en curso
+  responses: TransferResponse[];
+}

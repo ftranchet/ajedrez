@@ -22,11 +22,12 @@ import type {
   StoykoDatasetMeta,
   StoykoItem,
   TriageAttempt,
+  TransferMeasurement,
 } from '../../core/types';
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -48,6 +49,7 @@ export class ElomaxDB extends Dexie {
   stoykoAttempts!: Table<StoykoAttempt, string>;
   triageAttempts!: Table<TriageAttempt, string>;
   sessions!: Table<SessionRecord, string>;
+  transferMeasurements!: Table<TransferMeasurement, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -272,6 +274,32 @@ export class ElomaxDB extends Dexie {
             if (progress.dificultadCentro === undefined) progress.dificultadCentro = 50;
           });
       });
+
+    // v13 — batería de transferencia (RF-12.2). Solo se persisten las tomas
+    // personales; el instrumento fijo vive embebido y separado de los
+    // catálogos de entrenamiento. Migración puramente aditiva.
+    this.version(13).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
+      stoykoAttempts: 'id, itemId, fecha',
+      triageAttempts: 'id, itemId, fecha',
+      sessions: 'id, fechaInicio, estado',
+      transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+    });
   }
 }
 

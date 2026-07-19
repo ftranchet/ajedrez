@@ -17,6 +17,7 @@ const empty = {
   stoykoAttempts: [],
   triageAttempts: [],
   sessions: [],
+  transferMeasurements: [],
 };
 
 describe('buildExportBundle', () => {
@@ -85,6 +86,7 @@ describe('validateImportBundle', () => {
     const bundle = buildExportBundle({
       ...empty,
       sessions: [{ id: 's1', fechaInicio: '2026-07-19T10:00:00.000Z', estado: 'completada', bloques: [] }],
+      transferMeasurements: [],
     });
     const raw = JSON.parse(JSON.stringify(bundle));
     raw.sessions[0].bloques = 'no-es-array';

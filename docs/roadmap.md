@@ -44,7 +44,8 @@ Documento vivo. Sin fechas: cada fase tiene entregables y un **criterio de salid
 **Criterio de salida:** 🟡 mayormente cumplido — el Prescriptor incorpora los módulos nuevos a la dieta según fugas (triage de reloj), el subtipo doble solución registra la tasa de conformismo (visible en el Panel), y E7 (RF-7.1/7.2/7.3) queda con su flujo completo y su historial persistido. Todo verificado end-to-end con Playwright. Pendientes acotados detectados en la auditoría 2026-07: el informe mensual de fugas de tiempo en el Panel (RF-9.3) —los datos ya se guardan, falta la vista—. Fuera del criterio, pendiente por bloqueo de red: conversión de ventajas (E8, P1).
 
 ## Fase 5 — Medición completa
-**Entregables:** batería de transferencia (RF-12.2) ⬜️; detector de sobreajuste (RF-12.3) ⬜️; panel de calibración con curva y lectura en lenguaje claro (RF-10.3) ✅; modo experimento n=1 (RF-12.4) ⬜️; adherencia honesta (E13) ⬜️.
+**Estado:** 🟡 En progreso.
+**Entregables:** batería de transferencia (RF-12.2) ✅ — instrumento fijo y versionado de 30 posiciones exclusivas, verificadas por Stockfish y aisladas por prueba de todos los catálogos de entrenamiento; primera toma inmediata, siguientes cada 49 días, reanudación persistente, comparación en el Panel y exportación/restauración completa; no revela soluciones ni crea tarjetas (ADR-0009). Detector de sobreajuste (RF-12.3) ⬜️; panel de calibración con curva y lectura en lenguaje claro (RF-10.3) ✅; modo experimento n=1 (RF-12.4) ⬜️; adherencia honesta (E13) ⬜️.
 **Criterio de salida:** la app puede responder, con datos propios del usuario, "¿está funcionando este entrenamiento?".
 
 ## Fase 6+ — Extensiones (cada una con su ADR previo)

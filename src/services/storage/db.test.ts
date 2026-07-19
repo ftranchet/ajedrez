@@ -632,4 +632,34 @@ describe('migración de esquema Dexie', () => {
     expect(await current.sessions.count()).toBe(1);
     current.close();
   });
+
+  it('migra de v12 a v13 sin perder sesiones y crea las mediciones de transferencia', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v12 = new Dexie(name);
+    v12.version(12).stores({
+      sessions: 'id, fechaInicio, estado',
+      radarProgress: 'id, updatedAt',
+    });
+    await v12.open();
+    await v12.table('sessions').add({
+      id: 's12',
+      fechaInicio: '2026-07-19T10:00:00.000Z',
+      estado: 'completada',
+      bloques: [],
+    });
+    v12.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.sessions.get('s12')).toMatchObject({ id: 's12', estado: 'completada' });
+    expect(await current.transferMeasurements.count()).toBe(0);
+    await current.transferMeasurements.add({
+      id: 'm1',
+      datasetVersion: 'transfer-v1',
+      startedAt: '2026-07-19T11:00:00.000Z',
+      completedAt: null,
+      responses: [],
+    });
+    expect(await current.transferMeasurements.count()).toBe(1);
+    current.close();
+  });
 });

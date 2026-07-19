@@ -4,13 +4,14 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord } from '../../core/types';
+import type { CalibrationRecord, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
 import { brierScore, calibrationCurve, calibrationInsight } from '../../core/calibration';
 import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
+import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -18,9 +19,12 @@ import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
+import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
+import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { AnalizarScreen } from './AnalizarScreen';
+import { TransferScreen } from './TransferScreen';
 import { t } from '../i18n/es';
 
 function formatJugadas(n: number): string {
@@ -35,6 +39,8 @@ export function PanelScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dobleSolucionAttempts, setDobleSolucionAttempts] = useState<DobleSolucionAttempt[] | null>(null);
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
+  const [transferMeasurements, setTransferMeasurements] = useState<TransferMeasurement[] | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
@@ -57,18 +63,26 @@ export function PanelScreen() {
     void sessionRepo.list().then((records) => {
       if (alive) setSessions(records);
     });
+    void transferMeasurementRepo.list().then((records) => {
+      if (alive) setTransferMeasurements(records);
+    });
     return () => {
       alive = false;
     };
   }, [analysisPhase, importVersion]); // recarga la lista al volver de un análisis (E3) o importar un PGN (RF-2.2)
 
   if (analysisPhase !== 'inactivo') return <AnalizarScreen />;
+  if (transferOpen) {
+    return <TransferScreen onClose={() => { setTransferOpen(false); setImportVersion((version) => version + 1); }} />;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <h1 className="m-0 font-display text-3xl font-medium">{t.panel.titulo}</h1>
 
       <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
+
+      <TransferPanel measurements={transferMeasurements} onOpen={() => setTransferOpen(true)} />
 
       <CalibrationPanel records={calibraciones} />
 
@@ -115,6 +129,60 @@ export function PanelScreen() {
 
       <DatosSection onImported={() => setImportVersion((v) => v + 1)} />
     </div>
+  );
+}
+
+function TransferPanel({
+  measurements,
+  onOpen,
+}: {
+  measurements: TransferMeasurement[] | null;
+  onOpen: () => void;
+}) {
+  if (measurements === null) return null;
+  const availability = transferAvailability(measurements, new Date(), TRANSFER_DATASET_VERSION);
+  const results = transferResults(measurements, TRANSFER_DATASET_VERSION);
+  const latest = results.at(-1);
+  const delta = transferDelta(measurements, TRANSFER_DATASET_VERSION);
+  const canOpen = availability.status !== 'scheduled';
+  const status =
+    availability.status === 'available'
+      ? t.transfer.disponible
+      : availability.status === 'in-progress'
+        ? t.transfer.reanudar.replace('{hechas}', String(availability.measurement.responses.length))
+        : t.transfer.programada.replace('{fecha}', new Date(availability.nextAt).toLocaleDateString('es-AR'));
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+      <div>
+        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.transfer.titulo}</h2>
+        <p className="m-0 mt-1 text-primary">{t.transfer.descripcion}</p>
+      </div>
+      <p className="m-0 text-sm text-secondary">{t.transfer.metodologia}</p>
+      <p className="m-0 font-mono text-sm text-primary">{status}</p>
+      {latest && (
+        <div className="text-sm">
+          <p className="m-0 text-secondary">
+            {t.transfer.ultimoResultado
+              .replace('{porcentaje}', String(latest.percentage))
+              .replace('{aciertos}', String(latest.correct))
+              .replace('{total}', String(latest.total))}
+          </p>
+          {delta !== null && (
+            <p className="m-0 mt-1 text-secondary">
+              {t.transfer.cambio
+                .replace('{signo}', delta > 0 ? '+' : '')
+                .replace('{puntos}', String(delta))}
+            </p>
+          )}
+        </div>
+      )}
+      {canOpen && (
+        <button onClick={onOpen} className="btn-primary">
+          {availability.status === 'in-progress' ? t.transfer.continuar : t.transfer.iniciar}
+        </button>
+      )}
+    </section>
   );
 }
 

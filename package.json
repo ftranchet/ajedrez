@@ -12,6 +12,7 @@
     "postinstall": "node scripts/copy-engine.mjs",
     "build:radar-dataset": "node scripts/build-radar-dataset.mjs",
     "verify:finales": "node scripts/verify-curriculum-finales.mjs",
+    "build:transfer-battery": "node scripts/mine-transfer-battery.mjs --target 30",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

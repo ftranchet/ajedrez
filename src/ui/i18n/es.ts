@@ -322,6 +322,28 @@ export const es = {
     importadoOk: 'Restaurado: {partidas} partidas, {tarjetas} tarjetas, {calibraciones} registros de calibración y {radar} respuestas del Radar',
     importadoError: 'No se pudo restaurar',
   },
+  transfer: {
+    titulo: 'Batería de transferencia',
+    instrumento: 'Medición separada del entrenamiento',
+    descripcion: '30 posiciones reservadas para comprobar si lo aprendido se transfiere a contenido nuevo.',
+    metodologia: 'No muestra soluciones ni crea repasos. Se repite cada 7 semanas para que las tomas sean comparables.',
+    disponible: 'La primera toma está disponible.',
+    reanudar: 'Tenés una toma en curso: {hechas} de 30 posiciones.',
+    programada: 'Próxima toma: {fecha}.',
+    iniciar: 'Empezar medición',
+    continuar: 'Continuar medición',
+    ultimoResultado: 'Última toma: {porcentaje}% ({aciertos}/{total}).',
+    cambio: 'Cambio frente a la toma anterior: {signo}{puntos} puntos porcentuales.',
+    progreso: 'Posición {actual} de {total}',
+    consigna: 'Jugá la mejor jugada que encuentres. No hay reloj visible y podés pausar cuando quieras.',
+    sinFeedback: 'No vas a ver si acertaste durante la toma: así la batería sigue siendo un instrumento, no otro entrenamiento.',
+    pausar: 'Pausar y volver al Panel',
+    completada: 'Toma completada',
+    resultado: '{aciertos} aciertos sobre {total} posiciones.',
+    resultadoAyuda: 'El valor importa al compararlo con la próxima toma, no como puntaje aislado.',
+    volverPanel: 'Volver al Panel',
+    volver: 'Volver',
+  },
 } as const;
 
 export const t = es;
