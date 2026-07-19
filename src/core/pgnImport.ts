@@ -7,10 +7,36 @@ import type { Resultado } from './types';
 
 export type PgnParseError = 'vacio' | 'invalido' | 'sin-jugadas';
 
-export type PgnParseResult = { ok: true; pgn: string; resultado: Resultado; plyCount: number } | { ok: false; error: PgnParseError };
+export type PgnParseResult = {
+  ok: true;
+  pgn: string;
+  resultado: Resultado;
+  plyCount: number;
+  whiteElo?: number;
+  blackElo?: number;
+  playedAt?: string;
+} | { ok: false; error: PgnParseError };
 
 function normalizeResultado(raw: string | undefined): Resultado {
   return raw === '1-0' || raw === '0-1' || raw === '1/2-1/2' ? raw : '*';
+}
+
+function parseElo(raw: string | undefined): number | undefined {
+  if (!raw || !/^\d{3,4}$/.test(raw)) return undefined;
+  const value = Number(raw);
+  return value >= 100 && value <= 4000 ? value : undefined;
+}
+
+/** Fecha PGN `YYYY.MM.DD`; los signos `?` indican que no es utilizable. */
+function parsePlayedAt(raw: string | undefined): string | undefined {
+  const match = raw?.match(/^(\d{4})\.(\d{2})\.(\d{2})$/);
+  if (!match) return undefined;
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T12:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  // Evita que Date normalice silenciosamente fechas imposibles como 31/02.
+  if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return undefined;
+  return date.toISOString();
 }
 
 export function parsePastedPgn(raw: string): PgnParseResult {
@@ -27,5 +53,17 @@ export function parsePastedPgn(raw: string): PgnParseResult {
   const plyCount = chess.history().length;
   if (plyCount === 0) return { ok: false, error: 'sin-jugadas' };
 
-  return { ok: true, pgn, resultado: normalizeResultado(chess.getHeaders().Result), plyCount };
+  const headers = chess.getHeaders();
+  const whiteElo = parseElo(headers.WhiteElo);
+  const blackElo = parseElo(headers.BlackElo);
+  const playedAt = parsePlayedAt(headers.Date);
+  return {
+    ok: true,
+    pgn,
+    resultado: normalizeResultado(headers.Result),
+    plyCount,
+    ...(whiteElo !== undefined ? { whiteElo } : {}),
+    ...(blackElo !== undefined ? { blackElo } : {}),
+    ...(playedAt !== undefined ? { playedAt } : {}),
+  };
 }

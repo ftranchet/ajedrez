@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
+import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
@@ -12,6 +12,7 @@ import { brierScore, calibrationCurve, calibrationInsight } from '../../core/cal
 import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
 import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
+import { detectOverfitting } from '../../core/overfitting';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -84,6 +85,8 @@ export function PanelScreen() {
 
       <TransferPanel measurements={transferMeasurements} onOpen={() => setTransferOpen(true)} />
 
+      <OverfittingPanel games={games} attempts={radarAttempts} />
+
       <CalibrationPanel records={calibraciones} />
 
       <ActivityPanel records={sessions} />
@@ -105,6 +108,9 @@ export function PanelScreen() {
                     <span className="text-sm text-tertiary">{formatJugadas(Math.ceil(jugadas / 2))}</span>
                     <span className="font-mono text-sm text-primary">{g.resultado}</span>
                   </div>
+                  {g.ratingUsuario === undefined ? null : (
+                    <span className="font-mono text-xs text-tertiary">{t.panel.partidaRating.replace('{rating}', String(g.ratingUsuario))}</span>
+                  )}
                   {g.analizada ? (
                     <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
                   ) : jugadas === 0 ? (
@@ -129,6 +135,35 @@ export function PanelScreen() {
 
       <DatosSection onImported={() => setImportVersion((v) => v + 1)} />
     </div>
+  );
+}
+
+function OverfittingPanel({ games, attempts }: { games: GameRecord[] | null; attempts: RadarAttempt[] | null }) {
+  if (games === null || attempts === null) return null;
+  const result = detectOverfitting(attempts, games);
+  const alert = result.status === 'overfitting';
+  return (
+    <section className={`flex flex-col gap-2 rounded-lg border p-4 ${alert ? 'border-error/35 bg-error-subtle' : 'border-subtle bg-surface'}`}>
+      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.sobreajusteTitulo}</h2>
+      {result.status === 'insufficient' ? (
+        <p className="m-0 text-sm text-secondary">{t.panel.sobreajusteInsuficiente}</p>
+      ) : result.status === 'overfitting' ? (
+        <>
+          <p className="m-0 text-primary">
+            {t.panel.sobreajusteAlerta
+              .replace('{interno}', String(Math.round(result.internalDelta)))
+              .replace('{rating}', String(Math.round(result.gameRatingDelta)))}
+          </p>
+          <p className="m-0 text-sm text-secondary">{t.panel.sobreajusteSugerencia}</p>
+        </>
+      ) : (
+        <p className="m-0 text-sm text-secondary">
+          {t.panel.sobreajusteSinSenal
+            .replace('{interno}', String(Math.round(result.internalDelta)))
+            .replace('{rating}', String(Math.round(result.gameRatingDelta)))}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -308,14 +343,17 @@ function PanelDeVerdad({
 
   const mediaErroresGraves = erroresGravesPorPartidaMediaMovil(games);
   const brier = brierScore(calibraciones);
+  const latestRatedGame = games
+    .filter((game) => (game.ritmo === 'rapida' || game.ritmo === 'clasica') && game.ratingUsuario !== undefined)
+    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
 
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
       <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.verdadTitulo}</h2>
       <div className="flex flex-col gap-1">
-        <span className="text-sm text-secondary">{t.panel.verdadBanda}</span>
+        <span className="text-sm text-secondary">{latestRatedGame ? t.panel.verdadRating : t.panel.verdadBanda}</span>
         <span className="font-mono text-lg text-primary">
-          {profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico}
+          {latestRatedGame?.ratingUsuario ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico)}
         </span>
       </div>
       <div className="flex flex-col gap-1">
@@ -406,8 +444,14 @@ function errorMensaje(error: PgnParseError): string {
 function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
   const [pgn, setPgn] = useState('');
   const [ritmo, setRitmo] = useState<Ritmo>('rapida');
+  const [jugadorColor, setJugadorColor] = useState<Color | null>(null);
+  const [rating, setRating] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const parsedManualRating = Number(rating);
+  const manualRatingValid = rating.trim() === '' || (
+    Number.isInteger(parsedManualRating) && parsedManualRating >= 100 && parsedManualRating <= 4000
+  );
 
   async function handleImportar() {
     const resultado = parsePastedPgn(pgn);
@@ -415,17 +459,31 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
       setMensaje(errorMensaje(resultado.error));
       return;
     }
+    if (jugadorColor === null) {
+      setMensaje(t.panel.importarPgnColorRequerido);
+      return;
+    }
     setGuardando(true);
     try {
+      const ratingUsuario = rating.trim() !== ''
+        ? parsedManualRating
+        : jugadorColor === 'w'
+          ? resultado.whiteElo
+          : resultado.blackElo;
       const game = buildGameRecord({
         pgn: resultado.pgn,
         resultado: resultado.resultado,
         tiemposPorJugadaMs: [],
         fuente: 'manual',
         ritmo,
+        jugadorColor,
+        ...(ratingUsuario !== undefined ? { ratingUsuario } : {}),
+        ...(resultado.playedAt ? { fecha: resultado.playedAt } : {}),
       });
       await gameRepo.save(game);
       setPgn('');
+      setJugadorColor(null);
+      setRating('');
       setMensaje(t.panel.importarPgnOk);
       onImported();
     } finally {
@@ -454,7 +512,35 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
           ))}
         </div>
       </fieldset>
-      <button onClick={() => void handleImportar()} disabled={guardando || pgn.trim() === ''} className="btn-secondary">
+      <fieldset className="m-0 border-0 p-0">
+        <legend className="mb-2 p-0 text-sm text-secondary">{t.panel.importarPgnColor}</legend>
+        <div className="flex gap-2">
+          <Chip selected={jugadorColor === 'w'} onClick={() => setJugadorColor('w')}>{t.panel.blancas}</Chip>
+          <Chip selected={jugadorColor === 'b'} onClick={() => setJugadorColor('b')}>{t.panel.negras}</Chip>
+        </div>
+      </fieldset>
+      <label className="flex flex-col gap-1 text-sm text-secondary">
+        {t.panel.importarPgnRating}
+        <input
+          type="number"
+          min="100"
+          max="4000"
+          value={rating}
+          onChange={(event) => setRating(event.target.value)}
+          placeholder={t.panel.importarPgnRatingPlaceholder}
+          className="rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-primary placeholder:text-tertiary focus-visible:border-accent"
+        />
+      </label>
+      <p className="m-0 text-xs text-tertiary">{t.panel.importarPgnRatingAyuda}</p>
+      <button
+        onClick={() => void handleImportar()}
+        disabled={
+          guardando ||
+          pgn.trim() === '' ||
+          !manualRatingValid
+        }
+        className="btn-secondary"
+      >
         {t.panel.importarPgnBoton}
       </button>
       {mensaje && <p className="m-0 text-sm text-secondary">{mensaje}</p>}

@@ -58,6 +58,19 @@ describe('buildGameRecord', () => {
     expect(g.jugadorColor).toBe('b');
   });
 
+  it('guarda el rating real del usuario cuando se aporta (RF-12.3)', () => {
+    const g = buildGameRecord({
+      pgn: '1. e4 e5 *',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      fuente: 'manual',
+      ritmo: 'clasica',
+      jugadorColor: 'w',
+      ratingUsuario: 1537,
+    });
+    expect(g.ratingUsuario).toBe(1537);
+  });
+
   it('no agrega jugadorColor cuando no se pasa (partida importada)', () => {
     const g = buildGameRecord({
       pgn: '1. e4 e5 *',

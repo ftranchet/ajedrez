@@ -30,6 +30,8 @@ export interface GameRecord {
    * perfil.
    */
   jugadorColor?: Color;
+  /** Elo del usuario al jugar esta partida, si el PGN o el usuario lo aporta. */
+  ratingUsuario?: number;
 }
 
 /**

@@ -4,7 +4,7 @@
 // rompe nada y avisa; uno válido aparece en el Panel listo para analizar.
 import { expect, test } from '@playwright/test';
 
-const PGN_VALIDO = '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6';
+const PGN_VALIDO = '[Date "2026.07.01"]\n[WhiteElo "1512"]\n[BlackElo "1498"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 a6';
 
 test('importar PGN: un texto inválido avisa y un PGN válido aparece en el Panel', async ({ page }) => {
   await page.goto('./');
@@ -21,10 +21,12 @@ test('importar PGN: un texto inválido avisa y un PGN válido aparece en el Pane
   // PGN válido con ritmo "Clásica" elegido a mano.
   await page.locator('textarea').fill(PGN_VALIDO);
   await page.getByRole('button', { name: 'Clásica' }).click();
+  await page.getByRole('button', { name: 'Blancas' }).click();
   await page.getByRole('button', { name: 'Importar partida' }).click();
   await page.getByText('Partida importada.').waitFor();
 
   // La partida aparece en la lista, sin analizar todavía, y el formulario se vació.
   await expect(page.locator('textarea')).toHaveValue('');
+  await expect(page.getByText('Tu rating: 1512')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Analizar' })).toBeVisible();
 });
