@@ -148,6 +148,7 @@ Cada componente lista sus **estados obligatorios**; un componente sin todos sus 
 | `Board` | interactivo / solo lectura / a ciegas | envoltorio de chessground; ver §3 |
 | `Button` | default / hover / pressed / focus / disabled | primario (accent pleno, único por pantalla), secundario (borde), peligro (fondo `-subtle`, para acciones irreversibles como rendirse) |
 | `SegmentedControl` | default / seleccionado / focus | selección mutuamente excluyente con semántica `radiogroup`, foco único y flechas/Home/End; `accent-subtle` + borde `accent`, nunca relleno pleno |
+| `WeeklyPlanCard` | sin actividad / en curso / cumplido / editando | barra por sesiones, minutos como contexto; cumplido usa `success-subtle`, edición siempre secundaria al CTA de la sesión |
 | `SessionCard` | pendiente / en curso / completado / salteado | siempre con su porqué en `text-secondary`; en curso = borde `accent`; completado = tachado + opacidad .75; salteado = borde punteado |
 | `EvalPicker` | default / seleccionado | 3 chips "mejor blancas / igual / mejor negras" (RF-5.2, evaluación rápida del Radar antes de jugar); selección = `accent-subtle` + borde `accent` |
 | `EvalScalePicker` | default / seleccionado | 5 chips `+− ± = ∓ −+` en `font-mono` (RF-3.1c, escala de evaluación de la fase 1 del análisis); mismo criterio de selección que `EvalPicker` |

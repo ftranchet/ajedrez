@@ -41,7 +41,7 @@ test('Panel: curva de calibración y actividad de los últimos 30 días', async 
   await page.getByRole('heading', { name: 'Curva de calibración' }).waitFor();
   await expect(page.getByRole('img', { name: 'Confianza declarada frente a tasa real de acierto' })).toBeVisible();
   await expect(page.getByText(/90%.*Radar.*33%.*sobreconfianza/)).toBeVisible();
-  await expect(page.getByText('Actividad de los últimos 30 días; racha vigente. Mide proceso, no resultados.')).toBeVisible();
+  await expect(page.getByText('Totales de los últimos 30 días. Describen actividad, no mejora.')).toBeVisible();
   await expect(page.getByText('minutos', { exact: true })).toHaveCount(1);
   await expect(page.getByText('15', { exact: true })).toBeVisible();
   await expect(page.getByText('8', { exact: true })).toBeVisible();

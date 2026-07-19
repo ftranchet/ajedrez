@@ -20,6 +20,7 @@ import type {
 } from './types';
 import { SCHEMA_VERSION } from '../services/storage/db';
 import { DEFAULT_PROFILE } from './prescriptor';
+import { isValidWeeklyPlan } from './adherence';
 
 export interface ExportManifest {
   esquema: number;
@@ -163,6 +164,14 @@ function esSessionRecordValido(x: unknown): boolean {
   );
 }
 
+function esProfileValido(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  const bands = ['principiante', 'elemental', 'intermedio', 'avanzado', 'experto'];
+  return x.id === 'principal' && bands.includes(String(x.bandaElo)) &&
+    (x.diagnosticoCompletadoEn === null || typeof x.diagnosticoCompletadoEn === 'string') &&
+    (x.planSemanal === undefined || isValidWeeklyPlan(x.planSemanal));
+}
+
 function esTransferMeasurementValida(x: unknown): boolean {
   if (!isObj(x)) return false;
   return (
@@ -266,7 +275,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   // Ni perfil (E11): restaurarlos arranca con la banda por defecto, sin
   // diagnosticar, en vez de rechazar un respaldo válido.
-  if (obj.profile !== undefined && (typeof obj.profile !== 'object' || obj.profile === null)) {
+  if (obj.profile !== undefined && !esProfileValido(obj.profile)) {
     return { ok: false, error: 'El perfil no tiene la forma esperada.' };
   }
   // Los respaldos de antes de Fase 4 no traen la regla de candidatas (RF-5.8).

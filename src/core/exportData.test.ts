@@ -95,6 +95,18 @@ describe('validateImportBundle', () => {
     expect(result.ok).toBe(false);
   });
 
+  it('acepta perfiles anteriores sin plan y rechaza un plan semanal inválido', () => {
+    const legacy = buildExportBundle({
+      ...empty,
+      profile: { id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: null },
+    });
+    expect(validateImportBundle(JSON.parse(JSON.stringify(legacy))).ok).toBe(true);
+
+    const corrupt = JSON.parse(JSON.stringify(buildExportBundle(empty)));
+    corrupt.profile.planSemanal = { sesionesObjetivo: 12, minutosObjetivo: 0 };
+    expect(validateImportBundle(corrupt).ok).toBe(false);
+  });
+
   it('rechaza un experimento n=1 corrupto antes de restaurar', () => {
     const bundle = buildExportBundle(empty);
     const raw = JSON.parse(JSON.stringify(bundle));

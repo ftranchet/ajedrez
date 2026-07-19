@@ -380,6 +380,13 @@ export interface SessionRecord {
  */
 export type BandaElo = 'principiante' | 'elemental' | 'intermedio' | 'avanzado' | 'experto';
 
+/** Compromiso semanal elegido por el usuario. Los minutos orientan la carga;
+ * completar el plan depende de los días con sesión, no de acumular volumen. */
+export interface PlanSemanal {
+  sesionesObjetivo: number;
+  minutosObjetivo: number;
+}
+
 /**
  * Perfil del usuario (E11): banda de Elo y estado del diagnóstico inicial
  * que la produjo. `diagnosticoCompletadoEn` en null significa que la banda
@@ -395,6 +402,8 @@ export interface Profile {
    * disponible de entrada.
    */
   stoykoUltimaCompletadaEn?: string | null; // ISO 8601
+  /** Opcional para poder leer perfiles creados antes del plan semanal. */
+  planSemanal?: PlanSemanal;
 }
 
 /**

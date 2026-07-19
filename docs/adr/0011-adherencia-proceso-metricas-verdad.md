@@ -1,6 +1,6 @@
 # ADR-0011 — Adherencia basada en proceso y métricas de verdad
 
-**Estado:** Aceptado
+**Estado:** Reemplazado parcialmente por ADR-0013 (la racha diaria deja de ser el indicador principal; se conservan las reglas de proceso y métricas de verdad)
 **Fecha:** 2026-07-19
 
 ## Contexto
