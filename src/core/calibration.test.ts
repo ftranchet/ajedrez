@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brierScore, brierScoreByContext, shouldSampleConfidence } from './calibration';
+import { brierScore, brierScoreByContext, calibrationCurve, calibrationInsight, shouldSampleConfidence } from './calibration';
 
 describe('shouldSampleConfidence', () => {
   it('respeta la probabilidad ~1/4.5 (RF-10.1): con rng < umbral muestrea', () => {
@@ -65,5 +65,55 @@ describe('brierScoreByContext', () => {
     expect(result.radar).toBe(0);
     expect(result.analisis).toBe(1);
     expect(result.stoyko).toBeUndefined();
+  });
+});
+
+describe('calibrationCurve', () => {
+  it('agrupa confianza declarada y tasa real en bandas de 20 puntos', () => {
+    const curve = calibrationCurve([
+      { confianzaDeclarada: 85, acierto: true },
+      { confianzaDeclarada: 90, acierto: false },
+      { confianzaDeclarada: 95, acierto: true },
+      { confianzaDeclarada: 45, acierto: false },
+    ]);
+    expect(curve).toHaveLength(2);
+    expect(curve[0]).toMatchObject({ desde: 40, cantidad: 1, confianzaMedia: 45, aciertoReal: 0 });
+    expect(curve[1]).toMatchObject({ desde: 80, cantidad: 3, confianzaMedia: 90 });
+    expect(curve[1].aciertoReal).toBeCloseTo(2 / 3);
+  });
+
+  it('acota valores históricos fuera de 0–100', () => {
+    const curve = calibrationCurve([
+      { confianzaDeclarada: -5, acierto: false },
+      { confianzaDeclarada: 120, acierto: true },
+    ]);
+    expect(curve[0].confianzaMedia).toBe(0);
+    expect(curve[1].confianzaMedia).toBe(100);
+  });
+});
+
+describe('calibrationInsight', () => {
+  it('explica sobreconfianza por contexto cuando hay muestra suficiente', () => {
+    const records = [
+      { id: '1', contexto: 'radar' as const, confianzaDeclarada: 90, acierto: true, fecha: '2026-07-19' },
+      { id: '2', contexto: 'radar' as const, confianzaDeclarada: 90, acierto: false, fecha: '2026-07-19' },
+      { id: '3', contexto: 'radar' as const, confianzaDeclarada: 90, acierto: false, fecha: '2026-07-19' },
+    ];
+    expect(calibrationInsight(records)).toEqual({
+      direccion: 'sobreconfianza',
+      contexto: 'radar',
+      confianza: 90,
+      acierto: 33,
+      cantidad: 3,
+    });
+  });
+
+  it('no afirma un patrón con una muestra insuficiente', () => {
+    expect(
+      calibrationInsight([
+        { id: '1', contexto: 'radar', confianzaDeclarada: 90, acierto: false, fecha: '2026-07-19' },
+        { id: '2', contexto: 'radar', confianzaDeclarada: 90, acierto: false, fecha: '2026-07-19' },
+      ]),
+    ).toBeNull();
   });
 });

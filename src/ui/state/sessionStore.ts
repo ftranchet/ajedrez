@@ -5,12 +5,13 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord } from '../../core/types';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
   adjustDifficulty,
   categoriaFromTipo,
+  dificultadNormalizada,
   esRespuestaCorrectaRadar,
   explainFeedback,
   recordServed,
@@ -23,6 +24,7 @@ import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
 import { clasificarRespuestaDobleSolucion, feedbackConformismo } from '../../core/dobleSolucion';
+import { abandonSessionRecord, completeSessionRecord, recordSessionItem, startSessionRecord, transitionSessionBlock } from '../../core/session';
 import { altaErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
@@ -36,6 +38,7 @@ import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { gameRepo } from '../../services/storage/gameRepo';
+import { sessionRepo } from '../../services/storage/sessionRepo';
 import { computeDests, sanDeLinea } from './chessBoardUtils';
 
 /** SAN de una jugada UCI para mostrar en el feedback (design system §5,
@@ -69,6 +72,8 @@ interface SessionState {
   // Prescriptor (E11): perfil y dieta de la sesión en curso (RF-11.2).
   profile: Profile;
   dieta: DietaSesion;
+  /** Snapshot persistente de la sesión en curso/completada (RF-12.1). */
+  sessionRecord: SessionRecord | null;
 
   // Cola (E4)
   colaCards: ErrorCard[];
@@ -150,6 +155,8 @@ interface SessionState {
 let chess = new Chess();
 /** Marca de tiempo al servir el ítem de Triage, para la latencia de la decisión (RF-9.2). */
 let triageInicioMs = 0;
+/** Serializa snapshots de una misma sesión para que un put viejo no pise uno nuevo. */
+let sessionWriteQueue: Promise<void> = Promise.resolve();
 
 function boardSnapshot() {
   return {
@@ -177,7 +184,7 @@ function selectionFromProgress(progress: RadarProgress | undefined): RadarSelect
   return {
     historialTipos: progress.historialTipos,
     historialIds: progress.historialIds,
-    ratingCentro: progress.ratingCentro,
+    dificultadCentro: progress.dificultadCentro ?? RADAR_INITIAL_STATE.dificultadCentro,
   };
 }
 
@@ -186,16 +193,47 @@ function progressFromState(selection: RadarSelectionState, aciertosRecientes: bo
     id: RADAR_PROGRESS_ID,
     historialTipos: selection.historialTipos,
     historialIds: selection.historialIds,
-    ratingCentro: selection.ratingCentro,
+    dificultadCentro: selection.dificultadCentro,
     aciertosRecientes,
     updatedAt: new Date().toISOString(),
   };
 }
 
 export const useSessionStore = create<SessionState>((set, get) => {
+  function persistSession(record: SessionRecord): Promise<void> {
+    sessionWriteQueue = sessionWriteQueue.then(() => sessionRepo.save(record));
+    return sessionWriteQueue;
+  }
+
+  function updateTrackedSession(update: (record: SessionRecord) => SessionRecord): void {
+    const current = get().sessionRecord;
+    if (!current) return;
+    const next = update(current);
+    set({ sessionRecord: next });
+    void persistSession(next);
+  }
+
+  function completeTrackedBlock(tipo: SessionBlockType): void {
+    updateTrackedSession((record) => {
+      const index = record.bloques.findIndex((block) => block.tipo === tipo);
+      if (index < 0 || record.bloques[index].estado === 'completado') return record;
+      const next = record.bloques[index + 1]?.tipo ?? null;
+      return transitionSessionBlock(record, tipo, next);
+    });
+  }
+
+  async function finishTrackedSession(): Promise<void> {
+    const current = get().sessionRecord;
+    if (!current || current.estado !== 'en_curso') return;
+    const completed = completeSessionRecord(current);
+    set({ sessionRecord: completed });
+    await persistSession(completed);
+  }
+
   function loadRadarItem(item: RadarItem | null) {
     if (!item) {
       set({ phase: 'fin', radarItem: null });
+      void finishTrackedSession();
       return;
     }
     chess = new Chess(item.fen);
@@ -217,6 +255,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
   function loadColaCard(card: ErrorCard | null) {
     if (!card) {
       // Cola terminada: pasar al currículo (RF-11.2: repasos vencidos primero).
+      completeTrackedBlock('cola');
       void beginCurriculum();
       return;
     }
@@ -234,6 +273,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     if (!item) {
       // Currículo del día terminado (o sin elementos vencidos): pasar al
       // Triage si la dieta lo activó, si no directo al Radar.
+      completeTrackedBlock('curriculo');
       void beginTriage();
       return;
     }
@@ -249,6 +289,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   function loadTriageItem(item: RadarItem | null) {
     if (!item) {
+      completeTrackedBlock('triage');
       void beginRadar();
       return;
     }
@@ -291,7 +332,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
   // `loadRadarItem` corriera y `radarItem` quedaba null un instante).
   function beginCurriculum(): Promise<void> | void {
     const s = get();
-    const due = interleaveByPattern(dueCurriculumItems(s.curriculumItemsAll, s.curriculumProgressById));
+    // Los finales (RF-6.2) son partidas completas contra Stockfish y viven
+    // en Jugar → Finales; este bloque conserva la interacción breve de
+    // patrón, una jugada y feedback.
+    const due = interleaveByPattern(
+      dueCurriculumItems(s.curriculumItemsAll, s.curriculumProgressById).filter((item) => item.tipo === 'patron'),
+    );
     // Interlevar y recién ahí topar preserva la mezcla de patrones dentro
     // del cupo de la dieta (RF-6.1), en vez de topar antes y arriesgar un
     // cupo monotemático.
@@ -319,6 +365,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     curriculumDueCount: null,
     profile: DEFAULT_PROFILE,
     dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
+    sessionRecord: null,
     colaCards: [],
     colaIndex: 0,
     colaSubPhase: 'jugando',
@@ -373,7 +420,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
       set({
         dueCount: dueErrorCards(allCards).length,
-        curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).length,
+        curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron').length,
         profile,
         dieta: dietaPorBanda(profile.bandaElo, allCards, games),
       });
@@ -381,6 +428,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     async start() {
       set({ phase: 'cargando' });
+      await sessionWriteQueue;
+      await sessionRepo.abandonInProgress();
       await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
       const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
         errorCardRepo.list(),
@@ -392,9 +441,22 @@ export const useSessionStore = create<SessionState>((set, get) => {
         gameRepo.list(),
       ]);
       const due = dueErrorCards(allCards);
+      const dieta = dietaPorBanda(profile.bandaElo, allCards, games);
+      const curriculumDue = interleaveByPattern(
+        dueCurriculumItems(curriculumItems, new Map(curriculumProgressList.map((p) => [p.id, p] as const)))
+          .filter((item) => item.tipo === 'patron'),
+      ).slice(0, dieta.curriculumMax).length;
+      const sessionRecord = startSessionRecord([
+        { tipo: 'cola', planificados: due.length },
+        { tipo: 'curriculo', planificados: curriculumDue },
+        { tipo: 'triage', planificados: dieta.triageActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
+        { tipo: 'radar', planificados: pool.length > 0 ? dieta.radarCount : 0 },
+      ]);
+      await persistSession(sessionRecord);
       set({
         profile,
-        dieta: dietaPorBanda(profile.bandaElo, allCards, games),
+        dieta,
+        sessionRecord,
         radarPool: pool,
         colaCards: due,
         colaIndex: 0,
@@ -414,6 +476,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     volver() {
+      const current = get().sessionRecord;
+      if (current?.estado === 'en_curso') void persistSession(abandonSessionRecord(current));
       chess = new Chess();
       set({
         phase: 'sinEmpezar',
@@ -433,6 +497,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         radarServidos: 0,
         radarAciertosRecientes: [],
         radarSelState: RADAR_INITIAL_STATE,
+        sessionRecord: null,
       });
     },
 
@@ -455,6 +520,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
       const revisada = reviewErrorCard(card, acierto);
       await errorCardRepo.save(revisada);
+      updateTrackedSession((record) => recordSessionItem(record, 'cola'));
       const nuevasCards = [...s.colaCards];
       nuevasCards[s.colaIndex] = revisada;
 
@@ -493,6 +559,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const progresoPrevio = s.curriculumProgressById.get(item.id) ?? newCurriculumProgress(item.id);
       const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia);
       await curriculumProgressRepo.save(progresoNuevo);
+      updateTrackedSession((record) => recordSessionItem(record, 'curriculo'));
       const nuevoMapa = new Map(s.curriculumProgressById);
       nuevoMapa.set(item.id, progresoNuevo);
 
@@ -518,6 +585,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (s.phase !== 'triage' || s.triageSubPhase !== 'decidiendo') return;
       const item = s.triageQueue[s.triageIndex];
       const correcta = decisionCorrecta(item.tipo);
+      updateTrackedSession((record) => recordSessionItem(record, 'triage'));
       set({ triageSubPhase: 'feedback', triageUltimaCorrecta: decision === correcta, triageDecisionCorrecta: correcta });
       // Persistir la decisión, si fue correcta y la latencia (RF-9.2/9.3):
       // antes la decisión se evaluaba en memoria y no quedaba registro.
@@ -612,6 +680,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         // (RF-5.5) pierde el incremento de la última posición de cada sesión.
         set({ phase: 'fin', radarItem: null, radarSelState: selState });
         await radarProgressRepo.save(progressFromState(selState, get().radarAciertosRecientes));
+        await finishTrackedSession();
         return;
       }
       const item = selectNextRadarItem(s.radarPool, selState, Math.random);
@@ -630,6 +699,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarServidos: s.radarServidos + 1,
       radarAciertosRecientes: [...s.radarAciertosRecientes, acierto].slice(-VENTANA_TASA_ACIERTO),
     }));
+    updateTrackedSession((record) => recordSessionItem(record, 'radar'));
     const state = get();
     await radarProgressRepo.save(progressFromState(state.radarSelState, state.radarAciertosRecientes));
     await radarAttemptRepo.save({
@@ -637,6 +707,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       itemId: item.id,
       tipo: item.tipo,
       rating: item.rating,
+      dificultadNormalizada: dificultadNormalizada(item, state.radarPool),
       acierto,
       evalGuess,
       fecha: new Date().toISOString(),

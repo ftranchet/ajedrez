@@ -4,11 +4,12 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo } from '../../core/types';
+import type { CalibrationRecord, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
-import { brierScore } from '../../core/calibration';
+import { brierScore, calibrationCurve, calibrationInsight } from '../../core/calibration';
+import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
@@ -16,6 +17,7 @@ import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
+import { sessionRepo } from '../../services/storage/sessionRepo';
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { AnalizarScreen } from './AnalizarScreen';
@@ -32,6 +34,7 @@ export function PanelScreen() {
   const [calibraciones, setCalibraciones] = useState<CalibrationRecord[] | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dobleSolucionAttempts, setDobleSolucionAttempts] = useState<DobleSolucionAttempt[] | null>(null);
+  const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
   const [importVersion, setImportVersion] = useState(0);
 
   useEffect(() => {
@@ -51,6 +54,9 @@ export function PanelScreen() {
     void dobleSolucionAttemptRepo.list().then((attempts) => {
       if (alive) setDobleSolucionAttempts(attempts);
     });
+    void sessionRepo.list().then((records) => {
+      if (alive) setSessions(records);
+    });
     return () => {
       alive = false;
     };
@@ -63,6 +69,10 @@ export function PanelScreen() {
       <h1 className="m-0 font-display text-3xl font-medium">{t.panel.titulo}</h1>
 
       <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
+
+      <CalibrationPanel records={calibraciones} />
+
+      <ActivityPanel records={sessions} />
 
       <section>
         <h2 className="m-0 mb-2 text-sm tracking-wider text-tertiary uppercase">{t.panel.partidas}</h2>
@@ -104,6 +114,111 @@ export function PanelScreen() {
       <DobleSolucionSummary attempts={dobleSolucionAttempts} />
 
       <DatosSection onImported={() => setImportVersion((v) => v + 1)} />
+    </div>
+  );
+}
+
+function CalibrationPanel({ records }: { records: CalibrationRecord[] | null }) {
+  if (records === null) return null;
+  const curve = calibrationCurve(records);
+  const insight = calibrationInsight(records);
+  const points = curve
+    .sort((a, b) => a.confianzaMedia - b.confianzaMedia)
+    .map((point) => `${5 + point.confianzaMedia * 0.9},${95 - point.aciertoReal * 90}`)
+    .join(' ');
+
+  let lectura: string = t.panel.calibracionSinLectura;
+  if (insight) {
+    const contexto = t.panel.calibracionContextos[insight.contexto];
+    const plantilla =
+      insight.direccion === 'sobreconfianza'
+        ? t.panel.calibracionSobreconfianza
+        : insight.direccion === 'subconfianza'
+          ? t.panel.calibracionSubconfianza
+          : t.panel.calibracionAlineada;
+    lectura = plantilla
+      .replace('{confianza}', String(insight.confianza))
+      .replace('{acierto}', String(insight.acierto))
+      .replace('{contexto}', contexto);
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
+      <div>
+        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.calibracionTitulo}</h2>
+        <p className="m-0 mt-1 text-sm text-secondary">{t.panel.calibracionAyuda}</p>
+      </div>
+      {curve.length === 0 ? (
+        <p className="m-0 text-secondary">{t.panel.verdadSinCalibracion}</p>
+      ) : (
+        <div className="flex flex-col gap-1">
+          <svg
+            viewBox="0 0 100 100"
+            className="h-48 w-full overflow-visible"
+            role="img"
+            aria-label={t.panel.calibracionGraficoLabel}
+          >
+            <g className="text-tertiary" stroke="currentColor" fill="none">
+              <line x1="5" y1="95" x2="95" y2="5" strokeDasharray="3 3" />
+              <line x1="5" y1="95" x2="95" y2="95" />
+              <line x1="5" y1="95" x2="5" y2="5" />
+            </g>
+            {curve.length > 1 && (
+              <polyline points={points} className="text-info" stroke="currentColor" strokeWidth="2" fill="none" />
+            )}
+            {curve.map((point) => (
+              <circle
+                key={point.desde}
+                cx={5 + point.confianzaMedia * 0.9}
+                cy={95 - point.aciertoReal * 90}
+                r="2.5"
+                className="text-info"
+                fill="currentColor"
+              >
+                <title>
+                  {t.panel.calibracionPunto
+                    .replace('{confianza}', String(Math.round(point.confianzaMedia)))
+                    .replace('{acierto}', String(Math.round(point.aciertoReal * 100)))
+                    .replace('{n}', String(point.cantidad))}
+                </title>
+              </circle>
+            ))}
+          </svg>
+          <div className="flex justify-between font-mono text-xs text-tertiary">
+            <span>{t.panel.calibracionEjeBajo}</span>
+            <span>{t.panel.calibracionEjeConfianza}</span>
+            <span>{t.panel.calibracionEjeAlto}</span>
+          </div>
+        </div>
+      )}
+      <p className="m-0 text-primary">{lectura}</p>
+    </section>
+  );
+}
+
+function ActivityPanel({ records }: { records: SessionRecord[] | null }) {
+  if (records === null) return null;
+  const summary = activitySummary(records);
+  return (
+    <section className="flex flex-col gap-2 rounded-md border border-subtle bg-surface p-3">
+      <div>
+        <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.actividadTitulo}</h2>
+        <p className="m-0 mt-1 text-xs text-secondary">{t.panel.actividadPeriodo}</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <ActivityMetric value={summary.sesiones} label={t.panel.actividadSesiones} />
+        <ActivityMetric value={summary.minutos} label={t.panel.actividadMinutos} />
+        <ActivityMetric value={summary.items} label={t.panel.actividadItems} />
+      </div>
+    </section>
+  );
+}
+
+function ActivityMetric({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-lg text-primary">{value}</span>
+      <span className="text-xs text-secondary">{label}</span>
     </div>
   );
 }

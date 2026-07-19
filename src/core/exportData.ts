@@ -12,6 +12,7 @@ import type {
   Profile,
   RadarAttempt,
   RadarProgress,
+  SessionRecord,
   StoykoAttempt,
   TriageAttempt,
 } from './types';
@@ -38,6 +39,7 @@ export interface ExportBundle {
   dobleSolucionAttempts: DobleSolucionAttempt[];
   stoykoAttempts: StoykoAttempt[];
   triageAttempts: TriageAttempt[];
+  sessions: SessionRecord[];
 }
 
 export interface ExportSourceData {
@@ -53,6 +55,7 @@ export interface ExportSourceData {
   dobleSolucionAttempts: DobleSolucionAttempt[];
   stoykoAttempts: StoykoAttempt[];
   triageAttempts: TriageAttempt[];
+  sessions: SessionRecord[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -71,6 +74,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     dobleSolucionAttempts: data.dobleSolucionAttempts,
     stoykoAttempts: data.stoykoAttempts,
     triageAttempts: data.triageAttempts,
+    sessions: data.sessions,
   };
 }
 
@@ -131,6 +135,26 @@ function esCalibrationRecordValido(x: unknown): boolean {
   );
 }
 
+function esSessionRecordValido(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  const blockTypes = ['cola', 'curriculo', 'triage', 'radar'];
+  const blockStatuses = ['pendiente', 'en_curso', 'completado', 'salteado'];
+  return (
+    typeof x.id === 'string' &&
+    typeof x.fechaInicio === 'string' &&
+    (x.estado === 'en_curso' || x.estado === 'completada' || x.estado === 'abandonada') &&
+    Array.isArray(x.bloques) &&
+    x.bloques.every(
+      (block) =>
+        isObj(block) &&
+        blockTypes.includes(String(block.tipo)) &&
+        typeof block.planificados === 'number' &&
+        typeof block.completados === 'number' &&
+        blockStatuses.includes(String(block.estado)),
+    )
+  );
+}
+
 /**
  * Valida la forma de un paquete importado antes de tocar la base de datos
  * (RF-14.2). No migra todavía versiones de esquema anteriores a la actual:
@@ -187,6 +211,10 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.triageAttempts !== undefined && !Array.isArray(obj.triageAttempts)) {
     return { ok: false, error: 'El historial de Triage no tiene la forma esperada.' };
   }
+  // Los respaldos anteriores a RF-12.1 no traen sesiones persistidas.
+  if (obj.sessions !== undefined && !Array.isArray(obj.sessions)) {
+    return { ok: false, error: 'El historial de sesiones no tiene la forma esperada.' };
+  }
   // Validación por-registro de las entidades críticas (RF-14.2): como la
   // restauración reemplaza el estado local entero, un solo registro corrupto
   // rechaza el paquete en vez de escribirse sobre datos buenos.
@@ -198,6 +226,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   if (!(obj.calibrationRecords as unknown[]).every(esCalibrationRecordValido)) {
     return { ok: false, error: 'Algún registro de calibración del respaldo está corrupto o incompleto.' };
+  }
+  if (!((obj.sessions ?? []) as unknown[]).every(esSessionRecordValido)) {
+    return { ok: false, error: 'Alguna sesión del respaldo está corrupta o incompleta.' };
   }
   return {
     ok: true,
@@ -215,6 +246,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       dobleSolucionAttempts: (obj.dobleSolucionAttempts ?? []) as DobleSolucionAttempt[],
       stoykoAttempts: (obj.stoykoAttempts ?? []) as StoykoAttempt[],
       triageAttempts: (obj.triageAttempts ?? []) as TriageAttempt[],
+      sessions: (obj.sessions ?? []) as SessionRecord[],
     },
   };
 }

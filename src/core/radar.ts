@@ -11,27 +11,39 @@ export interface RadarSelectionState {
   historialTipos: TipoRadar[];
   /** Últimos ids servidos (evita repetir la posición exacta). */
   historialIds: string[];
-  /** Centro de la banda de rating servida; se desplaza según el desempeño. */
-  ratingCentro: number;
+  /** Centro 0–100 de dificultad normalizada por fuente (ADR-0007). */
+  dificultadCentro: number;
 }
 
 export const RADAR_INITIAL_STATE: RadarSelectionState = {
   historialTipos: [],
   historialIds: [],
-  ratingCentro: 1200,
+  dificultadCentro: 50,
 };
 
 const VENTANA_TIPOS = 3; // cuántos tipos recientes penalizan la repetición
 const VENTANA_IDS = 8; // cuántos ids recientes se evitan
-const ANCHO_BANDA = 150; // ± sobre ratingCentro
-const PASO_AJUSTE = 40; // cuánto se mueve ratingCentro por respuesta
-// Rango de rating del catálogo (pipeline: puzzles 800–2000, ver
-// docs/radar-dataset.md). Sin este tope, una racha sostenida fuera de la
-// banda 60–80% empuja ratingCentro más allá de cualquier posición existente
-// y el filtro por banda queda vacío para siempre: la selección cae al pool
-// completo y la adaptación de RF-5.5 se apaga en silencio.
-const RATING_MIN = 800;
-const RATING_MAX = 2000;
+const ANCHO_BANDA = 15; // ± percentiles sobre dificultadCentro
+const PASO_AJUSTE = 4; // cuánto se mueve dificultadCentro por respuesta
+const DIFICULTAD_MIN = 0;
+const DIFICULTAD_MAX = 100;
+
+/**
+ * Percentil 0–100 del rating dentro de su fuente (ADR-0007). Las escalas de
+ * fuentes distintas no se comparan. Los empates reciben su rango medio; una
+ * cohorte sin variación queda en 50, sin inventar precisión.
+ */
+export function dificultadNormalizada(item: RadarItem, pool: RadarItem[]): number {
+  const ratings = pool
+    .filter((candidate) => candidate.fuente === item.fuente)
+    .map((candidate) => candidate.rating)
+    .sort((a, b) => a - b);
+  if (ratings.length <= 1) return 50;
+  const first = ratings.indexOf(item.rating);
+  if (first < 0) return 50;
+  const last = ratings.lastIndexOf(item.rating);
+  return ((first + last) / 2 / (ratings.length - 1)) * 100;
+}
 
 /**
  * Ajusta el centro de la banda de dificultad tras una respuesta (RF-5.5):
@@ -44,8 +56,11 @@ export function adjustDifficulty(state: RadarSelectionState, acierto: boolean, t
       : tasaAciertoReciente < 0.6
         ? -PASO_AJUSTE
         : (acierto ? 1 : -1) * (PASO_AJUSTE / 4); // deriva suave dentro de la banda buena
-  const ratingCentro = Math.min(RATING_MAX, Math.max(RATING_MIN, state.ratingCentro + delta));
-  return { ...state, ratingCentro };
+  const dificultadCentro = Math.min(
+    DIFICULTAD_MAX,
+    Math.max(DIFICULTAD_MIN, state.dificultadCentro + delta),
+  );
+  return { ...state, dificultadCentro };
 }
 
 function pesoPorTipo(tipo: TipoRadar, historialTipos: TipoRadar[]): number {
@@ -76,7 +91,8 @@ export function selectNextRadarItem(
 
   const banda = pool.filter(
     (item) =>
-      Math.abs(item.rating - state.ratingCentro) <= ANCHO_BANDA && !state.historialIds.slice(-VENTANA_IDS).includes(item.id),
+      Math.abs(dificultadNormalizada(item, pool) - state.dificultadCentro) <= ANCHO_BANDA &&
+      !state.historialIds.slice(-VENTANA_IDS).includes(item.id),
   );
   const candidatos = banda.length > 0 ? banda : pool.filter((item) => !state.historialIds.slice(-VENTANA_IDS).includes(item.id));
   const universo = candidatos.length > 0 ? candidatos : pool;

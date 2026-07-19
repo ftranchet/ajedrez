@@ -1,17 +1,26 @@
 // Pantalla Jugar: partida local contra el motor (RF-1.1, RF-1.2, RF-1.3).
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { Chip } from '../components/Chip';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
+import { useFinalesStore } from '../state/finalesStore';
 import type { Color } from '../../core/types';
+import { isAutomatizado } from '../../core/curriculum';
 import { t } from '../i18n/es';
 
 export function JugarScreen() {
+  const [modo, setModo] = useState<'partida' | 'finales'>('partida');
+  return modo === 'finales'
+    ? <FinalesScreen onPartida={() => setModo('partida')} />
+    : <PartidaScreen onFinales={() => setModo('finales')} />;
+}
+
+function PartidaScreen({ onFinales }: { onFinales: () => void }) {
   const s = useGameStore();
 
-  if (s.phase === 'setup' || s.phase === 'loading') return <Setup />;
+  if (s.phase === 'setup' || s.phase === 'loading') return <Setup onFinales={onFinales} />;
 
   const statusText =
     s.phase === 'ended'
@@ -139,13 +148,17 @@ function ResignButton() {
   );
 }
 
-function Setup() {
+function Setup({ onFinales }: { onFinales: () => void }) {
   const s = useGameStore();
   const [levelId, setLevelId] = useState(ENGINE_LEVELS[0].id);
   const [color, setColor] = useState<Color | 'random'>('w');
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <div className="grid grid-cols-2 gap-2">
+        <Chip selected onClick={() => {}}>{t.finales.modoPartida}</Chip>
+        <Chip selected={false} onClick={onFinales}>{t.finales.modoFinales}</Chip>
+      </div>
       <header>
         <h1 className="m-0 font-display text-3xl font-medium">{t.jugar.titulo}</h1>
         <p className="mt-1 mb-0 text-secondary">{t.jugar.subtitulo}</p>
@@ -190,3 +203,102 @@ function Setup() {
   );
 }
 
+function FinalesScreen({ onPartida }: { onPartida: () => void }) {
+  const s = useFinalesStore();
+  const itemCount = s.items.length;
+  const load = s.load;
+
+  useEffect(() => {
+    if (itemCount === 0) void load();
+  }, [itemCount, load]);
+
+  if (s.phase === 'lista' || s.phase === 'cargando') {
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <div className="grid grid-cols-2 gap-2">
+          <Chip selected={false} onClick={onPartida}>{t.finales.modoPartida}</Chip>
+          <Chip selected onClick={() => {}}>{t.finales.modoFinales}</Chip>
+        </div>
+        <header>
+          <h1 className="m-0 font-display text-3xl font-medium">{t.finales.titulo}</h1>
+          <p className="mt-1 mb-0 text-secondary">{t.finales.subtitulo}</p>
+        </header>
+        {s.engineError && (
+          <div className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
+            <p className="m-0 text-sm">{t.finales.errorMotor}</p>
+            <button className="btn-secondary" onClick={() => s.volver()}>{t.finales.volver}</button>
+          </div>
+        )}
+        {s.phase === 'cargando' ? (
+          <p className="m-0 text-secondary">{t.finales.cargando}</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {s.items.map((item) => {
+              const progress = s.progressById.get(item.id);
+              return (
+                <li key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
+                  <div>
+                    <p className="m-0 text-primary">{item.nombre}</p>
+                    <p className="m-0 mt-1 text-xs text-tertiary">
+                      {progress && isAutomatizado(progress)
+                        ? t.finales.automatizado
+                        : t.finales.progreso.replace('{n}', String(progress?.demostracionesLimpias ?? 0))}
+                    </p>
+                  </div>
+                  <button className="btn-secondary shrink-0" onClick={() => void s.start(item.id)}>{t.finales.empezar}</button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  const item = s.item!;
+  return (
+    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <Board
+          fen={s.fen}
+          orientation={s.playerColor}
+          turn={s.turn}
+          lastMove={s.lastMove}
+          check={s.check}
+          dests={s.dests}
+          movableColor={s.phase === 'jugando' && !s.thinking && s.turn === s.playerColor ? s.playerColor : null}
+          onMove={(from, to) => void s.userMove(from as Square, to as Square)}
+        />
+        {s.pendingPromotion && (
+          <PromotionDialog
+            color={s.playerColor}
+            onPick={(piece) => void s.userMove(s.pendingPromotion!.from, s.pendingPromotion!.to, piece)}
+            onCancel={() => s.cancelPromotion()}
+          />
+        )}
+      </div>
+      <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
+        <div className="rounded-lg border border-subtle bg-surface p-4">
+          <p className="m-0 font-display text-xl">{item.nombre}</p>
+          <p className="m-0 mt-2 text-sm text-secondary">
+            {item.resultadoEsperado === 'gana' ? t.finales.objetivoGana : t.finales.objetivoTablas}
+          </p>
+        </div>
+        {s.engineError && (
+          <div className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
+            <p className="m-0 text-sm">{t.finales.errorMotor}</p>
+            <button className="btn-secondary" onClick={() => s.volver()}>{t.finales.volver}</button>
+          </div>
+        )}
+        {s.phase === 'jugando' && <p className="m-0 text-secondary">{s.thinking ? t.finales.pensando : t.finales.teToca}</p>}
+        {s.phase === 'feedback' && (
+          <div className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
+            <h2 className="m-0 font-display text-2xl">{s.limpia ? t.finales.demostrado : t.finales.perdido}</h2>
+            <p className="m-0 text-secondary">{s.limpia ? t.finales.demostradoTexto : t.finales.perdidoTexto}</p>
+            <button className="btn-primary" onClick={() => s.volver()}>{t.finales.volver}</button>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}

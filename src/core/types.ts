@@ -128,7 +128,7 @@ export interface RadarItem {
   fen: string;
   tipo: TipoRadar;
   temas: string[];
-  /** Rating de dificultad, mismo rango que el rating de puzzles de Lichess. */
+  /** Rating crudo de la fuente; no se compara entre fuentes (ADR-0007). */
   rating: number;
   solucion: string[];
   fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'pipeline-envenenada' | 'seed-dev';
@@ -161,7 +161,10 @@ export interface RadarProgress {
   id: 'principal';
   historialTipos: TipoRadar[];
   historialIds: string[];
-  ratingCentro: number;
+  /** Centro adaptativo 0–100 sobre percentiles por fuente (ADR-0007). */
+  dificultadCentro?: number;
+  /** @deprecated Escala heterogénea anterior a ADR-0007; solo compatibilidad de importación. */
+  ratingCentro?: number;
   aciertosRecientes: boolean[];
   updatedAt: string; // ISO 8601
 }
@@ -179,6 +182,8 @@ export interface RadarAttempt {
   itemId: string;
   tipo: TipoRadar;
   rating: number;
+  /** Percentil 0–100 usado al servir el ítem (ADR-0007). Ausente en intentos históricos. */
+  dificultadNormalizada?: number;
   acierto: boolean;
   /**
    * Evaluación rápida declarada antes de jugar (RF-5.2). Se persiste tal
@@ -293,6 +298,8 @@ export interface CurriculumItem {
   solucion: string[];
   /** Solo en finales: qué debe forzar el usuario jugando el lado indicado por `fen` (RF-6.2). */
   resultadoEsperado?: 'gana' | 'tablas';
+  /** Solo en finales: bando que demuestra la técnica; puede no ser quien mueve primero. */
+  ladoUsuario?: Color;
 }
 
 /** Versión del catálogo de currículo embebido (mismo patrón que `RadarDatasetMeta`). */
@@ -326,6 +333,32 @@ export interface CalibrationRecord {
   confianzaDeclarada: number; // 0–100
   acierto: boolean;
   fecha: string; // ISO 8601
+}
+
+/** Bloques que puede prescribir y medir la sesión diaria (RF-11.1/12.1). */
+export type SessionBlockType = 'cola' | 'curriculo' | 'triage' | 'radar';
+export type SessionBlockStatus = 'pendiente' | 'en_curso' | 'completado' | 'salteado';
+
+export interface SessionBlockRecord {
+  tipo: SessionBlockType;
+  planificados: number;
+  completados: number;
+  estado: SessionBlockStatus;
+  inicio?: string; // ISO 8601
+  fin?: string; // ISO 8601
+}
+
+/**
+ * Sesión prescrita persistente (RF-11.1, RF-12.1, RF-13.1). Registra proceso,
+ * no resultado: bloques e ítems hechos y tiempo real, sin premiar volumen.
+ */
+export interface SessionRecord {
+  id: string;
+  fechaInicio: string; // ISO 8601
+  fechaFin?: string; // ISO 8601
+  estado: 'en_curso' | 'completada' | 'abandonada';
+  bloques: SessionBlockRecord[];
+  duracionMs?: number;
 }
 
 /**

@@ -15,6 +15,7 @@ import { compromisoAttemptRepo } from '../storage/compromisoAttemptRepo';
 import { dobleSolucionAttemptRepo } from '../storage/dobleSolucionAttemptRepo';
 import { stoykoAttemptRepo } from '../storage/stoykoAttemptRepo';
 import { triageAttemptRepo } from '../storage/triageAttemptRepo';
+import { sessionRepo } from '../storage/sessionRepo';
 import { db } from '../storage/db';
 
 function pgnFileName(gameId: string): string {
@@ -36,6 +37,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     dobleSolucionAttempts: await dobleSolucionAttemptRepo.list(),
     stoykoAttempts: await stoykoAttemptRepo.list(),
     triageAttempts: await triageAttemptRepo.list(),
+    sessions: await sessionRepo.list(),
   };
   const bundle = buildExportBundle(data);
 
@@ -53,6 +55,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     'dobleSolucionAttempts.json': strToU8(JSON.stringify(bundle.dobleSolucionAttempts, null, 2)),
     'stoykoAttempts.json': strToU8(JSON.stringify(bundle.stoykoAttempts, null, 2)),
     'triageAttempts.json': strToU8(JSON.stringify(bundle.triageAttempts, null, 2)),
+    'sessions.json': strToU8(JSON.stringify(bundle.sessions, null, 2)),
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
@@ -102,6 +105,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const dobleSolucionAttemptsRaw = unzipped['dobleSolucionAttempts.json'];
   const stoykoAttemptsRaw = unzipped['stoykoAttempts.json'];
   const triageAttemptsRaw = unzipped['triageAttempts.json'];
+  const sessionsRaw = unzipped['sessions.json'];
   if (!manifestRaw || !gamesRaw || !errorCardsRaw || !calibrationRaw) {
     return { ok: false, error: 'Faltan archivos dentro del .zip (¿es una exportación de ELOmax?).' };
   }
@@ -129,6 +133,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       // Ni el historial de Stoyko (E7) o Triage (E9), agregados en esquema v11.
       stoykoAttempts: stoykoAttemptsRaw ? JSON.parse(strFromU8(stoykoAttemptsRaw)) : [],
       triageAttempts: triageAttemptsRaw ? JSON.parse(strFromU8(triageAttemptsRaw)) : [],
+      sessions: sessionsRaw ? JSON.parse(strFromU8(sessionsRaw)) : [],
     };
   } catch {
     return { ok: false, error: 'Algún archivo dentro del .zip no es JSON válido.' };
@@ -161,6 +166,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       db.dobleSolucionAttempts,
       db.stoykoAttempts,
       db.triageAttempts,
+      db.sessions,
     ],
     async () => {
       await Promise.all([
@@ -176,6 +182,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
         db.dobleSolucionAttempts.clear(),
         db.stoykoAttempts.clear(),
         db.triageAttempts.clear(),
+        db.sessions.clear(),
       ]);
       if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
       if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
@@ -189,6 +196,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       if (bundle.dobleSolucionAttempts.length > 0) await db.dobleSolucionAttempts.bulkPut(bundle.dobleSolucionAttempts);
       if (bundle.stoykoAttempts.length > 0) await db.stoykoAttempts.bulkPut(bundle.stoykoAttempts);
       if (bundle.triageAttempts.length > 0) await db.triageAttempts.bulkPut(bundle.triageAttempts);
+      if (bundle.sessions.length > 0) await db.sessions.bulkPut(bundle.sessions);
     },
   );
 

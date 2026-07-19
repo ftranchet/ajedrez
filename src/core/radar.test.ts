@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RADAR_INITIAL_STATE, adjustDifficulty, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from './radar';
+import { RADAR_INITIAL_STATE, adjustDifficulty, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from './radar';
 import type { RadarItem, TipoRadar } from './types';
 
 function seededRng(seed: number): () => number {
@@ -38,7 +38,7 @@ describe('selectNextRadarItem', () => {
 
   it('sobre 500 tiradas, aparecen los cinco tipos (mezcla, RF-5.1)', () => {
     const pool = buildPool(50);
-    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, ratingCentro: 1200 };
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
     const rng = seededRng(42);
     const vistos = new Set<TipoRadar>();
     for (let i = 0; i < 500; i++) {
@@ -100,39 +100,63 @@ describe('selectNextRadarItem', () => {
     expect(repetidoInmediato).toBe(0);
   });
 
-  it('respeta la banda de rating cuando hay candidatos suficientes', () => {
+  it('respeta la banda normalizada cuando hay candidatos suficientes', () => {
     const pool = buildPool(50);
-    const state: RadarSelectionState = { ...RADAR_INITIAL_STATE, ratingCentro: 1000 };
+    const state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
     const rng = seededRng(1);
     const item = selectNextRadarItem(pool, state, rng);
     expect(item).not.toBeNull();
-    expect(Math.abs(item!.rating - 1000)).toBeLessThanOrEqual(150);
+    expect(Math.abs(dificultadNormalizada(item!, pool) - 50)).toBeLessThanOrEqual(15);
+  });
+
+  it('no mezcla escalas: el punto medio de fuentes con ratings incompatibles vale lo mismo', () => {
+    const base = buildPool(2)[0];
+    const pool: RadarItem[] = [
+      { ...base, id: 'lichess-bajo', fuente: 'lichess-cc0', rating: 800 },
+      { ...base, id: 'lichess-medio', fuente: 'lichess-cc0', rating: 1200 },
+      { ...base, id: 'lichess-alto', fuente: 'lichess-cc0', rating: 2000 },
+      { ...base, id: 'quiet-bajo', fuente: 'pipeline-tranquilas', rating: 1300 },
+      { ...base, id: 'quiet-medio', fuente: 'pipeline-tranquilas', rating: 1700 },
+      { ...base, id: 'quiet-alto', fuente: 'pipeline-tranquilas', rating: 2300 },
+    ];
+    expect(dificultadNormalizada(pool[1], pool)).toBe(50);
+    expect(dificultadNormalizada(pool[4], pool)).toBe(50);
+  });
+
+  it('una cohorte de rating constante queda honestamente en el centro', () => {
+    const base = buildPool(2)[0];
+    const pool: RadarItem[] = [
+      { ...base, id: 'a', fuente: 'pipeline-envenenada', rating: 1500 },
+      { ...base, id: 'b', fuente: 'pipeline-envenenada', rating: 1500 },
+    ];
+    expect(dificultadNormalizada(pool[0], pool)).toBe(50);
+    expect(dificultadNormalizada(pool[1], pool)).toBe(50);
   });
 });
 
 describe('adjustDifficulty', () => {
   it('sube el centro cuando el acierto reciente supera 80% (RF-5.5)', () => {
     const next = adjustDifficulty(RADAR_INITIAL_STATE, true, 0.9);
-    expect(next.ratingCentro).toBeGreaterThan(RADAR_INITIAL_STATE.ratingCentro);
+    expect(next.dificultadCentro).toBeGreaterThan(RADAR_INITIAL_STATE.dificultadCentro);
   });
 
   it('baja el centro cuando el acierto reciente cae debajo de 60%', () => {
     const next = adjustDifficulty(RADAR_INITIAL_STATE, false, 0.4);
-    expect(next.ratingCentro).toBeLessThan(RADAR_INITIAL_STATE.ratingCentro);
+    expect(next.dificultadCentro).toBeLessThan(RADAR_INITIAL_STATE.dificultadCentro);
   });
 
   it('dentro de la banda 60-80% hace ajustes chicos, no saltos', () => {
     const next = adjustDifficulty(RADAR_INITIAL_STATE, true, 0.7);
-    expect(Math.abs(next.ratingCentro - RADAR_INITIAL_STATE.ratingCentro)).toBeLessThan(40);
+    expect(Math.abs(next.dificultadCentro - RADAR_INITIAL_STATE.dificultadCentro)).toBeLessThan(4);
   });
 
-  it('no empuja el centro más allá del rango del catálogo (800–2000)', () => {
+  it('no empuja el centro más allá del rango normalizado 0–100', () => {
     // Sin tope, una racha sostenida dejaba el centro fuera del rango de
     // cualquier posición y el filtro por banda quedaba vacío para siempre.
-    const arriba = adjustDifficulty({ ...RADAR_INITIAL_STATE, ratingCentro: 2000 }, true, 0.9);
-    expect(arriba.ratingCentro).toBe(2000);
-    const abajo = adjustDifficulty({ ...RADAR_INITIAL_STATE, ratingCentro: 800 }, false, 0.4);
-    expect(abajo.ratingCentro).toBe(800);
+    const arriba = adjustDifficulty({ ...RADAR_INITIAL_STATE, dificultadCentro: 100 }, true, 0.9);
+    expect(arriba.dificultadCentro).toBe(100);
+    const abajo = adjustDifficulty({ ...RADAR_INITIAL_STATE, dificultadCentro: 0 }, false, 0.4);
+    expect(abajo.dificultadCentro).toBe(0);
   });
 });
 

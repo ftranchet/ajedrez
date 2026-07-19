@@ -16,6 +16,7 @@ const empty = {
   dobleSolucionAttempts: [],
   stoykoAttempts: [],
   triageAttempts: [],
+  sessions: [],
 };
 
 describe('buildExportBundle', () => {
@@ -76,6 +77,18 @@ describe('validateImportBundle', () => {
     if (result.ok) {
       expect(result.bundle.curriculumProgress).toEqual([]);
       expect(result.bundle.profile).toEqual(DEFAULT_PROFILE);
+      expect(result.bundle.sessions).toEqual([]);
     }
+  });
+
+  it('rechaza una sesión corrupta antes de restaurar', () => {
+    const bundle = buildExportBundle({
+      ...empty,
+      sessions: [{ id: 's1', fechaInicio: '2026-07-19T10:00:00.000Z', estado: 'completada', bloques: [] }],
+    });
+    const raw = JSON.parse(JSON.stringify(bundle));
+    raw.sessions[0].bloques = 'no-es-array';
+    const result = validateImportBundle(raw);
+    expect(result.ok).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ import type {
   RadarDatasetMeta,
   RadarItem,
   RadarProgress,
+  SessionRecord,
   StoykoAttempt,
   StoykoDatasetMeta,
   StoykoItem,
@@ -25,7 +26,7 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -46,6 +47,7 @@ export class ElomaxDB extends Dexie {
   stoykoDatasetMeta!: Table<StoykoDatasetMeta, string>;
   stoykoAttempts!: Table<StoykoAttempt, string>;
   triageAttempts!: Table<TriageAttempt, string>;
+  sessions!: Table<SessionRecord, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -234,6 +236,42 @@ export class ElomaxDB extends Dexie {
       stoykoAttempts: 'id, itemId, fecha',
       triageAttempts: 'id, itemId, fecha',
     });
+
+    // v12 — dificultad normalizada del Radar (ADR-0007) y registro de
+    // sesiones (RF-11.1/RF-12.1). El centro viejo mezclaba unidades y no se
+    // puede convertir honestamente: se reinicia en el percentil neutral 50,
+    // conservando historial y aciertos. `sessions` es dato personal y forma
+    // parte de la exportación completa (RF-14.1).
+    this.version(12)
+      .stores({
+        games: 'id, fecha, fuente',
+        errorCards: 'id, fsrs.due, origen, categoria',
+        radarItems: 'id, tipo, rating',
+        calibrationRecords: 'id, contexto, fecha',
+        radarProgress: 'id, updatedAt',
+        radarDatasetMeta: 'id',
+        radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada',
+        curriculumItems: 'id, tipo, patternKey',
+        curriculumDatasetMeta: 'id',
+        curriculumProgress: 'id, fsrs.due, updatedAt',
+        profile: 'id',
+        candidataAttempts: 'id, itemId, fecha',
+        compromisoAttempts: 'id, itemId, fecha',
+        dobleSolucionAttempts: 'id, itemId, fecha',
+        stoykoItems: 'id',
+        stoykoDatasetMeta: 'id',
+        stoykoAttempts: 'id, itemId, fecha',
+        triageAttempts: 'id, itemId, fecha',
+        sessions: 'id, fechaInicio, estado',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('radarProgress')
+          .toCollection()
+          .modify((progress: Partial<RadarProgress>) => {
+            if (progress.dificultadCentro === undefined) progress.dificultadCentro = 50;
+          });
+      });
   }
 }
 

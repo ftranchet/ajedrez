@@ -30,6 +30,7 @@ beforeEach(async () => {
   await db.curriculumDatasetMeta.clear();
   await db.curriculumProgress.clear();
   await db.triageAttempts.clear();
+  await db.sessions.clear();
   await db.profile.clear();
   // Este archivo prueba Cola y Radar; el bloque de currículo (Fase 3) tiene
   // sus propios tests en sessionStore.curriculum.test.ts. Marcarlo
@@ -68,6 +69,20 @@ describe('sessionStore — bloque Radar', () => {
     expect(await db.radarItems.count()).toBe(seedRadarItems.length);
   });
 
+  it('al volver antes de terminar registra la sesión como abandonada', async () => {
+    await useSessionStore.getState().start();
+    const id = useSessionStore.getState().sessionRecord!.id;
+
+    useSessionStore.getState().volver();
+
+    await vi.waitFor(async () => {
+      const record = await db.sessions.get(id);
+      expect(record?.estado).toBe('abandonada');
+      expect(record?.fechaFin).toBeDefined();
+      expect(record?.bloques.find((block) => block.estado === 'en_curso')?.fin).toBeDefined();
+    });
+  });
+
   it('un fallo en el Radar crea una ErrorCard con la jugada del usuario y el lado correcto', async () => {
     // Forzar que no se muestree ni la regla de candidatas (RF-5.8) ni la
     // confianza (RF-10.1), para llegar directo a feedback y poder verificar
@@ -103,6 +118,8 @@ describe('sessionStore — bloque Radar', () => {
     const attempts = await db.radarAttempts.toArray();
     expect(attempts).toHaveLength(1);
     expect(attempts[0]).toMatchObject({ itemId: item.id, acierto: false, tipo: item.tipo });
+    expect(attempts[0].dificultadNormalizada).toBeGreaterThanOrEqual(0);
+    expect(attempts[0].dificultadNormalizada).toBeLessThanOrEqual(100);
 
     // El feedback muestra la jugada correcta en SAN, no en UCI crudo.
     const solucion = item.solucion[0];
@@ -180,6 +197,10 @@ describe('sessionStore — bloque Radar', () => {
     vi.restoreAllMocks();
     expect(s.phase).toBe('fin');
     expect(guard).toBeLessThan(50);
+    const sessions = await db.sessions.toArray();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].estado).toBe('completada');
+    expect(sessions[0].bloques.find((b) => b.tipo === 'radar')?.completados).toBe(RADAR_SESSION_SIZE);
   });
 
   it('persiste la dificultad y los aciertos recientes para la sesión siguiente (RF-5.5)', async () => {
@@ -187,7 +208,7 @@ describe('sessionStore — bloque Radar', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
     const s = useSessionStore.getState();
-    const ratingInicial = s.radarSelState.ratingCentro;
+    const dificultadInicial = s.radarSelState.dificultadCentro;
     const item = s.radarItem!;
 
     s.radarEval('igual');
@@ -199,11 +220,11 @@ describe('sessionStore — bloque Radar', () => {
 
     const guardado = await db.radarProgress.get('principal');
     expect(guardado?.aciertosRecientes).toHaveLength(1);
-    expect(guardado?.ratingCentro).not.toBe(ratingInicial);
+    expect(guardado?.dificultadCentro).not.toBe(dificultadInicial);
 
     useSessionStore.getState().volver();
     await useSessionStore.getState().start();
-    expect(useSessionStore.getState().radarSelState.ratingCentro).toBe(guardado?.ratingCentro);
+    expect(useSessionStore.getState().radarSelState.dificultadCentro).toBe(guardado?.dificultadCentro);
     expect(useSessionStore.getState().radarAciertosRecientes).toEqual(guardado?.aciertosRecientes);
   });
 
@@ -212,11 +233,11 @@ describe('sessionStore — bloque Radar', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     await useSessionStore.getState().start();
     let s = useSessionStore.getState();
-    // Historial de ratingCentro tras cada radarContinuar(), para detectar si
+    // Historial de dificultadCentro tras cada radarContinuar(), para detectar si
     // la última llamada (la que cierra la sesión) de verdad cambió algo:
     // antes del fix, esa última llamada no aplicaba el ajuste ni en memoria
     // ni en Dexie, así que el valor quedaba idéntico al de la llamada previa.
-    const ratingCentroTrasCadaContinuar: number[] = [];
+    const dificultadTrasCadaContinuar: number[] = [];
     let guard = 0;
     while (s.phase === 'radar' && guard < 20) {
       const item = s.radarItem;
@@ -229,23 +250,23 @@ describe('sessionStore — bloque Radar', () => {
       if (s.radarSubPhase === 'feedback') {
         await s.radarContinuar();
         s = useSessionStore.getState();
-        ratingCentroTrasCadaContinuar.push(s.radarSelState.ratingCentro);
+        dificultadTrasCadaContinuar.push(s.radarSelState.dificultadCentro);
       }
       guard++;
     }
     vi.restoreAllMocks();
     expect(s.phase).toBe('fin');
-    expect(ratingCentroTrasCadaContinuar.length).toBe(RADAR_SESSION_SIZE);
+    expect(dificultadTrasCadaContinuar.length).toBe(RADAR_SESSION_SIZE);
 
     // La última llamada (la que cierra la sesión) tiene que haber cambiado
     // el rating respecto a la anteúltima: si no, el ajuste de la 8ª
     // respuesta se descartó en vez de aplicarse.
-    const [penultimo, ultimo] = ratingCentroTrasCadaContinuar.slice(-2);
+    const [penultimo, ultimo] = dificultadTrasCadaContinuar.slice(-2);
     expect(ultimo).not.toBe(penultimo);
 
     // Y lo que quedó persistido en Dexie coincide con ese último valor.
     const guardado = await db.radarProgress.get('principal');
-    expect(guardado?.ratingCentro).toBe(ultimo);
+    expect(guardado?.dificultadCentro).toBe(ultimo);
   });
 });
 
