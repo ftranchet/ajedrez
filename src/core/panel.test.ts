@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { erroresGravesPorPartidaMediaMovil } from './panel';
+import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from './panel';
 import type { Color, GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
 
 function jugada(clasificacion: MoveAnalysisEntry['clasificacion'], ladoQueMueve: Color = 'w'): MoveAnalysisEntry {
@@ -99,5 +99,44 @@ describe('erroresGravesPorPartidaMediaMovil', () => {
   it('si ninguna partida tiene jugadorColor, devuelve null', () => {
     const games = [game('g1', '2026-01-01', analisisCon(['grave']), null)];
     expect(erroresGravesPorPartidaMediaMovil(games)).toBeNull();
+  });
+});
+
+describe('mejoraErroresGraves (RF-13.2)', () => {
+  const now = new Date('2026-07-19T12:00:00.000Z');
+
+  it('celebra una baja real y suficiente frente a los 30 días anteriores', () => {
+    const games = [
+      game('old-1', '2026-06-01T12:00:00.000Z', analisisCon(['grave', 'grave', 'error'])),
+      game('old-2', '2026-06-05T12:00:00.000Z', analisisCon(['grave', 'error', 'grave'])),
+      game('old-3', '2026-06-10T12:00:00.000Z', analisisCon(['error', 'grave', 'grave'])),
+      game('new-1', '2026-06-25T12:00:00.000Z', analisisCon(['grave', 'error'])),
+      game('new-2', '2026-07-05T12:00:00.000Z', analisisCon(['error'])),
+      game('new-3', '2026-07-15T12:00:00.000Z', analisisCon(['grave'])),
+    ];
+    const result = mejoraErroresGraves(games, now);
+    expect(result).not.toBeNull();
+    expect(result?.mediaAnterior).toBe(3);
+    expect(result?.mediaActual).toBeCloseTo(4 / 3);
+    expect(result?.porcentaje).toBeCloseTo(55.56, 1);
+  });
+
+  it('no celebra con menos de tres partidas atribuibles por ventana', () => {
+    const games = [
+      game('old-1', '2026-06-01T12:00:00.000Z', analisisCon(['grave', 'grave'])),
+      game('new-1', '2026-07-01T12:00:00.000Z', analisisCon([])),
+    ];
+    expect(mejoraErroresGraves(games, now)).toBeNull();
+  });
+
+  it('no celebra una baja menor al umbral ni partidas sin color del usuario', () => {
+    const previous = [1, 2, 3].map((n) => game(`old-${n}`, `2026-06-0${n}T12:00:00.000Z`, analisisCon(['grave', 'grave', 'grave', 'grave', 'grave'])));
+    const current = [
+      game('new-1', '2026-07-01T12:00:00.000Z', analisisCon(['grave', 'grave', 'grave', 'grave'])),
+      game('new-2', '2026-07-02T12:00:00.000Z', analisisCon(['grave', 'grave', 'grave', 'grave'])),
+      game('new-3', '2026-07-03T12:00:00.000Z', analisisCon(['grave', 'grave', 'grave', 'grave', 'grave'])),
+    ];
+    const unattributable = game('sin-color', '2026-07-10T12:00:00.000Z', analisisCon([]), null);
+    expect(mejoraErroresGraves([...previous, ...current, unattributable], now)).toBeNull();
   });
 });

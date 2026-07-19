@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
-import { erroresGravesPorPartidaMediaMovil } from '../../core/panel';
+import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from '../../core/panel';
 import { brierScore, calibrationCurve, calibrationInsight } from '../../core/calibration';
 import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
@@ -82,6 +82,8 @@ export function PanelScreen() {
       <h1 className="m-0 font-display text-3xl font-medium">{t.panel.titulo}</h1>
 
       <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
+
+      <TruthCelebrationPanel games={games} />
 
       <TransferPanel measurements={transferMeasurements} onOpen={() => setTransferOpen(true)} />
 
@@ -308,11 +310,33 @@ function ActivityPanel({ records }: { records: SessionRecord[] | null }) {
         <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.actividadTitulo}</h2>
         <p className="m-0 mt-1 text-xs text-secondary">{t.panel.actividadPeriodo}</p>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <ActivityMetric value={summary.racha} label={t.panel.actividadRacha} />
         <ActivityMetric value={summary.sesiones} label={t.panel.actividadSesiones} />
         <ActivityMetric value={summary.minutos} label={t.panel.actividadMinutos} />
         <ActivityMetric value={summary.items} label={t.panel.actividadItems} />
       </div>
+      <p className="m-0 text-xs text-tertiary">{t.panel.actividadRachaAyuda}</p>
+    </section>
+  );
+}
+
+function TruthCelebrationPanel({ games }: { games: GameRecord[] | null }) {
+  if (games === null) return null;
+  const improvement = mejoraErroresGraves(games);
+  if (!improvement) return null;
+  return (
+    <section className="flex flex-col gap-1 rounded-lg border border-success/35 bg-success-subtle p-4">
+      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.panel.mejoraRealTitulo}</h2>
+      <p className="m-0 text-primary">
+        {t.panel.mejoraRealErrores.replace('{porcentaje}', String(Math.round(improvement.porcentaje)))}
+      </p>
+      <p className="m-0 text-sm text-secondary">
+        {t.panel.mejoraRealComparacion
+          .replace('{anterior}', improvement.mediaAnterior.toFixed(1))
+          .replace('{actual}', improvement.mediaActual.toFixed(1))
+          .replace('{partidas}', String(improvement.partidasActuales))}
+      </p>
     </section>
   );
 }
