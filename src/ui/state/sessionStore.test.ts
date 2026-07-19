@@ -69,6 +69,85 @@ describe('sessionStore — bloque Radar', () => {
     expect(await db.radarItems.count()).toBe(seedRadarItems.length);
   });
 
+  it('intercala un error de partida no vencido sin tocar FSRS ni la dificultad del catálogo (RF-5.9)', async () => {
+    const source = seedRadarItems[0];
+    const baseCard = buildErrorCard({
+      id: 'error-partida-revisado',
+      fen: source.fen,
+      ladoAMover: source.fen.split(' ')[1] === 'b' ? 'b' : 'w',
+      jugadaUsuario: 'a2a3',
+      jugadaCorrecta: source.solucion[0],
+      categoria: 'posicional',
+      origen: 'partida',
+    });
+    const card = { ...baseCard, fsrs: { ...baseCard.fsrs, due: '2100-01-01T00:00:00.000Z' } };
+    await db.errorCards.put(card);
+
+    // El primer 0 reserva el primer lugar del bloque; los 0.99 siguientes
+    // dejan apagados los muestreos de candidatas/confianza.
+    vi.spyOn(Math, 'random').mockImplementationOnce(() => 0).mockReturnValue(0.99);
+    await useSessionStore.getState().start();
+    let s = useSessionStore.getState();
+    expect(s.phase).toBe('radar');
+    expect(s.colaCards).toHaveLength(0);
+    expect(s.radarItem).toMatchObject({
+      fuente: 'error-propio',
+      errorCardId: card.id,
+      fen: card.fen,
+    });
+    expect(s.radarOwnErrorSlots).toContain(0);
+    const dificultadInicial = s.radarSelState.dificultadCentro;
+
+    s.radarEval('igual');
+    s = useSessionStore.getState();
+    const item = s.radarItem!;
+    const jugadaMala = [...s.dests.entries()]
+      .flatMap(([from, destinos]) => destinos.map((to) => [from, to] as const))
+      .find(([from, to]) => from + to !== item.solucion[0]);
+    if (!jugadaMala) throw new Error('la posición semilla no tiene una alternativa legal');
+    await s.radarUserMove(jugadaMala[0] as never, jugadaMala[1] as never);
+
+    s = useSessionStore.getState();
+    expect(s.radarFeedbackTexto).toContain('partida tuya');
+    expect(s.radarAciertosRecientes).toEqual([]);
+    const attempt = (await db.radarAttempts.toArray())[0];
+    expect(attempt).toMatchObject({
+      itemId: `error-propio:${card.id}`,
+      origenContenido: 'error-propio',
+      errorCardId: card.id,
+      acierto: false,
+    });
+    expect(attempt.dificultadNormalizada).toBeUndefined();
+    expect((await db.errorCards.get(card.id))?.fsrs).toEqual(card.fsrs);
+
+    await s.radarContinuar();
+    vi.restoreAllMocks();
+    expect(useSessionStore.getState().radarSelState.dificultadCentro).toBe(dificultadInicial);
+    expect(useSessionStore.getState().radarItem?.fuente).not.toBe('error-propio');
+  });
+
+  it('no recicla en Radar una tarjeta vencida que ya pertenece a la Cola de esa sesión', async () => {
+    const source = seedRadarItems[0];
+    const dueCard = buildErrorCard({
+      id: 'error-partida-vencido',
+      fen: source.fen,
+      ladoAMover: source.fen.split(' ')[1] === 'b' ? 'b' : 'w',
+      jugadaUsuario: 'a2a3',
+      jugadaCorrecta: source.solucion[0],
+      categoria: 'tactico',
+      origen: 'partida',
+      now: new Date('2020-01-01T00:00:00.000Z'),
+    });
+    await db.errorCards.put(dueCard);
+
+    await useSessionStore.getState().start();
+    const s = useSessionStore.getState();
+    expect(s.phase).toBe('cola');
+    expect(s.colaCards.map((card) => card.id)).toContain(dueCard.id);
+    expect(s.radarOwnErrorItems).toEqual([]);
+    expect(s.radarOwnErrorSlots).toEqual([]);
+  });
+
   it('al volver antes de terminar registra la sesión como abandonada', async () => {
     await useSessionStore.getState().start();
     const id = useSessionStore.getState().sessionRecord!.id;

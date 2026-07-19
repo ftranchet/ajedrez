@@ -131,7 +131,12 @@ export interface RadarItem {
   /** Rating crudo de la fuente; no se compara entre fuentes (ADR-0007). */
   rating: number;
   solucion: string[];
-  fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'pipeline-envenenada' | 'seed-dev';
+  fuente: 'lichess-cc0' | 'pipeline-tranquilas' | 'pipeline-doble-solucion' | 'pipeline-envenenada' | 'seed-dev' | 'error-propio';
+  /**
+   * Referencia a la tarjeta que originó una posición reciclada por RF-5.9.
+   * Estos ítems son efímeros: nunca se guardan en el catálogo del Radar.
+   */
+  errorCardId?: string;
   /**
    * Jugadas UCI adicionales que también cuentan como acierto (RF-5.3). Solo
    * en posiciones tranquilas: la definición de "tranquila" es que no hay un
@@ -184,6 +189,10 @@ export interface RadarAttempt {
   rating: number;
   /** Percentil 0–100 usado al servir el ítem (ADR-0007). Ausente en intentos históricos. */
   dificultadNormalizada?: number;
+  /** Separa el catálogo calibrado de los errores propios reciclados (RF-5.9). */
+  origenContenido?: 'catalogo' | 'error-propio';
+  /** Tarjeta fuente cuando `origenContenido` es `error-propio`. */
+  errorCardId?: string;
   acierto: boolean;
   /**
    * Evaluación rápida declarada antes de jugar (RF-5.2). Se persiste tal

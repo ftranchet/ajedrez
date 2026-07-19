@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { RADAR_INITIAL_STATE, adjustDifficulty, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from './radar';
+import { RADAR_INITIAL_STATE, OWN_ERROR_RADAR_MAX_SHARE, adjustDifficulty, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, isOwnErrorRadarItem, ownErrorRadarItems, recordServed, scheduleOwnErrorRadarSlots, selectNextRadarItem, type RadarSelectionState } from './radar';
 import type { RadarItem, TipoRadar } from './types';
+import { buildErrorCard } from './errorCard';
 
 function seededRng(seed: number): () => number {
   let s = seed;
@@ -131,6 +132,54 @@ describe('selectNextRadarItem', () => {
     ];
     expect(dificultadNormalizada(pool[0], pool)).toBe(50);
     expect(dificultadNormalizada(pool[1], pool)).toBe(50);
+  });
+});
+
+describe('errores propios dentro del Radar (RF-5.9)', () => {
+  const ownCard = buildErrorCard({
+    id: 'partida-1',
+    fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+    ladoAMover: 'w',
+    jugadaUsuario: 'f2f3',
+    jugadaCorrecta: 'g1f3',
+    categoria: 'posicional',
+    origen: 'partida',
+  });
+
+  it('recicla solo tarjetas de partidas propias y excluye las que ya van a la Cola', () => {
+    const radarCard = { ...ownCard, id: 'radar-1', origen: 'radar' as const };
+    const excludedCard = { ...ownCard, id: 'partida-vencida' };
+    const items = ownErrorRadarItems([ownCard, radarCard, excludedCard], ['partida-vencida']);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: 'error-propio:partida-1',
+      errorCardId: 'partida-1',
+      fuente: 'error-propio',
+      solucion: ['g1f3'],
+    });
+    expect(isOwnErrorRadarItem(items[0])).toBe(true);
+  });
+
+  it('reserva lugares aleatorios sin superar un cuarto del bloque', () => {
+    const slots = scheduleOwnErrorRadarSlots(10, 20, seededRng(19));
+    expect(slots).toHaveLength(Math.floor(10 * OWN_ERROR_RADAR_MAX_SHARE));
+    expect(new Set(slots).size).toBe(slots.length);
+    expect(slots.every((slot) => slot >= 0 && slot < 10)).toBe(true);
+    expect(slots).toEqual([...slots].sort((a, b) => a - b));
+  });
+
+  it('no inventa cupo si no hay errores propios o el bloque es demasiado corto', () => {
+    expect(scheduleOwnErrorRadarSlots(8, 0, seededRng(1))).toEqual([]);
+    expect(scheduleOwnErrorRadarSlots(3, 3, seededRng(1))).toEqual([]);
+  });
+
+  it('registra el id reciclado sin contaminar el historial de tipos del catálogo', () => {
+    const item = ownErrorRadarItems([ownCard])[0];
+    const initial = { ...RADAR_INITIAL_STATE, historialTipos: ['defensa' as const] };
+    const next = recordServed(initial, item);
+    expect(next.historialIds).toContain('error-propio:partida-1');
+    expect(next.historialTipos).toEqual(['defensa']);
   });
 });
 

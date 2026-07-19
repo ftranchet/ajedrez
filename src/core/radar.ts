@@ -4,7 +4,7 @@
 // fallo 20–40%, Bjork). El subtipo doble solución (RF-5.7) se selecciona
 // igual que cualquier otro ítem — su lógica de puntuación vive en
 // core/dobleSolucion.ts, no acá.
-import type { CategoriaError, RadarItem, TipoRadar } from './types';
+import type { CategoriaError, ErrorCard, RadarItem, TipoRadar } from './types';
 
 export interface RadarSelectionState {
   /** Últimos tipos servidos, más reciente al final. */
@@ -27,6 +27,66 @@ const ANCHO_BANDA = 15; // ± percentiles sobre dificultadCentro
 const PASO_AJUSTE = 4; // cuánto se mueve dificultadCentro por respuesta
 const DIFICULTAD_MIN = 0;
 const DIFICULTAD_MAX = 100;
+/** RF-5.9: los errores propios complementan el Radar; no reemplazan su catálogo. */
+export const OWN_ERROR_RADAR_MAX_SHARE = 0.25;
+const OWN_ERROR_RADAR_PREFIX = 'error-propio:';
+
+function tipoFromCategoria(categoria: CategoriaError): TipoRadar {
+  if (categoria === 'posicional') return 'tranquila';
+  if (categoria === 'tiempo') return 'defensa';
+  if (categoria === 'psicologico') return 'envenenada';
+  return 'ofensiva';
+}
+
+/** Convierte una tarjeta en un ítem efímero, sin incorporarlo al catálogo. */
+export function radarItemFromOwnError(card: ErrorCard): RadarItem {
+  return {
+    id: `${OWN_ERROR_RADAR_PREFIX}${card.id}`,
+    fen: card.fen,
+    tipo: tipoFromCategoria(card.categoria),
+    temas: ['error-propio', card.categoria],
+    rating: 0,
+    solucion: [card.jugadaCorrecta],
+    fuente: 'error-propio',
+    errorCardId: card.id,
+  };
+}
+
+/**
+ * Solo recicla errores nacidos en partidas del usuario. Los ids excluidos
+ * corresponden a tarjetas vencidas que ya tienen prioridad en la Cola de la
+ * misma sesión, para no mostrar dos veces el mismo ejercicio.
+ */
+export function ownErrorRadarItems(cards: ErrorCard[], excludedCardIds: Iterable<string> = []): RadarItem[] {
+  const excluded = new Set(excludedCardIds);
+  return cards
+    .filter((card) => card.origen === 'partida' && !excluded.has(card.id))
+    .map(radarItemFromOwnError);
+}
+
+export function isOwnErrorRadarItem(item: RadarItem | null | undefined): boolean {
+  return item?.fuente === 'error-propio' && typeof item.errorCardId === 'string';
+}
+
+/**
+ * Sortea los lugares (0-based) reservados a errores propios. La cuota dura
+ * de 25% evita que el reciclaje desplace al catálogo, y el sorteo impide que
+ * el usuario aprenda un patrón como "cada cuarta posición es mía".
+ */
+export function scheduleOwnErrorRadarSlots(
+  totalPositions: number,
+  availableErrors: number,
+  rng: () => number = Math.random,
+): number[] {
+  const total = Math.max(0, Math.floor(totalPositions));
+  const quota = Math.min(Math.max(0, Math.floor(availableErrors)), Math.floor(total * OWN_ERROR_RADAR_MAX_SHARE));
+  const positions = Array.from({ length: total }, (_, index) => index);
+  for (let i = 0; i < quota; i++) {
+    const j = i + Math.floor(rng() * (positions.length - i));
+    [positions[i], positions[j]] = [positions[j], positions[i]];
+  }
+  return positions.slice(0, quota).sort((a, b) => a - b);
+}
 
 /**
  * Percentil 0–100 del rating dentro de su fuente (ADR-0007). Las escalas de
@@ -108,7 +168,11 @@ export function selectNextRadarItem(
 export function recordServed(state: RadarSelectionState, item: RadarItem): RadarSelectionState {
   return {
     ...state,
-    historialTipos: [...state.historialTipos, item.tipo].slice(-20),
+    // El tipo de un error propio es una adaptación técnica de su categoría,
+    // no una etiqueta verificada del catálogo: no debe sesgar la mezcla RF-5.1.
+    historialTipos: isOwnErrorRadarItem(item)
+      ? state.historialTipos
+      : [...state.historialTipos, item.tipo].slice(-20),
     historialIds: [...state.historialIds, item.id].slice(-20),
   };
 }
@@ -132,6 +196,13 @@ const EXPLICACIONES_FALLO: Record<TipoRadar, string> = {
 /** Texto de feedback (RF-5.3): explica el porqué también cuando no había táctica. */
 export function explainFeedback(item: RadarItem, acierto: boolean): string {
   return (acierto ? EXPLICACIONES_ACIERTO : EXPLICACIONES_FALLO)[item.tipo];
+}
+
+/** Feedback que revela el origen propio recién después de responder. */
+export function explainOwnErrorFeedback(acierto: boolean): string {
+  return acierto
+    ? 'Esta posición volvió de un error de una partida tuya. Esta vez encontraste la corrección.'
+    : 'Esta posición volvió de un error de una partida tuya. La corrección todavía necesita trabajo y seguirá en su calendario de repaso.';
 }
 
 /**
