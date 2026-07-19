@@ -28,6 +28,7 @@ import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { SectionHeading } from '../components/SectionHeading';
+import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { AnalizarScreen } from './AnalizarScreen';
 import { TransferScreen } from './TransferScreen';
 import { N1ExperimentScreen } from './N1ExperimentScreen';
@@ -181,7 +182,7 @@ function ResumenView({
         <div className="hidden lg:block">
           <NextStepPanel games={games} profile={profile} onView={onView} />
         </div>
-        <ActivityPanel records={sessions} />
+        <ActivityPanel records={sessions} profile={profile} />
         <RadarSummary attempts={radarAttempts} />
         <DobleSolucionSummary attempts={dobleSolucionAttempts} />
       </aside>
@@ -493,23 +494,25 @@ function CalibrationPanel({ records }: { records: CalibrationRecord[] | null }) 
   );
 }
 
-function ActivityPanel({ records }: { records: SessionRecord[] | null }) {
+function ActivityPanel({ records, profile }: { records: SessionRecord[] | null; profile: Profile }) {
   if (records === null) return null;
   const summary = activitySummary(records);
   return (
-    <section className="flex flex-col gap-2 rounded-md border border-subtle bg-surface p-3">
-      <div>
-        <SectionHeading>{t.panel.actividadTitulo}</SectionHeading>
-        <p className="m-0 mt-1 text-xs text-secondary">{t.panel.actividadPeriodo}</p>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <ActivityMetric value={summary.racha} label={t.panel.actividadRacha} />
-        <ActivityMetric value={summary.sesiones} label={t.panel.actividadSesiones} />
-        <ActivityMetric value={summary.minutos} label={t.panel.actividadMinutos} />
-        <ActivityMetric value={summary.items} label={t.panel.actividadItems} />
-      </div>
-      <p className="m-0 text-xs text-tertiary">{t.panel.actividadRachaAyuda}</p>
-    </section>
+    <div className="flex flex-col gap-3">
+      <WeeklyPlanCard records={records} profile={profile} />
+      <section className="flex flex-col gap-2 rounded-md border border-subtle bg-surface p-3">
+        <div>
+          <SectionHeading>{t.panel.actividadTitulo}</SectionHeading>
+          <p className="m-0 mt-1 text-xs text-secondary">{t.panel.actividadPeriodo}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <ActivityMetric value={summary.sesiones} label={t.panel.actividadSesiones} />
+          <ActivityMetric value={summary.minutos} label={t.panel.actividadMinutos} />
+          <ActivityMetric value={summary.items} label={t.panel.actividadItems} />
+        </div>
+        <p className="m-0 text-xs text-tertiary">{t.panel.actividadAyuda}</p>
+      </section>
+    </div>
   );
 }
 

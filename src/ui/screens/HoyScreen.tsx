@@ -8,11 +8,14 @@ import { Board } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
+import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { nivelCiegas } from '../../core/curriculum';
+import type { PlanSemanal } from '../../core/types';
+import { profileRepo } from '../../services/storage/profileRepo';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
@@ -95,6 +98,12 @@ function fechaDeHoy(): string {
 function Portada() {
   const s = useSessionStore();
 
+  async function saveWeeklyPlan(planSemanal: PlanSemanal) {
+    const profile = { ...s.profile, planSemanal };
+    await profileRepo.save(profile);
+    useSessionStore.setState({ profile });
+  }
+
   if (s.dueCount === null) {
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -119,6 +128,13 @@ function Portada() {
           <span className="font-mono text-sm text-secondary">{t.sesion.minutos.replace('{n}', String(duracionMin))}</span>
         </div>
       </div>
+
+      <WeeklyPlanCard
+        records={s.sessions ?? []}
+        profile={s.profile}
+        editable
+        onSave={saveWeeklyPlan}
+      />
 
       {/* Bloque héroe (design system §4.1): el siguiente bloque, destacado con
           borde accent y el único botón primario de la pantalla. */}

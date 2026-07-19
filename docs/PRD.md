@@ -177,9 +177,12 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 
 ### E13 — Adherencia honesta
 
-- **RF-13.1 (P1)** Rachas de **proceso** (sesiones completadas), nunca de resultado. Sin celebraciones por volumen.
+- **RF-13.1 (P1)** Adherencia de **proceso** mediante un plan semanal personalizado: sesiones completadas, nunca resultado ni volumen; como máximo una sesión por día para la meta.
 - **RF-13.2 (P1)** Celebración atada a métricas de verdad ("tus errores graves bajaron 30% este mes").
 - **RF-13.3 (P2)** Recordatorio diario opcional (notificación local de la PWA), configurable y apagado por defecto.
+- **RF-13.4 (P1)** Plan configurable (Ligero 2/60, Constante 3/90, Intenso 5/150 o personalizado 1–7 sesiones y 15–600 minutos), persistido y exportable.
+- **RF-13.5 (P1)** Racha semanal y consistencia de las últimas ocho semanas; la consistencia tiene mayor jerarquía y una semana fallida no borra la historia.
+- **RF-13.6 (P2)** Hitos ligados a capacidades o evidencia nueva, con explicación de significado; sin XP, monedas, cofres ni rankings.
 
 ### E14 — Exportación e importación de datos
 

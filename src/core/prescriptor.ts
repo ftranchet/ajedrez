@@ -6,6 +6,7 @@
 // (E9) cuando el perfil de tiempo muestra apuro o desperdicio — el ejemplo
 // literal de RF-11.2 ("si >35% de las derrotas son por reloj, sube Triage").
 import type { BandaElo, CategoriaError, ErrorCard, GameRecord, Profile } from './types';
+import { DEFAULT_WEEKLY_PLAN } from './adherence';
 import { hayFugaDeTiempo, perfilDeTiempo } from './triage';
 import dietaConfig from '../config/prescriptor-dieta.json' with { type: 'json' };
 
@@ -18,6 +19,7 @@ export const DEFAULT_PROFILE: Profile = {
   id: 'principal',
   bandaElo: 'elemental',
   diagnosticoCompletadoEn: null,
+  planSemanal: DEFAULT_WEEKLY_PLAN,
 };
 
 interface DietaBanda {

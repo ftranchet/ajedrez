@@ -78,6 +78,8 @@ interface SessionState {
   dieta: DietaSesion;
   /** Snapshot persistente de la sesión en curso/completada (RF-12.1). */
   sessionRecord: SessionRecord | null;
+  /** Historial necesario para mostrar el plan semanal en Hoy. */
+  sessions: SessionRecord[] | null;
 
   // Cola (E4)
   colaCards: ErrorCard[];
@@ -234,7 +236,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
     const current = get().sessionRecord;
     if (!current || current.estado !== 'en_curso') return;
     const completed = completeSessionRecord(current);
-    set({ sessionRecord: completed });
+    set({
+      sessionRecord: completed,
+      sessions: [completed, ...(get().sessions ?? []).filter((record) => record.id !== completed.id)],
+    });
     await persistSession(completed);
   }
 
@@ -384,6 +389,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     profile: DEFAULT_PROFILE,
     dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
     sessionRecord: null,
+    sessions: null,
     colaCards: [],
     colaIndex: 0,
     colaSubPhase: 'jugando',
@@ -430,12 +436,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     async loadSummary() {
       await curriculumItemRepo.ensureSeeded();
-      const [allCards, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
+      const [allCards, curriculumItems, curriculumProgressList, profile, games, sessions] = await Promise.all([
         errorCardRepo.list(),
         curriculumItemRepo.list(),
         curriculumProgressRepo.list(),
         profileRepo.get(),
         gameRepo.list(),
+        sessionRepo.list(),
       ]);
       const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
       set({
@@ -443,6 +450,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron').length,
         profile,
         dieta: dietaPorBanda(profile.bandaElo, allCards, games),
+        sessions,
       });
     },
 

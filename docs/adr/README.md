@@ -22,3 +22,4 @@ Un ADR documenta una decisión con costo de reversa alto: qué se decidió, en q
 | 0010 | Detector de sobreajuste con rating real | Aceptado |
 | 0011 | Adherencia basada en proceso y métricas de verdad | Aceptado |
 | 0012 | Experimento n=1 con diseño ABAB fijo | Aceptado |
+| 0013 | Plan semanal como unidad de adherencia | Aceptado |

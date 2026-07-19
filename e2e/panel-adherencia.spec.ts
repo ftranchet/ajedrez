@@ -1,8 +1,8 @@
-// E13: la adherencia se reconoce por proceso y la celebración solo aparece
-// ante una mejora medida en partidas reales.
+// E13: la adherencia se reconoce por el plan semanal de proceso y la
+// celebración solo aparece ante una mejora medida en partidas reales.
 import { expect, test } from '@playwright/test';
 
-test('Panel: racha de sesiones completas y mejora real de errores graves', async ({ page }) => {
+test('Panel: plan semanal cumplido y mejora real de errores graves', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.evaluate(() => {
@@ -28,7 +28,13 @@ test('Panel: racha de sesiones completas y mejora real de errores graves', async
       const request = indexedDB.open('elomax');
       request.onsuccess = () => {
         const database = request.result;
-        const tx = database.transaction(['sessions', 'games'], 'readwrite');
+        const tx = database.transaction(['sessions', 'games', 'profile'], 'readwrite');
+        tx.objectStore('profile').put({
+          id: 'principal',
+          bandaElo: 'elemental',
+          diagnosticoCompletadoEn: new Date().toISOString(),
+          planSemanal: { sesionesObjetivo: 1, minutosObjetivo: 30 },
+        });
         const sessions = tx.objectStore('sessions');
         [0, 1, 2].forEach((daysAgo) => sessions.put({
           id: `process-${daysAgo}`,
@@ -63,9 +69,9 @@ test('Panel: racha de sesiones completas y mejora real de errores graves', async
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
 
-  const streakMetric = page.getByText('días de proceso', { exact: true }).locator('..');
-  await expect(streakMetric.getByText('3', { exact: true })).toBeVisible();
-  await expect(page.getByText('el volumen y los aciertos no la inflan', { exact: false })).toBeVisible();
+  await expect(page.getByText('1 de 1 sesiones', { exact: true })).toBeVisible();
+  await expect(page.getByText('Plan semanal cumplido.', { exact: false })).toBeVisible();
+  await expect(page.getByText('no otorgan premios ni inflan la meta', { exact: false })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Mejora en partidas reales' })).toBeVisible();
   await expect(page.getByText('bajaron 67%', { exact: false })).toBeVisible();
 });
