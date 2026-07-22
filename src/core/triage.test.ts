@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decisionCorrecta, hayFugaDeTiempo, perfilDeTiempo, type PerfilDeTiempo } from './triage';
-import type { GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
+import { decisionCorrecta, hayFugaDeTiempo, informeFugasTiempo, perfilDeTiempo, type PerfilDeTiempo } from './triage';
+import type { GameAnalysis, GameRecord, MoveAnalysisEntry, TriageAttempt } from './types';
 
 function jugada(ply: number, ladoQueMueve: 'w' | 'b', clasificacion: MoveAnalysisEntry['clasificacion']): MoveAnalysisEntry {
   return {
@@ -94,5 +94,77 @@ describe('decisionCorrecta', () => {
   it('tranquila y genuina alcanzan con una jugada sólida', () => {
     expect(decisionCorrecta('tranquila')).toBe('alcanza');
     expect(decisionCorrecta('genuina')).toBe('alcanza');
+  });
+});
+
+function triageAttempt(overrides: Partial<TriageAttempt>): TriageAttempt {
+  return {
+    id: crypto.randomUUID(),
+    itemId: 'r1',
+    tipo: 'tranquila',
+    decisionUsuario: 'alcanza',
+    decisionCorrecta: 'alcanza',
+    correcta: true,
+    tiempoMs: 2000,
+    fecha: '2026-07-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('informeFugasTiempo', () => {
+  const ahora = new Date('2026-07-22T00:00:00.000Z');
+
+  it('sin partidas ni ejercicios en la ventana, deja perfil y ejercicios en null', () => {
+    const informe = informeFugasTiempo([], [], ahora);
+    expect(informe.perfil).toBeNull();
+    expect(informe.ejercicios).toBeNull();
+    expect(informe.infragastoEsFuga).toBe(false);
+    expect(informe.sobregastoEsFuga).toBe(false);
+  });
+
+  // Blancas juegan índices pares; sus dos jugadas propias son índices 0 y 2 con
+  // tiempos 100 y 5000 → mediana 2550, así que el índice 0 (100 ms) queda rápido.
+  const analisisConApuro: GameAnalysis = {
+    jugadas: [jugada(0, 'w', 'grave'), jugada(1, 'b', 'buena'), jugada(2, 'w', 'buena'), jugada(3, 'b', 'buena')],
+    comparacionEvaluaciones: [],
+    analizadaEn: '2026-07-20',
+  };
+  const analisisSinApuro: GameAnalysis = {
+    jugadas: [jugada(0, 'w', 'buena'), jugada(1, 'b', 'buena'), jugada(2, 'w', 'buena'), jugada(3, 'b', 'buena')],
+    comparacionEvaluaciones: [],
+    analizadaEn: '2026-07-20',
+  };
+  const tiempos = [100, 500, 5000, 500];
+
+  it('acota el perfil a las partidas de los últimos 30 días', () => {
+    // Partida vieja (fuera de ventana) con apuro; partida reciente sin apuro.
+    const vieja = game({ analisis: analisisConApuro, jugadorColor: 'w', tiemposPorJugadaMs: tiempos, fecha: '2026-01-01T00:00:00.000Z' });
+    const reciente = game({ id: 'g2', analisis: analisisSinApuro, jugadorColor: 'w', tiemposPorJugadaMs: tiempos, fecha: '2026-07-20T00:00:00.000Z' });
+
+    const informe = informeFugasTiempo([vieja, reciente], [], ahora);
+    // Solo entra la reciente: la jugada rápida no fue costosa → sin fuga.
+    expect(informe.perfil).not.toBeNull();
+    expect(informe.infragastoEsFuga).toBe(false);
+  });
+
+  it('marca fuga cuando el infragasto de la ventana supera el umbral', () => {
+    const g = game({ analisis: analisisConApuro, jugadorColor: 'w', tiemposPorJugadaMs: tiempos, fecha: '2026-07-20T00:00:00.000Z' });
+    const informe = informeFugasTiempo([g], [], ahora);
+    expect(informe.infragastoEsFuga).toBe(true);
+  });
+
+  it('resume los ejercicios de la ventana con precisión y latencia mediana', () => {
+    const dentro = [
+      triageAttempt({ fecha: '2026-07-10T00:00:00.000Z', correcta: true, tiempoMs: 1000 }),
+      triageAttempt({ fecha: '2026-07-11T00:00:00.000Z', correcta: false, tiempoMs: 3000 }),
+      triageAttempt({ fecha: '2026-07-12T00:00:00.000Z', correcta: true, tiempoMs: 2000 }),
+    ];
+    const fuera = triageAttempt({ fecha: '2026-01-01T00:00:00.000Z', correcta: true });
+    const informe = informeFugasTiempo([], [...dentro, fuera], ahora);
+    expect(informe.ejercicios).not.toBeNull();
+    expect(informe.ejercicios?.total).toBe(3);
+    expect(informe.ejercicios?.correctos).toBe(2);
+    expect(informe.ejercicios?.precision).toBeCloseTo(2 / 3);
+    expect(informe.ejercicios?.latenciaMedianaMs).toBe(2000);
   });
 });

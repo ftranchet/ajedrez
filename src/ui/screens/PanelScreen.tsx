@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement } from '../../core/types';
+import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from '../../core/panel';
@@ -13,6 +13,7 @@ import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
 import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
 import { detectOverfitting } from '../../core/overfitting';
+import { informeFugasTiempo } from '../../core/triage';
 import { currentN1Phase } from '../../core/n1Experiment';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
@@ -22,6 +23,7 @@ import { profileRepo } from '../../services/storage/profileRepo';
 import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
+import { triageAttemptRepo } from '../../services/storage/triageAttemptRepo';
 import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
 import { useAnalysisStore } from '../state/analysisStore';
@@ -49,6 +51,7 @@ export function PanelScreen() {
   const [dobleSolucionAttempts, setDobleSolucionAttempts] = useState<DobleSolucionAttempt[] | null>(null);
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
   const [transferMeasurements, setTransferMeasurements] = useState<TransferMeasurement[] | null>(null);
+  const [triageAttempts, setTriageAttempts] = useState<TriageAttempt[] | null>(null);
   const [n1Experiments, setN1Experiments] = useState<N1Experiment[] | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [n1Open, setN1Open] = useState(false);
@@ -65,8 +68,9 @@ export function PanelScreen() {
       dobleSolucionAttemptRepo.list(),
       sessionRepo.list(),
       transferMeasurementRepo.list(),
+      triageAttemptRepo.list(),
       n1ExperimentRepo.list(),
-    ]).then(([g, radar, calibration, loadedProfile, doble, loadedSessions, transfer, experiments]) => {
+    ]).then(([g, radar, calibration, loadedProfile, doble, loadedSessions, transfer, triage, experiments]) => {
       if (!alive) return;
       setGames(g);
       setRadarAttempts(radar);
@@ -75,6 +79,7 @@ export function PanelScreen() {
       setDobleSolucionAttempts(doble);
       setSessions(loadedSessions);
       setTransferMeasurements(transfer);
+      setTriageAttempts(triage);
       setN1Experiments(experiments);
     });
     return () => {
@@ -91,7 +96,8 @@ export function PanelScreen() {
   }
 
   const loading = games === null || radarAttempts === null || calibraciones === null || profile === null ||
-    dobleSolucionAttempts === null || sessions === null || transferMeasurements === null || n1Experiments === null;
+    dobleSolucionAttempts === null || sessions === null || transferMeasurements === null || triageAttempts === null ||
+    n1Experiments === null;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
@@ -120,6 +126,7 @@ export function PanelScreen() {
           sessions={sessions}
           radarAttempts={radarAttempts}
           dobleSolucionAttempts={dobleSolucionAttempts}
+          triageAttempts={triageAttempts}
           onView={setView}
         />
       ) : view === 'medicion' ? (
@@ -158,6 +165,7 @@ function ResumenView({
   sessions,
   radarAttempts,
   dobleSolucionAttempts,
+  triageAttempts,
   onView,
 }: {
   games: GameRecord[];
@@ -166,6 +174,7 @@ function ResumenView({
   sessions: SessionRecord[];
   radarAttempts: RadarAttempt[];
   dobleSolucionAttempts: DobleSolucionAttempt[];
+  triageAttempts: TriageAttempt[];
   onView: (view: PanelView) => void;
 }) {
   return (
@@ -183,6 +192,7 @@ function ResumenView({
           <NextStepPanel games={games} profile={profile} onView={onView} />
         </div>
         <ActivityPanel records={sessions} profile={profile} />
+        <TriageTimeReportPanel games={games} attempts={triageAttempts} />
         <RadarSummary attempts={radarAttempts} />
         <DobleSolucionSummary attempts={dobleSolucionAttempts} />
       </aside>
@@ -655,6 +665,62 @@ function DobleSolucionSummary({ attempts }: { attempts: DobleSolucionAttempt[] |
       ) : (
         <p className="m-0 text-primary">{t.panel.dobleSolucionTasa.replace('{porcentaje}', String(Math.round(tasa * 100)))}</p>
       )}
+    </section>
+  );
+}
+
+// Triage de reloj (E9, RF-9.3): informe mensual de fugas de tiempo integrado al
+// Panel. Lee el perfil de gestión del reloj de las partidas analizadas del
+// último mes (RF-9.1) y la práctica de decisión "¿pide cálculo o alcanza?"
+// (RF-9.2); resalta como "fuga" solo cuando supera el umbral que el Prescriptor
+// usa para sumar el bloque a la sesión.
+function TriageTimeReportPanel({ games, attempts }: { games: GameRecord[] | null; attempts: TriageAttempt[] | null }) {
+  if (games === null || attempts === null) return null;
+  const informe = informeFugasTiempo(games, attempts);
+  const { perfil, ejercicios, infragastoEsFuga, sobregastoEsFuga } = informe;
+  if (!perfil && !ejercicios) {
+    return (
+      <section className="rounded-lg border border-subtle bg-surface p-4">
+        <SectionHeading className="mb-2">{t.panel.triageInformeTitulo}</SectionHeading>
+        <p className="m-0 text-secondary">{t.panel.triageInformeSinDatos}</p>
+      </section>
+    );
+  }
+  const hayFuga = infragastoEsFuga || sobregastoEsFuga;
+  return (
+    <section className={`flex flex-col gap-2 rounded-lg border p-4 ${hayFuga ? 'border-accent/40 bg-accent-subtle' : 'border-subtle bg-surface'}`}>
+      <div>
+        <SectionHeading>{t.panel.triageInformeTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-xs text-secondary">{t.panel.triageInformePeriodo}</p>
+      </div>
+      {perfil ? (
+        <div className="flex flex-col gap-1 text-sm">
+          <p className={`m-0 ${infragastoEsFuga ? 'font-medium text-primary' : 'text-secondary'}`}>
+            {t.panel.triageInfragasto.replace('{porcentaje}', String(Math.round(perfil.infragasto * 100)))}
+            {infragastoEsFuga ? ` · ${t.panel.triageFugaEtiqueta}` : ''}
+          </p>
+          <p className={`m-0 ${sobregastoEsFuga ? 'font-medium text-primary' : 'text-secondary'}`}>
+            {t.panel.triageSobregasto.replace('{porcentaje}', String(Math.round(perfil.sobregasto * 100)))}
+            {sobregastoEsFuga ? ` · ${t.panel.triageFugaEtiqueta}` : ''}
+          </p>
+          <p className="m-0 text-xs text-tertiary">{t.panel.triageJugadasConsideradas.replace('{n}', String(perfil.jugadasConsideradas))}</p>
+        </div>
+      ) : (
+        <p className="m-0 text-sm text-secondary">{t.panel.triageInformeSinPerfil}</p>
+      )}
+      {ejercicios ? (
+        <div className="flex flex-col gap-1 text-sm text-secondary">
+          <p className="m-0">
+            {t.panel.triageEjercicios
+              .replace('{correctos}', String(ejercicios.correctos))
+              .replace('{total}', String(ejercicios.total))
+              .replace('{porcentaje}', String(Math.round(ejercicios.precision * 100)))}
+          </p>
+          <p className="m-0 text-xs text-tertiary">
+            {t.panel.triageEjerciciosLatencia.replace('{segundos}', (ejercicios.latenciaMedianaMs / 1000).toFixed(1))}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }
