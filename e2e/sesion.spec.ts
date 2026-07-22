@@ -490,14 +490,13 @@ test.describe('sesión simple: Cola', () => {
 });
 
 test.describe('exportación e importación (E14)', () => {
-  test('exportar mis datos descarga un .zip, alcanzable en 3 toques desde Hoy', async ({ page }) => {
+  test('exportar mis datos descarga un .zip, alcanzable desde el engranaje de Ajustes', async ({ page }) => {
     await page.goto('./');
     await page.getByText('Tu sesión de hoy').waitFor();
 
-    // Toque 1: Panel. Toque 2: Partidas y datos. Toque 3: Exportar.
-    await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
-    await page.getByRole('radio', { name: 'Partidas y datos' }).click();
-    await page.getByText('Tus datos').waitFor();
+    // Toque 1: engranaje de Ajustes. Toque 2: Exportar (dentro de RF-14.1 ≤3).
+    await page.locator('button[aria-label="Ajustes"]:visible').click();
+    await page.getByRole('heading', { name: 'Tus datos' }).waitFor();
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Exportar mis datos' }).click();

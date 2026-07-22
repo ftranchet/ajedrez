@@ -135,6 +135,8 @@ Rotación re-acomoda sin recargar (RNF-1); entrada por teclado en notación alge
 
 La navegación persiste cada destino como hash (`#/hoy`, `#/jugar`, `#/calculo`, `#/panel`) para admitir enlaces directos, recarga e historial aun bajo GitHub Pages. Al cambiar de pantalla, el contenido vuelve arriba y el foco pasa al título principal. En celular, el destino activo combina fondo, texto y una barra superior: nunca depende solo del color.
 
+**Ajustes** (`#/ajustes`) no es un quinto destino de la navegación —para no diluir los cuatro— sino un **engranaje** en el header: en escritorio vive en el pie de la barra lateral; en celular, en una barra superior fina junto a la marca. Concentra toda la configuración (plan semanal editable, recordatorio, sonido y movimiento, respaldo de datos y "Acerca de"), dejando "Tu sesión de hoy" enfocada en la decisión del día (la constancia se ve de solo lectura) y el Panel enfocado en la medición. El respaldo completo (E14) sigue alcanzable en ≤3 toques (engranaje → Exportar), dentro de RF-14.1.
+
 ### 4.1 Pantalla "Tu sesión de hoy" (decisión)
 Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque de la sesión es una tarjeta destacada con borde `accent`, su porqué y el único botón primario de la pantalla ("Empezar sesión"); los bloques restantes se listan debajo como tarjetas secundarias. Encabezado: fecha en `font-mono` tertiary + título en `font-display` + duración total. En celular el héroe y su CTA aparecen antes de cualquier bloque de constancia, plan semanal o recordatorio: la acción diaria debe entrar en el primer viewport. Alternativa "línea de tiempo" descartada como default; queda documentada como variante B en el prototipo (`docs/prototipos/sesion-de-hoy.dc.html`).
 

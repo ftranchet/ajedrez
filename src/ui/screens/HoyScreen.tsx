@@ -9,8 +9,6 @@ import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
-import { ReminderCard } from '../components/ReminderCard';
-import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { SectionHeading } from '../components/SectionHeading';
 import { Transition } from '../components/Transition';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
@@ -18,9 +16,7 @@ import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { nivelCiegas } from '../../core/curriculum';
-import type { PlanSemanal, ReminderConfig, SensoryPreferences } from '../../core/types';
 import { normalizeSensoryPreferences } from '../../core/sensory';
-import { profileRepo } from '../../services/storage/profileRepo';
 import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
@@ -109,21 +105,6 @@ function Portada() {
   const s = useSessionStore();
   const loadingSlow = useSlowLoading(s.summaryStatus === 'idle' || s.summaryStatus === 'loading');
 
-  async function saveWeeklyPlan(planSemanal: PlanSemanal) {
-    const profile = await profileRepo.update({ planSemanal });
-    useSessionStore.setState({ profile });
-  }
-
-  async function saveReminder(recordatorio: ReminderConfig) {
-    const profile = await profileRepo.update({ recordatorio });
-    useSessionStore.setState({ profile });
-  }
-
-  async function saveSensoryPreferences(preferenciasSensoriales: SensoryPreferences) {
-    const profile = await profileRepo.update({ preferenciasSensoriales });
-    useSessionStore.setState({ profile });
-  }
-
   if (s.summaryStatus === 'error') return <PortadaError />;
   if (s.summaryStatus !== 'ready' || s.dueCount === null) return <PortadaLoading slow={loadingSlow} />;
 
@@ -187,19 +168,7 @@ function Portada() {
         <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
       </div>
 
-      <WeeklyPlanCard
-        records={s.sessions ?? []}
-        profile={s.profile}
-        editable
-        onSave={saveWeeklyPlan}
-      />
-
-      <ReminderCard config={s.profile.recordatorio} onSave={saveReminder} />
-
-      <SensoryPreferencesCard
-        preferences={s.profile.preferenciasSensoriales}
-        onSave={saveSensoryPreferences}
-      />
+      <WeeklyPlanCard records={s.sessions ?? []} profile={s.profile} />
     </div>
   );
 }

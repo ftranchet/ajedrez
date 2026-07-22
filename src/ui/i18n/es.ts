@@ -10,6 +10,15 @@ export const es = {
     jugar: 'Jugar',
     calculo: 'Cálculo',
     panel: 'Panel',
+    ajustes: 'Ajustes',
+  },
+  ajustes: {
+    titulo: 'Ajustes',
+    subtitulo: 'Tu plan, los avisos, el sonido y tus datos, en un solo lugar.',
+    acercaTitulo: 'Acerca de',
+    acercaLocal: 'Tus datos viven en tu dispositivo. Nada se envía a la nube; para pasarlos a otro equipo, exportá desde “Tus datos” y restaurá allá.',
+    acercaLicencia: 'Software libre bajo licencia GPLv3.',
+    acercaRepo: 'Ver el código en GitHub',
   },
   hoy: {
     titulo: 'Tu sesión de hoy',
