@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useEffect, useRef, useState } from 'react';
-import type { CalibrationRecord, Color, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from '../../core/panel';
@@ -14,6 +14,7 @@ import { tasaConformismo } from '../../core/dobleSolucion';
 import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
 import { detectOverfitting } from '../../core/overfitting';
 import { informeFugasTiempo } from '../../core/triage';
+import { hitosLogrados } from '../../core/milestones';
 import { currentN1Phase } from '../../core/n1Experiment';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { exportAllData, importAllData } from '../../services/export/exportImport';
@@ -24,6 +25,7 @@ import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAt
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
 import { triageAttemptRepo } from '../../services/storage/triageAttemptRepo';
+import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
 import { useAnalysisStore } from '../state/analysisStore';
@@ -52,6 +54,7 @@ export function PanelScreen() {
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
   const [transferMeasurements, setTransferMeasurements] = useState<TransferMeasurement[] | null>(null);
   const [triageAttempts, setTriageAttempts] = useState<TriageAttempt[] | null>(null);
+  const [curriculumProgress, setCurriculumProgress] = useState<CurriculumProgress[] | null>(null);
   const [n1Experiments, setN1Experiments] = useState<N1Experiment[] | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [n1Open, setN1Open] = useState(false);
@@ -69,8 +72,9 @@ export function PanelScreen() {
       sessionRepo.list(),
       transferMeasurementRepo.list(),
       triageAttemptRepo.list(),
+      curriculumProgressRepo.list(),
       n1ExperimentRepo.list(),
-    ]).then(([g, radar, calibration, loadedProfile, doble, loadedSessions, transfer, triage, experiments]) => {
+    ]).then(([g, radar, calibration, loadedProfile, doble, loadedSessions, transfer, triage, curriculum, experiments]) => {
       if (!alive) return;
       setGames(g);
       setRadarAttempts(radar);
@@ -80,6 +84,7 @@ export function PanelScreen() {
       setSessions(loadedSessions);
       setTransferMeasurements(transfer);
       setTriageAttempts(triage);
+      setCurriculumProgress(curriculum);
       setN1Experiments(experiments);
     });
     return () => {
@@ -97,7 +102,7 @@ export function PanelScreen() {
 
   const loading = games === null || radarAttempts === null || calibraciones === null || profile === null ||
     dobleSolucionAttempts === null || sessions === null || transferMeasurements === null || triageAttempts === null ||
-    n1Experiments === null;
+    curriculumProgress === null || n1Experiments === null;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
@@ -127,6 +132,8 @@ export function PanelScreen() {
           radarAttempts={radarAttempts}
           dobleSolucionAttempts={dobleSolucionAttempts}
           triageAttempts={triageAttempts}
+          transferMeasurements={transferMeasurements}
+          curriculumProgress={curriculumProgress}
           onView={setView}
         />
       ) : view === 'medicion' ? (
@@ -166,6 +173,8 @@ function ResumenView({
   radarAttempts,
   dobleSolucionAttempts,
   triageAttempts,
+  transferMeasurements,
+  curriculumProgress,
   onView,
 }: {
   games: GameRecord[];
@@ -175,6 +184,8 @@ function ResumenView({
   radarAttempts: RadarAttempt[];
   dobleSolucionAttempts: DobleSolucionAttempt[];
   triageAttempts: TriageAttempt[];
+  transferMeasurements: TransferMeasurement[];
+  curriculumProgress: CurriculumProgress[];
   onView: (view: PanelView) => void;
 }) {
   return (
@@ -185,6 +196,13 @@ function ResumenView({
           <NextStepPanel games={games} profile={profile} onView={onView} />
         </div>
         <TruthCelebrationPanel games={games} />
+        <HitosPanel
+          games={games}
+          calibraciones={calibraciones}
+          curriculumProgress={curriculumProgress}
+          dobleSolucionAttempts={dobleSolucionAttempts}
+          transferMeasurements={transferMeasurements}
+        />
         <CalibrationPanel records={calibraciones} />
       </div>
       <aside className="flex flex-col gap-4">
@@ -542,6 +560,63 @@ function TruthCelebrationPanel({ games }: { games: GameRecord[] | null }) {
           .replace('{actual}', improvement.mediaActual.toFixed(1))
           .replace('{partidas}', String(improvement.partidasActuales))}
       </p>
+    </section>
+  );
+}
+
+// Hitos (RF-13.6): capacidades demostradas y evidencia nueva, cada una con su
+// significado. Sin puntos, monedas ni rankings (ADR-0013). Solo se muestran los
+// logrados; el estado vacío explica qué son, sin convertirlos en una lista de
+// misiones pendientes.
+function HitosPanel({
+  games,
+  calibraciones,
+  curriculumProgress,
+  dobleSolucionAttempts,
+  transferMeasurements,
+}: {
+  games: GameRecord[];
+  calibraciones: CalibrationRecord[];
+  curriculumProgress: CurriculumProgress[];
+  dobleSolucionAttempts: DobleSolucionAttempt[];
+  transferMeasurements: TransferMeasurement[];
+}) {
+  const hitos = hitosLogrados({
+    games,
+    calibraciones,
+    curriculumProgress,
+    dobleSolucionAttempts,
+    transferMeasurements,
+    transferVersion: TRANSFER_DATASET_VERSION,
+  });
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
+      <div>
+        <SectionHeading>{t.panel.hitosTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-xs text-secondary">{t.panel.hitosAyuda}</p>
+      </div>
+      {hitos.length === 0 ? (
+        <p className="m-0 text-sm text-secondary">{t.panel.hitosSinDatos}</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+          {hitos.map((hito) => {
+            const texto = t.panel.hitos[hito.id];
+            return (
+              <li key={hito.id} className="flex flex-col gap-1 rounded-md bg-elevated p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <strong className="font-display text-lg font-medium text-primary">{texto.titulo}</strong>
+                  {hito.fecha && (
+                    <span className="font-mono text-xs text-tertiary">
+                      {t.panel.hitoFecha.replace('{fecha}', new Date(hito.fecha).toLocaleDateString('es-AR'))}
+                    </span>
+                  )}
+                </div>
+                <p className="m-0 text-sm text-secondary">{texto.significado}</p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

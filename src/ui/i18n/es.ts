@@ -338,6 +338,36 @@ export const es = {
     triageJugadasConsideradas: 'Sobre {n} jugadas propias del período.',
     triageEjercicios: 'Ejercicio “¿pide cálculo o alcanza?”: {correctos}/{total} correctas ({porcentaje}%).',
     triageEjerciciosLatencia: 'Mediana de decisión: {segundos} s.',
+    hitosTitulo: 'Hitos',
+    hitosAyuda: 'Capacidades demostradas y evidencia nueva. No hay puntos, monedas ni rankings.',
+    hitosSinDatos: 'Todavía no alcanzaste ningún hito. Aparecen cuando demostrás una capacidad nueva o hay evidencia de mejora, con su significado — nunca por volumen.',
+    hitoFecha: 'Logrado el {fecha}',
+    hitos: {
+      'primera-partida-analizada': {
+        titulo: 'Primera partida analizada',
+        significado: 'Analizaste una partida propia en dos fases: primero tu juicio, después el motor. Es el ciclo que convierte tus errores en repasos.',
+      },
+      'patron-automatizado': {
+        titulo: 'Patrón automatizado',
+        significado: 'Un patrón del currículo llegó a demostraciones limpias seguidas: lo reconocés sin cálculo consciente y deja de aparecer.',
+      },
+      'doble-solucion-superior': {
+        titulo: 'Jugada superior',
+        significado: 'Elegiste la jugada objetivamente mejor en vez de la familiar que también ganaba: rompiste el efecto Einstellung.',
+      },
+      'transferencia-sostenida': {
+        titulo: 'Transferencia al juego',
+        significado: 'Una toma posterior de la batería de transferencia superó a la primera: lo entrenado se traslada a posiciones nuevas, no memorizadas.',
+      },
+      'mejora-errores-graves': {
+        titulo: 'Menos errores graves',
+        significado: 'Tus errores graves por partida bajaron de forma sostenida este mes frente al anterior: hay señal de mejora en juego real.',
+      },
+      'calibracion-afinada': {
+        titulo: 'Juicio calibrado',
+        significado: 'Tu confianza declarada se acerca a tu acierto real: sabés cuándo sabés. Un juicio calibrado decide mejor bajo presión.',
+      },
+    },
     importarPgnTitulo: 'Importar PGN',
     importarPgnConsigna: 'Pegá el PGN de una partida jugada en otro lado (Lichess, Chess.com, un club) para analizarla acá.',
     importarPgnPlaceholder: '1. e4 e5 2. Nf3 …',
