@@ -1,11 +1,12 @@
 // Test de integración de Cálculo comprometido (E7, RF-7.1) contra Dexie
 // real: la línea se declara completa antes de revelar, y se puntúa entera.
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCompromisoStore } from './compromisoStore';
 import { db } from '../../services/storage/db';
 import { RADAR_DATASET_VERSION } from '../../services/puzzles/seedData';
 import type { RadarItem } from '../../core/types';
+import { radarItemRepo } from '../../services/storage/radarItemRepo';
 
 const item: RadarItem = {
   id: 'compromiso-e2e-1',
@@ -18,6 +19,7 @@ const item: RadarItem = {
 };
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   await db.radarItems.clear();
   await db.radarDatasetMeta.clear();
   await db.compromisoAttempts.clear();
@@ -26,6 +28,17 @@ beforeEach(async () => {
 });
 
 describe('compromisoStore', () => {
+  it('sale de la carga ante un fallo del catálogo y permite reintentar', async () => {
+    const failure = vi.spyOn(radarItemRepo, 'ensureSeeded').mockRejectedValueOnce(new Error('indexeddb'));
+
+    await useCompromisoStore.getState().empezar(true);
+    expect(useCompromisoStore.getState().phase).toBe('error');
+
+    failure.mockRestore();
+    await useCompromisoStore.getState().empezar(true);
+    expect(useCompromisoStore.getState().phase).toBe('jugando');
+  });
+
   it('con un único ítem apto en el pool, lo sirve determinísticamente', async () => {
     await useCompromisoStore.getState().empezar();
     const s = useCompromisoStore.getState();

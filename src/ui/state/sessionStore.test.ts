@@ -13,12 +13,16 @@ import { newCurriculumProgress } from '../../core/curriculum';
 import { dietaPorBanda } from '../../core/prescriptor';
 import { DEFAULT_PROFILE } from '../../services/storage/profileRepo';
 import { buildErrorCard } from '../../core/errorCard';
+import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
+import { radarItemRepo } from '../../services/storage/radarItemRepo';
+import { sessionRepo } from '../../services/storage/sessionRepo';
 
 // Perfil por defecto (sin diagnóstico): fija cuántas posiciones sirve el
 // Radar por sesión para que estos tests no dependan del Prescriptor.
 const RADAR_SESSION_SIZE = dietaPorBanda(DEFAULT_PROFILE.bandaElo, []).radarCount;
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   await db.games.clear();
   await db.errorCards.clear();
   await db.radarItems.clear();
@@ -42,6 +46,55 @@ beforeEach(async () => {
 });
 
 describe('sessionStore — bloque Radar', () => {
+  it('muestra el diagnóstico nuevo sin esperar a sembrar catálogos', async () => {
+    const ensureSeeded = vi.spyOn(curriculumItemRepo, 'ensureSeeded');
+
+    await useSessionStore.getState().loadSummary(true);
+
+    const state = useSessionStore.getState();
+    expect(state.summaryStatus).toBe('ready');
+    expect(state.profile.diagnosticoCompletadoEn).toBeNull();
+    expect(ensureSeeded).not.toHaveBeenCalled();
+  });
+
+  it('expone un error recuperable si falla el resumen y un reintento lo completa', async () => {
+    await db.profile.put({ ...DEFAULT_PROFILE, diagnosticoCompletadoEn: new Date().toISOString() });
+    const failure = vi.spyOn(curriculumItemRepo, 'ensureSeeded').mockRejectedValueOnce(new Error('indexeddb'));
+
+    await useSessionStore.getState().loadSummary(true);
+    expect(useSessionStore.getState().summaryStatus).toBe('error');
+
+    failure.mockRestore();
+    await useSessionStore.getState().loadSummary(true);
+    const state = useSessionStore.getState();
+    expect(state.summaryStatus).toBe('ready');
+    expect(state.dueCount).toBeTypeOf('number');
+  });
+
+  it('vuelve a la portada si falla el arranque y permite iniciar después', async () => {
+    const failure = vi.spyOn(radarItemRepo, 'ensureSeeded').mockRejectedValueOnce(new Error('indexeddb'));
+
+    await useSessionStore.getState().start();
+    expect(useSessionStore.getState()).toMatchObject({ phase: 'sinEmpezar', startError: true });
+
+    failure.mockRestore();
+    await useSessionStore.getState().start();
+    expect(useSessionStore.getState().phase).toBe('radar');
+    expect(useSessionStore.getState().startError).toBe(false);
+  });
+
+  it('recupera la cola de persistencia si guardar el arranque falla', async () => {
+    const failure = vi.spyOn(sessionRepo, 'save').mockRejectedValueOnce(new Error('indexeddb'));
+
+    await useSessionStore.getState().start();
+    expect(useSessionStore.getState()).toMatchObject({ phase: 'sinEmpezar', startError: true });
+
+    failure.mockRestore();
+    await useSessionStore.getState().start();
+    expect(useSessionStore.getState().phase).toBe('radar');
+    expect(useSessionStore.getState().startError).toBe(false);
+  });
+
   it('la orientación del tablero queda fija tras jugar (no gira 180° en el feedback)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // sin candidatas ni confianza
     await useSessionStore.getState().start();

@@ -3,7 +3,7 @@
 // exportación/restauración completa (E14): "Exportar mis datos" alcanzable
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
@@ -36,6 +36,7 @@ import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { AnalizarScreen } from './AnalizarScreen';
 import { TransferScreen } from './TransferScreen';
 import { N1ExperimentScreen } from './N1ExperimentScreen';
+import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
 
 function formatJugadas(n: number): string {
@@ -44,53 +45,120 @@ function formatJugadas(n: number): string {
 
 type PanelView = 'resumen' | 'medicion' | 'partidas-datos';
 
+type PanelResourceStatus = 'loading' | 'ready' | 'error';
+
+interface PanelResource<T> {
+  data: T | null;
+  status: PanelResourceStatus;
+  retry: () => void;
+}
+
+type AnyPanelResource = PanelResource<unknown>;
+
+interface PanelResources {
+  games: PanelResource<GameRecord[]>;
+  radarAttempts: PanelResource<RadarAttempt[]>;
+  calibraciones: PanelResource<CalibrationRecord[]>;
+  profile: PanelResource<Profile>;
+  dobleSolucionAttempts: PanelResource<DobleSolucionAttempt[]>;
+  sessions: PanelResource<SessionRecord[]>;
+  transferMeasurements: PanelResource<TransferMeasurement[]>;
+  triageAttempts: PanelResource<TriageAttempt[]>;
+  curriculumProgress: PanelResource<CurriculumProgress[]>;
+  n1Experiments: PanelResource<N1Experiment[]>;
+}
+
+const PANEL_LOADERS = {
+  games: () => gameRepo.list(),
+  radarAttempts: () => radarAttemptRepo.list(),
+  calibraciones: () => calibrationRepo.list(),
+  profile: () => profileRepo.get(),
+  dobleSolucionAttempts: () => dobleSolucionAttemptRepo.list(),
+  sessions: () => sessionRepo.list(),
+  transferMeasurements: () => transferMeasurementRepo.list(),
+  triageAttempts: () => triageAttemptRepo.list(),
+  curriculumProgress: () => curriculumProgressRepo.list(),
+  n1Experiments: () => n1ExperimentRepo.list(),
+};
+
+/**
+ * Carga una tabla sin acoplarla al resto del Panel. Conserva el último dato
+ * durante una actualización y comparte la Promise entre los dos efectos de
+ * montaje de React StrictMode para no duplicar lecturas de IndexedDB.
+ */
+function usePanelResource<T>(
+  loader: () => Promise<T>,
+  refreshVersion: number,
+  enabled: boolean,
+): PanelResource<T> {
+  const [state, setState] = useState<{ data: T | null; status: PanelResourceStatus }>({
+    data: null,
+    status: 'loading',
+  });
+  const [retryVersion, setRetryVersion] = useState(0);
+  const activeRequest = useRef<{ key: string; promise: Promise<T> } | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let alive = true;
+    const requestKey = `${refreshVersion}:${retryVersion}`;
+    const loadingTimer = window.setTimeout(() => {
+      if (alive) setState((current) => ({ ...current, status: 'loading' }));
+    }, 0);
+
+    let promise: Promise<T>;
+    if (activeRequest.current?.key === requestKey) {
+      promise = activeRequest.current.promise;
+    } else {
+      promise = Promise.resolve().then(loader);
+      activeRequest.current = { key: requestKey, promise };
+    }
+
+    void promise.then(
+      (data) => {
+        window.clearTimeout(loadingTimer);
+        if (activeRequest.current?.promise === promise) activeRequest.current = null;
+        if (alive) setState({ data, status: 'ready' });
+      },
+      () => {
+        window.clearTimeout(loadingTimer);
+        if (activeRequest.current?.promise === promise) activeRequest.current = null;
+        if (alive) setState((current) => ({ ...current, status: 'error' }));
+      },
+    );
+
+    return () => {
+      alive = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [enabled, loader, refreshVersion, retryVersion]);
+
+  const retry = useCallback(() => setRetryVersion((version) => version + 1), []);
+  return { ...state, retry };
+}
+
 export function PanelScreen() {
   const analysisPhase = useAnalysisStore((s) => s.phase);
-  const [games, setGames] = useState<GameRecord[] | null>(null);
-  const [radarAttempts, setRadarAttempts] = useState<RadarAttempt[] | null>(null);
-  const [calibraciones, setCalibraciones] = useState<CalibrationRecord[] | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [dobleSolucionAttempts, setDobleSolucionAttempts] = useState<DobleSolucionAttempt[] | null>(null);
-  const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
-  const [transferMeasurements, setTransferMeasurements] = useState<TransferMeasurement[] | null>(null);
-  const [triageAttempts, setTriageAttempts] = useState<TriageAttempt[] | null>(null);
-  const [curriculumProgress, setCurriculumProgress] = useState<CurriculumProgress[] | null>(null);
-  const [n1Experiments, setN1Experiments] = useState<N1Experiment[] | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [n1Open, setN1Open] = useState(false);
   const [view, setView] = useState<PanelView>('resumen');
   const [importVersion, setImportVersion] = useState(0);
-
-  useEffect(() => {
-    let alive = true;
-    void Promise.all([
-      gameRepo.list(),
-      radarAttemptRepo.list(),
-      calibrationRepo.list(),
-      profileRepo.get(),
-      dobleSolucionAttemptRepo.list(),
-      sessionRepo.list(),
-      transferMeasurementRepo.list(),
-      triageAttemptRepo.list(),
-      curriculumProgressRepo.list(),
-      n1ExperimentRepo.list(),
-    ]).then(([g, radar, calibration, loadedProfile, doble, loadedSessions, transfer, triage, curriculum, experiments]) => {
-      if (!alive) return;
-      setGames(g);
-      setRadarAttempts(radar);
-      setCalibraciones(calibration);
-      setProfile(loadedProfile);
-      setDobleSolucionAttempts(doble);
-      setSessions(loadedSessions);
-      setTransferMeasurements(transfer);
-      setTriageAttempts(triage);
-      setCurriculumProgress(curriculum);
-      setN1Experiments(experiments);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [analysisPhase, importVersion]); // recarga la lista al volver de un análisis (E3) o importar un PGN (RF-2.2)
+  const panelVisible = analysisPhase === 'inactivo';
+  // Cada tabla resuelve por separado: una métrica dañada ya no bloquea las
+  // partidas, la siguiente acción ni las otras tarjetas del Panel.
+  const resources: PanelResources = {
+    games: usePanelResource(PANEL_LOADERS.games, importVersion, panelVisible),
+    radarAttempts: usePanelResource(PANEL_LOADERS.radarAttempts, importVersion, panelVisible),
+    calibraciones: usePanelResource(PANEL_LOADERS.calibraciones, importVersion, panelVisible),
+    profile: usePanelResource(PANEL_LOADERS.profile, importVersion, panelVisible),
+    dobleSolucionAttempts: usePanelResource(PANEL_LOADERS.dobleSolucionAttempts, importVersion, panelVisible),
+    sessions: usePanelResource(PANEL_LOADERS.sessions, importVersion, panelVisible),
+    transferMeasurements: usePanelResource(PANEL_LOADERS.transferMeasurements, importVersion, panelVisible),
+    triageAttempts: usePanelResource(PANEL_LOADERS.triageAttempts, importVersion, panelVisible),
+    curriculumProgress: usePanelResource(PANEL_LOADERS.curriculumProgress, importVersion, panelVisible),
+    n1Experiments: usePanelResource(PANEL_LOADERS.n1Experiments, importVersion, panelVisible),
+  };
 
   if (analysisPhase !== 'inactivo') return <AnalizarScreen />;
   if (transferOpen) {
@@ -100,9 +168,8 @@ export function PanelScreen() {
     return <N1ExperimentScreen onClose={() => { setN1Open(false); setImportVersion((version) => version + 1); }} />;
   }
 
-  const loading = games === null || radarAttempts === null || calibraciones === null || profile === null ||
-    dobleSolucionAttempts === null || sessions === null || transferMeasurements === null || triageAttempts === null ||
-    curriculumProgress === null || n1Experiments === null;
+  const visibleResources = resourcesForView(resources, view);
+  const loading = visibleResources.some((resource) => resource.status === 'loading');
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
@@ -123,124 +190,217 @@ export function PanelScreen() {
         className="w-full lg:max-w-2xl"
       />
 
-      {loading ? <PanelSkeleton /> : view === 'resumen' ? (
-        <ResumenView
-          games={games}
-          calibraciones={calibraciones}
-          profile={profile}
-          sessions={sessions}
-          radarAttempts={radarAttempts}
-          dobleSolucionAttempts={dobleSolucionAttempts}
-          triageAttempts={triageAttempts}
-          transferMeasurements={transferMeasurements}
-          curriculumProgress={curriculumProgress}
-          onView={setView}
-        />
-      ) : view === 'medicion' ? (
-        <MedicionView
-          games={games}
-          radarAttempts={radarAttempts}
-          transferMeasurements={transferMeasurements}
-          n1Experiments={n1Experiments}
-          onTransfer={() => setTransferOpen(true)}
-          onN1={() => setN1Open(true)}
-        />
-      ) : (
-        <PartidasDatosView
-          games={games}
-          onImported={() => setImportVersion((version) => version + 1)}
-        />
-      )}
+      <PanelLoadNotice resources={visibleResources} />
+
+      <div aria-busy={loading}>
+        {view === 'resumen' ? (
+          <ResumenView
+            resources={resources}
+            onView={setView}
+          />
+        ) : view === 'medicion' ? (
+          <MedicionView
+            resources={resources}
+            onTransfer={() => setTransferOpen(true)}
+            onN1={() => setN1Open(true)}
+          />
+        ) : (
+          <PartidasDatosView
+            games={resources.games}
+            onImported={() => setImportVersion((version) => version + 1)}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-function PanelSkeleton() {
+function resourcesForView(resources: PanelResources, view: PanelView): AnyPanelResource[] {
+  if (view === 'partidas-datos') return [resources.games];
+  if (view === 'medicion') {
+    return [resources.games, resources.radarAttempts, resources.transferMeasurements, resources.n1Experiments];
+  }
+  return [
+    resources.games,
+    resources.radarAttempts,
+    resources.calibraciones,
+    resources.profile,
+    resources.dobleSolucionAttempts,
+    resources.sessions,
+    resources.transferMeasurements,
+    resources.triageAttempts,
+    resources.curriculumProgress,
+  ];
+}
+
+function retryResources(resources: AnyPanelResource[]): void {
+  const retries = new Set(resources.map((resource) => resource.retry));
+  for (const retry of retries) retry();
+}
+
+function PanelLoadNotice({ resources }: { resources: AnyPanelResource[] }) {
+  const waiting = resources.filter((resource) => resource.status === 'loading' && resource.data === null);
+  const failed = resources.filter((resource) => resource.status === 'error');
+  const slow = useSlowLoading(waiting.length > 0);
+  const [retryCoolingDown, setRetryCoolingDown] = useState(false);
+
+  useEffect(() => {
+    if (!retryCoolingDown) return;
+    const timeout = window.setTimeout(() => setRetryCoolingDown(false), 4_000);
+    return () => window.clearTimeout(timeout);
+  }, [retryCoolingDown]);
+
+  function retryOnce(targets: AnyPanelResource[]) {
+    if (retryCoolingDown) return;
+    setRetryCoolingDown(true);
+    retryResources(targets);
+  }
+
   return (
-    <div aria-label={t.panel.cargando} className="grid gap-4 lg:grid-cols-2">
-      {[0, 1, 2].map((item) => (
-        <div key={item} className="h-36 rounded-lg border border-subtle bg-surface" />
-      ))}
+    <>
+      {waiting.length > 0 && !slow && (
+        <span className="sr-only" role="status">{t.panel.cargando}</span>
+      )}
+      {slow && (
+        <div role="status" className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="m-0 text-sm text-secondary">{t.panel.cargaLenta}</p>
+          <button className="btn-secondary shrink-0" disabled={retryCoolingDown} onClick={() => retryOnce(waiting)}>
+            {t.panel.reintentarCarga}
+          </button>
+        </div>
+      )}
+      {failed.length > 0 && (
+        <div role="alert" className="flex flex-col gap-2 rounded-lg border border-error/35 bg-error-subtle p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="m-0 text-sm text-primary">{t.panel.cargaError}</p>
+          <button className="btn-secondary shrink-0" disabled={retryCoolingDown} onClick={() => retryOnce(failed)}>
+            {t.panel.reintentarCarga}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PanelResourceSlot({
+  resources,
+  children,
+  className = 'min-h-36',
+}: {
+  resources: AnyPanelResource[];
+  children: ReactNode;
+  className?: string;
+}) {
+  if (resources.every((resource) => resource.data !== null)) return children;
+  const failed = resources.some((resource) => resource.status === 'error');
+  return <PanelSkeleton className={className} failed={failed} />;
+}
+
+function PanelSkeleton({ className, failed = false }: { className: string; failed?: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`${className} flex flex-col gap-3 rounded-lg border p-4 ${failed ? 'border-error/25 bg-error-subtle' : 'border-subtle bg-surface'}`}
+    >
+      <span className="h-4 w-28 rounded bg-elevated" />
+      <span className="h-3 w-4/5 rounded bg-elevated" />
+      <span className="h-3 w-3/5 rounded bg-elevated" />
     </div>
   );
 }
 
 function ResumenView({
-  games,
-  calibraciones,
-  profile,
-  sessions,
-  radarAttempts,
-  dobleSolucionAttempts,
-  triageAttempts,
-  transferMeasurements,
-  curriculumProgress,
+  resources,
   onView,
 }: {
-  games: GameRecord[];
-  calibraciones: CalibrationRecord[];
-  profile: Profile;
-  sessions: SessionRecord[];
-  radarAttempts: RadarAttempt[];
-  dobleSolucionAttempts: DobleSolucionAttempt[];
-  triageAttempts: TriageAttempt[];
-  transferMeasurements: TransferMeasurement[];
-  curriculumProgress: CurriculumProgress[];
+  resources: PanelResources;
   onView: (view: PanelView) => void;
 }) {
+  const {
+    games,
+    calibraciones,
+    profile,
+    sessions,
+    radarAttempts,
+    dobleSolucionAttempts,
+    triageAttempts,
+    transferMeasurements,
+    curriculumProgress,
+  } = resources;
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:items-start">
       <div className="flex flex-col gap-4">
-        <PanelDeVerdad games={games} calibraciones={calibraciones} profile={profile} />
+        <PanelResourceSlot resources={[games, calibraciones, profile]}>
+          <PanelDeVerdad games={games.data} calibraciones={calibraciones.data} profile={profile.data} />
+        </PanelResourceSlot>
         <div className="lg:hidden">
-          <NextStepPanel games={games} profile={profile} onView={onView} />
+          <PanelResourceSlot resources={[games, profile]}>
+            <NextStepPanel games={games.data!} profile={profile.data!} onView={onView} />
+          </PanelResourceSlot>
         </div>
-        <TruthCelebrationPanel games={games} />
-        <HitosPanel
-          games={games}
-          calibraciones={calibraciones}
-          curriculumProgress={curriculumProgress}
-          dobleSolucionAttempts={dobleSolucionAttempts}
-          transferMeasurements={transferMeasurements}
-        />
-        <CalibrationPanel records={calibraciones} />
+        <PanelResourceSlot resources={[games]}>
+          <TruthCelebrationPanel games={games.data} />
+        </PanelResourceSlot>
+        <PanelResourceSlot resources={[games, calibraciones, curriculumProgress, dobleSolucionAttempts, transferMeasurements]}>
+          <HitosPanel
+            games={games.data!}
+            calibraciones={calibraciones.data!}
+            curriculumProgress={curriculumProgress.data!}
+            dobleSolucionAttempts={dobleSolucionAttempts.data!}
+            transferMeasurements={transferMeasurements.data!}
+          />
+        </PanelResourceSlot>
+        <PanelResourceSlot resources={[calibraciones]} className="min-h-72">
+          <CalibrationPanel records={calibraciones.data} />
+        </PanelResourceSlot>
       </div>
       <aside className="flex flex-col gap-4">
         <div className="hidden lg:block">
-          <NextStepPanel games={games} profile={profile} onView={onView} />
+          <PanelResourceSlot resources={[games, profile]}>
+            <NextStepPanel games={games.data!} profile={profile.data!} onView={onView} />
+          </PanelResourceSlot>
         </div>
-        <ActivityPanel records={sessions} profile={profile} />
-        <TriageTimeReportPanel games={games} attempts={triageAttempts} />
-        <RadarSummary attempts={radarAttempts} />
-        <DobleSolucionSummary attempts={dobleSolucionAttempts} />
+        <PanelResourceSlot resources={[sessions, profile]} className="min-h-64">
+          <ActivityPanel records={sessions.data} profile={profile.data!} />
+        </PanelResourceSlot>
+        <PanelResourceSlot resources={[games, triageAttempts]}>
+          <TriageTimeReportPanel games={games.data} attempts={triageAttempts.data} />
+        </PanelResourceSlot>
+        <PanelResourceSlot resources={[radarAttempts]}>
+          <RadarSummary attempts={radarAttempts.data} />
+        </PanelResourceSlot>
+        <PanelResourceSlot resources={[dobleSolucionAttempts]}>
+          <DobleSolucionSummary attempts={dobleSolucionAttempts.data} />
+        </PanelResourceSlot>
       </aside>
     </div>
   );
 }
 
 function MedicionView({
-  games,
-  radarAttempts,
-  transferMeasurements,
-  n1Experiments,
+  resources,
   onTransfer,
   onN1,
 }: {
-  games: GameRecord[];
-  radarAttempts: RadarAttempt[];
-  transferMeasurements: TransferMeasurement[];
-  n1Experiments: N1Experiment[];
+  resources: PanelResources;
   onTransfer: () => void;
   onN1: () => void;
 }) {
+  const { games, radarAttempts, transferMeasurements, n1Experiments } = resources;
   return (
     <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <div className="flex flex-col gap-4">
-        <TransferPanel measurements={transferMeasurements} onOpen={onTransfer} />
-        <N1ExperimentPanel experiments={n1Experiments} onOpen={onN1} />
+        <PanelResourceSlot resources={[transferMeasurements]} className="min-h-64">
+          <TransferPanel measurements={transferMeasurements.data} onOpen={onTransfer} />
+        </PanelResourceSlot>
+        <PanelResourceSlot resources={[n1Experiments]}>
+          <N1ExperimentPanel experiments={n1Experiments.data} onOpen={onN1} />
+        </PanelResourceSlot>
       </div>
       <div className="flex flex-col gap-4">
-        <OverfittingPanel games={games} attempts={radarAttempts} />
+        <PanelResourceSlot resources={[games, radarAttempts]}>
+          <OverfittingPanel games={games.data} attempts={radarAttempts.data} />
+        </PanelResourceSlot>
         <section className="rounded-lg border border-subtle bg-surface p-4">
           <SectionHeading>{t.panel.medicionComoLeerTitulo}</SectionHeading>
           <p className="m-0 mt-2 text-secondary">{t.panel.medicionComoLeer}</p>
@@ -250,10 +410,12 @@ function MedicionView({
   );
 }
 
-function PartidasDatosView({ games, onImported }: { games: GameRecord[]; onImported: () => void }) {
+function PartidasDatosView({ games, onImported }: { games: PanelResource<GameRecord[]>; onImported: () => void }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] lg:items-start">
-      <GamesSection games={games} />
+      <PanelResourceSlot resources={[games]} className="min-h-72">
+        <GamesSection games={games.data!} />
+      </PanelResourceSlot>
       <aside className="flex flex-col gap-4">
         <ImportarPartidaSection onImported={onImported} />
         <DatosSection onImported={onImported} />

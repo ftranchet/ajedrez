@@ -61,6 +61,7 @@ export const TRIAGE_SESSION_SIZE = 5;
 
 export type { EvalGuess };
 type Phase = 'sinEmpezar' | 'cargando' | 'cola' | 'curriculo' | 'triage' | 'radar' | 'fin';
+type SummaryStatus = 'idle' | 'loading' | 'ready' | 'error';
 type ColaSubPhase = 'jugando' | 'feedback';
 type CurriculumSubPhase = 'jugando' | 'feedback';
 type TriageSubPhase = 'decidiendo' | 'feedback';
@@ -68,6 +69,10 @@ type RadarSubPhase = 'evaluando' | 'jugando' | 'candidata' | 'confianza' | 'feed
 
 interface SessionState {
   phase: Phase;
+  /** Estado explícito de la portada: evita usar `dueCount === null` como loading/error indistinguibles. */
+  summaryStatus: SummaryStatus;
+  /** El arranque de sesión falló y puede reintentarse sin recargar la app. */
+  startError: boolean;
   /** Repasos vencidos, para mostrar en Hoy antes de arrancar. null = sin cargar todavía. */
   dueCount: number | null;
   /** Patrones del currículo vencidos hoy, antes de topar por la dieta. Para el resumen de "Tu sesión de hoy" (RF-11.1). */
@@ -142,7 +147,7 @@ interface SessionState {
   lastMove: [string, string] | null;
   check: boolean;
 
-  loadSummary(): Promise<void>;
+  loadSummary(force?: boolean): Promise<void>;
   start(): Promise<void>;
   volver(): void;
 
@@ -167,6 +172,9 @@ let chess = new Chess();
 let triageInicioMs = 0;
 /** Serializa snapshots de una misma sesión para que un put viejo no pise uno nuevo. */
 let sessionWriteQueue: Promise<void> = Promise.resolve();
+/** Deduplica el doble montaje de React StrictMode y permite invalidar una carga lenta al reintentar. */
+let summaryLoad: { generation: number; promise: Promise<void> } | null = null;
+let summaryGeneration = 0;
 
 function boardSnapshot() {
   return {
@@ -211,8 +219,14 @@ function progressFromState(selection: RadarSelectionState, aciertosRecientes: bo
 
 export const useSessionStore = create<SessionState>((set, get) => {
   function persistSession(record: SessionRecord): Promise<void> {
-    sessionWriteQueue = sessionWriteQueue.then(() => sessionRepo.save(record));
-    return sessionWriteQueue;
+    // El llamador necesita recibir el fallo de SU escritura, pero la cola
+    // compartida no puede quedar rechazada para siempre: si no, cualquier
+    // reintento posterior falla antes de tocar IndexedDB.
+    const write = sessionWriteQueue
+      .catch(() => undefined)
+      .then(() => sessionRepo.save(record));
+    sessionWriteQueue = write.catch(() => undefined);
+    return write;
   }
 
   function updateTrackedSession(update: (record: SessionRecord) => SessionRecord): void {
@@ -384,6 +398,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   return {
     phase: 'sinEmpezar',
+    summaryStatus: 'idle',
+    startError: false,
     dueCount: null,
     curriculumDueCount: null,
     profile: DEFAULT_PROFILE,
@@ -434,78 +450,114 @@ export const useSessionStore = create<SessionState>((set, get) => {
     lastMove: null,
     check: false,
 
-    async loadSummary() {
-      await curriculumItemRepo.ensureSeeded();
-      const [allCards, curriculumItems, curriculumProgressList, profile, games, sessions] = await Promise.all([
-        errorCardRepo.list(),
-        curriculumItemRepo.list(),
-        curriculumProgressRepo.list(),
-        profileRepo.get(),
-        gameRepo.list(),
-        sessionRepo.list(),
-      ]);
-      const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
-      set({
-        dueCount: dueErrorCards(allCards).length,
-        curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron').length,
-        profile,
-        dieta: dietaPorBanda(profile.bandaElo, allCards, games),
-        sessions,
-      });
+    async loadSummary(force = false) {
+      if (summaryLoad && !force) return summaryLoad.promise;
+
+      const generation = ++summaryGeneration;
+      set({ summaryStatus: 'loading' });
+      const promise = (async () => {
+        try {
+          // El primer contacto solo necesita el perfil. No bloquear la
+          // bienvenida editorial por sembrar catálogos que todavía no va a
+          // usar: el resto se cargará al iniciar o después del diagnóstico.
+          const profile = await profileRepo.get();
+          if (generation !== summaryGeneration) return;
+          if (!profile.diagnosticoCompletadoEn) {
+            set({
+              profile,
+              dieta: dietaPorBanda(profile.bandaElo, []),
+              dueCount: 0,
+              curriculumDueCount: 0,
+              sessions: [],
+              summaryStatus: 'ready',
+            });
+            return;
+          }
+
+          await curriculumItemRepo.ensureSeeded();
+          const [allCards, curriculumItems, curriculumProgressList, games, sessions] = await Promise.all([
+            errorCardRepo.list(),
+            curriculumItemRepo.list(),
+            curriculumProgressRepo.list(),
+            gameRepo.list(),
+            sessionRepo.list(),
+          ]);
+          if (generation !== summaryGeneration) return;
+          const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
+          set({
+            dueCount: dueErrorCards(allCards).length,
+            curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron').length,
+            profile,
+            dieta: dietaPorBanda(profile.bandaElo, allCards, games),
+            sessions,
+            summaryStatus: 'ready',
+          });
+        } catch {
+          if (generation === summaryGeneration) set({ summaryStatus: 'error' });
+        } finally {
+          if (summaryLoad?.generation === generation) summaryLoad = null;
+        }
+      })();
+      summaryLoad = { generation, promise };
+      return promise;
     },
 
     async start() {
-      set({ phase: 'cargando' });
-      await sessionWriteQueue;
-      await sessionRepo.abandonInProgress();
-      await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
-      const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
-        errorCardRepo.list(),
-        radarItemRepo.list(),
-        radarProgressRepo.get(),
-        curriculumItemRepo.list(),
-        curriculumProgressRepo.list(),
-        profileRepo.get(),
-        gameRepo.list(),
-      ]);
-      const due = dueErrorCards(allCards);
-      const dieta = dietaPorBanda(profile.bandaElo, allCards, games);
-      // La Cola vencida conserva prioridad absoluta. Solo las tarjetas de
-      // partidas propias que no se sirvieron ahí pueden reaparecer en Radar.
-      const ownErrorItems = ownErrorRadarItems(allCards, due.map((card) => card.id));
-      const ownErrorSlots = scheduleOwnErrorRadarSlots(dieta.radarCount, ownErrorItems.length, Math.random);
-      const curriculumDue = interleaveByPattern(
-        dueCurriculumItems(curriculumItems, new Map(curriculumProgressList.map((p) => [p.id, p] as const)))
-          .filter((item) => item.tipo === 'patron'),
-      ).slice(0, dieta.curriculumMax).length;
-      const sessionRecord = startSessionRecord([
-        { tipo: 'cola', planificados: due.length },
-        { tipo: 'curriculo', planificados: curriculumDue },
-        { tipo: 'triage', planificados: dieta.triageActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
-        { tipo: 'radar', planificados: pool.length > 0 ? dieta.radarCount : 0 },
-      ]);
-      await persistSession(sessionRecord);
-      set({
-        profile,
-        dieta,
-        sessionRecord,
-        radarPool: pool,
-        radarOwnErrorItems: ownErrorItems,
-        radarOwnErrorSlots: ownErrorSlots,
-        colaCards: due,
-        colaIndex: 0,
-        dueCount: due.length,
-        radarSelState: selectionFromProgress(progress),
-        radarAciertosRecientes: progress?.aciertosRecientes ?? [],
-        radarServidos: 0,
-        curriculumItemsAll: curriculumItems,
-        curriculumProgressById: new Map(curriculumProgressList.map((p) => [p.id, p] as const)),
-      });
-      if (due.length > 0) {
-        set({ phase: 'cola' });
-        loadColaCard(due[0]);
-      } else {
-        await beginCurriculum();
+      set({ phase: 'cargando', startError: false });
+      try {
+        await sessionWriteQueue;
+        await sessionRepo.abandonInProgress();
+        await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
+        const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
+          errorCardRepo.list(),
+          radarItemRepo.list(),
+          radarProgressRepo.get(),
+          curriculumItemRepo.list(),
+          curriculumProgressRepo.list(),
+          profileRepo.get(),
+          gameRepo.list(),
+        ]);
+        const due = dueErrorCards(allCards);
+        const dieta = dietaPorBanda(profile.bandaElo, allCards, games);
+        // La Cola vencida conserva prioridad absoluta. Solo las tarjetas de
+        // partidas propias que no se sirvieron ahí pueden reaparecer en Radar.
+        const ownErrorItems = ownErrorRadarItems(allCards, due.map((card) => card.id));
+        const ownErrorSlots = scheduleOwnErrorRadarSlots(dieta.radarCount, ownErrorItems.length, Math.random);
+        const curriculumDue = interleaveByPattern(
+          dueCurriculumItems(curriculumItems, new Map(curriculumProgressList.map((p) => [p.id, p] as const)))
+            .filter((item) => item.tipo === 'patron'),
+        ).slice(0, dieta.curriculumMax).length;
+        const sessionRecord = startSessionRecord([
+          { tipo: 'cola', planificados: due.length },
+          { tipo: 'curriculo', planificados: curriculumDue },
+          { tipo: 'triage', planificados: dieta.triageActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
+          { tipo: 'radar', planificados: pool.length > 0 ? dieta.radarCount : 0 },
+        ]);
+        await persistSession(sessionRecord);
+        set({
+          profile,
+          dieta,
+          sessionRecord,
+          radarPool: pool,
+          radarOwnErrorItems: ownErrorItems,
+          radarOwnErrorSlots: ownErrorSlots,
+          colaCards: due,
+          colaIndex: 0,
+          dueCount: due.length,
+          radarSelState: selectionFromProgress(progress),
+          radarAciertosRecientes: progress?.aciertosRecientes ?? [],
+          radarServidos: 0,
+          curriculumItemsAll: curriculumItems,
+          curriculumProgressById: new Map(curriculumProgressList.map((p) => [p.id, p] as const)),
+        });
+        if (due.length > 0) {
+          set({ phase: 'cola' });
+          loadColaCard(due[0]);
+        } else {
+          await beginCurriculum();
+        }
+      } catch {
+        set({ phase: 'sinEmpezar', startError: true });
       }
     },
 
@@ -515,6 +567,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
       chess = new Chess();
       set({
         phase: 'sinEmpezar',
+        summaryStatus: 'idle',
+        startError: false,
         // null para que HoyScreen vuelva a pedirlo: un fallo del Radar o de
         // la Cola durante la sesión puede haber creado tarjetas vencidas de
         // inmediato, y el contador viejo quedaría desactualizado.

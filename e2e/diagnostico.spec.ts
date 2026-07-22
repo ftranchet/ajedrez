@@ -51,29 +51,45 @@ async function clickSquare(page: Page, board: ReturnType<Page['locator']>, file:
 
 test('diagnóstico inicial: dos partidas y 20 posiciones del Radar arman la primera banda de Elo', async ({ page }) => {
   await page.goto('./');
-  await page.getByText('Tu sesión de hoy').waitFor();
+  // El CTA confirma que Dexie ya abrió y creó el schema; el h1 aparece
+  // también durante el skeleton y no alcanza como barrera para sembrar IDB.
+  await page.getByRole('button', { name: 'Empezar diagnóstico' }).waitFor();
   await seedRadarFixture(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
   await page.getByText('Diagnóstico inicial').waitFor();
+  await expect(page.getByRole('heading', { name: 'Conocé tu punto de partida' })).toBeVisible();
+  await expect(page.getByText('20–40 min estimados')).toBeVisible();
+  await expect(page.getByText('Partida de referencia')).toBeVisible();
+  await expect(page.getByText('Partida de contraste')).toBeVisible();
+  await expect(page.getByText('Radar · 20 posiciones')).toBeVisible();
+  await expect(page.getByText('Tus partidas y respuestas se guardan únicamente en este dispositivo.')).toBeVisible();
   await page.getByRole('button', { name: 'Empezar diagnóstico' }).click();
 
   // Partida 1 de 2: abandonar de una (el resultado gana/pierde/empata ya
   // está probado en estimarBandaElo; acá solo importa que el flujo avance).
   await page.getByText('Partida 1 de 2').waitFor({ timeout: 15_000 });
+  await expect(page.getByText('Etapa 1 de 3')).toBeVisible();
   const board1 = page.locator('cg-board');
   await board1.waitFor();
   await page.getByRole('button', { name: 'Rendirse' }).click();
 
   // Partida 2 de 2: igual.
   await page.getByText('Partida 2 de 2').waitFor({ timeout: 15_000 });
+  await expect(page.getByText('Etapa 2 de 3')).toBeVisible();
   const board2 = page.locator('cg-board');
   await board2.waitFor();
   await page.getByRole('button', { name: 'Rendirse' }).click();
 
   // 20 posiciones del Radar, siempre la misma posición conocida (d5h5 acierta).
   await page.getByText('Posición 1 de 20').waitFor({ timeout: 15_000 });
+  await expect(page.getByText('Etapa 3 de 3')).toBeVisible();
+  await page.getByRole('button', { name: 'Pausar' }).click();
+  await expect(page.getByRole('heading', { name: 'Diagnóstico en pausa' })).toBeVisible();
+  await expect(page.getByText('Tu avance sigue disponible mientras mantengas abierta esta pestaña.')).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar diagnóstico' }).click();
+  await expect(page.getByText('Posición 1 de 20')).toBeVisible();
   for (let i = 0; i < 20; i++) {
     const board = page.locator('cg-board');
     await board.waitFor();

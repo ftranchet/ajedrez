@@ -1,4 +1,4 @@
-// Diagnóstico inicial (RF-11.4): sin historial, 2 partidas cortas contra el
+// Diagnóstico inicial (RF-11.4): sin historial, 2 partidas sin reloj contra el
 // motor local en niveles escalonados (fallback de Maia, bloqueada por red —
 // ver docs/roadmap.md Fase 2/3) más 20 posiciones del Radar. El resultado
 // combinado estima la banda de Elo que arranca la dieta del Prescriptor
@@ -27,15 +27,24 @@ export const DIAGNOSTICO_JUEGO1_NIVEL = 'nivel-2';
 export const DIAGNOSTICO_JUEGO2_NIVEL = 'nivel-4';
 export const DIAGNOSTICO_RADAR_TOTAL = 20;
 
-type Phase = 'inactivo' | 'juego1' | 'juego2' | 'radar' | 'resultado';
+type ActivePhase = 'juego1' | 'juego2' | 'radar';
+type Phase = 'inactivo' | ActivePhase | 'pausado' | 'resultado';
 type RadarSubPhase = 'jugando' | 'feedback';
+type RadarLoadStatus = 'inactivo' | 'cargando' | 'listo' | 'error';
+type ResultSaveStatus = 'inactivo' | 'guardando' | 'error';
 
 interface DiagnosticoState {
   phase: Phase;
+  /** Etapa conservada al pausar. El diagnóstico se reanuda en memoria sin
+   * resetear ni el tablero compartido ni la posición actual del Radar. */
+  pausedPhase: ActivePhase | null;
   resultadoJuego1: ResultadoPartida | null;
   resultadoJuego2: ResultadoPartida | null;
 
   radarPool: RadarItem[];
+  radarLoadStatus: RadarLoadStatus;
+  /** Persistencia de la banda final: el último paso también debe poder recuperarse. */
+  resultSaveStatus: ResultSaveStatus;
   radarSelState: RadarSelectionState;
   radarItem: RadarItem | null;
   radarSubPhase: RadarSubPhase;
@@ -56,9 +65,13 @@ interface DiagnosticoState {
   bandaEstimada: ReturnType<typeof estimarBandaElo> | null;
 
   empezarJuego1(): Promise<void>;
-  registrarResultadoJuego(): void;
+  registrarResultadoJuego(): Promise<void>;
+  reintentarJuego(): Promise<void>;
+  reintentarRadar(): Promise<void>;
   radarUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
   radarContinuar(): Promise<void>;
+  pausar(): void;
+  reanudar(): void;
   volver(): void;
 }
 
@@ -83,14 +96,38 @@ function resultadoDeGameStore(): ResultadoPartida {
 export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
   function loadRadarItem(item: RadarItem | null) {
     if (!item) {
-      void finalizarConResultado();
+      // Llegar sin ítem antes de las 20 respuestas es un fallo recuperable
+      // del catálogo, no un diagnóstico válido con respuestas inventadas.
+      set({ radarItem: null, radarLoadStatus: 'error' });
       return;
     }
     chess = new Chess(item.fen);
-    set({ radarItem: item, radarSubPhase: 'jugando', radarUltimoAcierto: null, radarFeedbackTexto: '', radarJugadaCorrecta: null, ...boardSnapshot(), boardOrientation: chess.turn() as Color, lastMove: null });
+    set({ radarItem: item, radarLoadStatus: 'listo', radarSubPhase: 'jugando', radarUltimoAcierto: null, radarFeedbackTexto: '', radarJugadaCorrecta: null, ...boardSnapshot(), boardOrientation: chess.turn() as Color, lastMove: null });
+  }
+
+  async function prepararRadar() {
+    set({ radarItem: null, radarLoadStatus: 'cargando' });
+    try {
+      await radarItemRepo.ensureSeeded();
+      // Sin ítems de doble solución (RF-5.7) en el diagnóstico: acá la
+      // jugada "familiar" contaría como fallo y generaría una tarjeta de
+      // error, contradiciendo la regla de que la familiar también es
+      // acierto. Esa lógica vive en la sesión (sessionStore), no acá.
+      const pool = (await radarItemRepo.list()).filter((item) => !item.dobleSolucion);
+      if (pool.length === 0) {
+        set({ radarPool: [], radarLoadStatus: 'error' });
+        return;
+      }
+      set({ radarPool: pool });
+      const item = selectNextRadarItem(pool, get().radarSelState, Math.random);
+      loadRadarItem(item);
+    } catch {
+      set({ radarItem: null, radarLoadStatus: 'error' });
+    }
   }
 
   async function finalizarConResultado() {
+    if (get().resultSaveStatus === 'guardando') return;
     const s = get();
     const banda = estimarBandaElo({
       juego1: s.resultadoJuego1 ?? 'perdio',
@@ -98,19 +135,34 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       radarAciertos: s.radarAciertos,
       radarTotal: DIAGNOSTICO_RADAR_TOTAL,
     });
-    // Se preserva el resto del perfil (p. ej. la fecha del último Stoyko):
-    // pisarlo con un objeto nuevo borraría datos ajenos al diagnóstico.
-    const actual = await profileRepo.get();
-    await profileRepo.save({ ...actual, bandaElo: banda, diagnosticoCompletadoEn: new Date().toISOString() });
-    set({ phase: 'resultado', bandaEstimada: banda, radarItem: null });
+    set({ resultSaveStatus: 'guardando' });
+    try {
+      // Se preserva el resto del perfil (p. ej. la fecha del último Stoyko):
+      // pisarlo con un objeto nuevo borraría datos ajenos al diagnóstico.
+      const actual = await profileRepo.get();
+      await profileRepo.save({ ...actual, bandaElo: banda, diagnosticoCompletadoEn: new Date().toISOString() });
+      set({
+        phase: 'resultado',
+        pausedPhase: null,
+        bandaEstimada: banda,
+        radarItem: null,
+        radarLoadStatus: 'inactivo',
+        resultSaveStatus: 'inactivo',
+      });
+    } catch {
+      set({ resultSaveStatus: 'error' });
+    }
   }
 
   return {
     phase: 'inactivo',
+    pausedPhase: null,
     resultadoJuego1: null,
     resultadoJuego2: null,
 
     radarPool: [],
+    radarLoadStatus: 'inactivo',
+    resultSaveStatus: 'inactivo',
     radarSelState: RADAR_INITIAL_STATE,
     radarItem: null,
     radarSubPhase: 'jugando',
@@ -136,11 +188,16 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       // JugarScreen esté desmontada). HoyScreen ya deshabilita este botón
       // mientras `useGameStore().phase === 'playing'`; esta comprobación es
       // el cinturón de seguridad del lado del store, no solo de la UI.
-      if (useGameStore.getState().phase === 'playing') return;
+      if (useGameStore.getState().phase === 'playing' || useGameStore.getState().phase === 'loading') return;
       set({
         phase: 'juego1',
+        pausedPhase: null,
         resultadoJuego1: null,
         resultadoJuego2: null,
+        radarPool: [],
+        radarLoadStatus: 'inactivo',
+        resultSaveStatus: 'inactivo',
+        radarItem: null,
         radarServidos: 0,
         radarAciertos: 0,
         radarSelState: RADAR_INITIAL_STATE,
@@ -150,29 +207,45 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       await useGameStore.getState().start(DIAGNOSTICO_JUEGO1_NIVEL, 'random');
     },
 
-    registrarResultadoJuego() {
+    async registrarResultadoJuego() {
       const s = get();
       if (s.phase !== 'juego1' && s.phase !== 'juego2') return;
+      // El efecto que observa `gameStore.phase` puede volver a ejecutarse al
+      // remontar la pantalla. Solo una partida realmente terminada debe
+      // avanzar la etapa; después del primer registro reset() ya la deja en
+      // setup y esta guarda vuelve idempotente esa transición.
+      if (useGameStore.getState().phase !== 'ended') return;
       const resultado = resultadoDeGameStore();
       if (s.phase === 'juego1') {
         set({ resultadoJuego1: resultado, phase: 'juego2' });
         useGameStore.getState().reset();
-        void useGameStore.getState().start(DIAGNOSTICO_JUEGO2_NIVEL, 'random');
+        await useGameStore.getState().start(DIAGNOSTICO_JUEGO2_NIVEL, 'random');
         return;
       }
-      set({ resultadoJuego2: resultado });
+      set({ resultadoJuego2: resultado, phase: 'radar', radarLoadStatus: 'cargando', radarItem: null });
       useGameStore.getState().reset();
-      void (async () => {
-        await radarItemRepo.ensureSeeded();
-        // Sin ítems de doble solución (RF-5.7) en el diagnóstico: acá la
-        // jugada "familiar" contaría como fallo y generaría una tarjeta de
-        // error, contradiciendo la regla de que la familiar también es
-        // acierto. Esa lógica vive en la sesión (sessionStore), no acá.
-        const pool = (await radarItemRepo.list()).filter((item) => !item.dobleSolucion);
-        set({ phase: 'radar', radarPool: pool });
-        const item = selectNextRadarItem(pool, RADAR_INITIAL_STATE, Math.random);
-        loadRadarItem(item);
-      })();
+      await prepararRadar();
+    },
+
+    async reintentarJuego() {
+      const s = get();
+      const activePhase = s.phase === 'pausado' ? s.pausedPhase : s.phase;
+      if (activePhase !== 'juego1' && activePhase !== 'juego2') return;
+      const level = activePhase === 'juego1' ? DIAGNOSTICO_JUEGO1_NIVEL : DIAGNOSTICO_JUEGO2_NIVEL;
+      const game = useGameStore.getState();
+      // start() reinicia la etapa. Si el motor ya había elegido un color
+      // antes de fallar, se conserva para que el reintento no cambie las
+      // condiciones del diagnóstico.
+      const color = game.levelId === level ? game.playerColor : 'random';
+      useGameStore.getState().reset();
+      await useGameStore.getState().start(level, color);
+    },
+
+    async reintentarRadar() {
+      const s = get();
+      const activePhase = s.phase === 'pausado' ? s.pausedPhase : s.phase;
+      if (activePhase !== 'radar' || s.radarLoadStatus === 'cargando') return;
+      await prepararRadar();
     },
 
     async radarUserMove(from, to, promotion) {
@@ -230,9 +303,23 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       loadRadarItem(item);
     },
 
+    pausar() {
+      const phase = get().phase;
+      if (phase !== 'juego1' && phase !== 'juego2' && phase !== 'radar') return;
+      if ((phase === 'juego1' || phase === 'juego2') && (useGameStore.getState().phase === 'loading' || useGameStore.getState().thinking)) return;
+      if (get().resultSaveStatus === 'guardando') return;
+      set({ phase: 'pausado', pausedPhase: phase });
+    },
+
+    reanudar() {
+      const s = get();
+      if (s.phase !== 'pausado' || !s.pausedPhase) return;
+      set({ phase: s.pausedPhase, pausedPhase: null });
+    },
+
     volver() {
       chess = new Chess();
-      set({ phase: 'inactivo', radarItem: null });
+      set({ phase: 'inactivo', pausedPhase: null, radarItem: null, radarLoadStatus: 'inactivo', resultSaveStatus: 'inactivo' });
     },
   };
 });

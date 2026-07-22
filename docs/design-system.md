@@ -1,8 +1,8 @@
-# Design System — ELOmax (v2.1)
+# Design System — ELOmax (v2.2)
 
 Documento vivo. Los tokens de esta página son la única fuente de estilos: se implementan en la configuración de Tailwind y ningún componente usa valores sueltos. Cambiar la estética = cambiar tokens acá, con entrada en el changelog.
 
-> **Cambios v2.1:** contraste AA también para texto terciario pequeño, navegación móvil con segunda señal visual, rutas persistentes por hash compatibles con GitHub Pages, control segmentado único y arquitectura del Panel en Resumen / Medición / Partidas y datos.
+> **Cambios v2.2:** el CTA diario recupera la primera pantalla, el diagnóstico inicial pasa a ser un recorrido editorial de tres etapas y los datos asíncronos tienen estados explícitos de carga, demora, error y reintento sin vaciar toda la vista.
 
 ## 1. Dirección estética: "Sala de estudio"
 
@@ -120,7 +120,9 @@ Rotación re-acomoda sin recargar (RNF-1); entrada por teclado en notación alge
 La navegación persiste cada destino como hash (`#/hoy`, `#/jugar`, `#/calculo`, `#/panel`) para admitir enlaces directos, recarga e historial aun bajo GitHub Pages. Al cambiar de pantalla, el contenido vuelve arriba y el foco pasa al título principal. En celular, el destino activo combina fondo, texto y una barra superior: nunca depende solo del color.
 
 ### 4.1 Pantalla "Tu sesión de hoy" (decisión)
-Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque de la sesión es una tarjeta destacada con borde `accent`, su porqué y el único botón primario de la pantalla ("Empezar sesión"); los bloques restantes se listan debajo como tarjetas secundarias. Encabezado: fecha en `font-mono` tertiary + título en `font-display` + duración total. Alternativa "línea de tiempo" descartada como default; queda documentada como variante B en el prototipo (`docs/prototipos/sesion-de-hoy.dc.html`).
+Layout **"bloque héroe"** (validado en prototipo, 2026-07): el siguiente bloque de la sesión es una tarjeta destacada con borde `accent`, su porqué y el único botón primario de la pantalla ("Empezar sesión"); los bloques restantes se listan debajo como tarjetas secundarias. Encabezado: fecha en `font-mono` tertiary + título en `font-display` + duración total. En celular el héroe y su CTA aparecen antes de cualquier bloque de constancia, plan semanal o recordatorio: la acción diaria debe entrar en el primer viewport. Alternativa "línea de tiempo" descartada como default; queda documentada como variante B en el prototipo (`docs/prototipos/sesion-de-hoy.dc.html`).
+
+Para un perfil nuevo, el diagnóstico ocupa ese mismo lugar prioritario con una bienvenida editorial: estimación honesta de 20–40 minutos, recorrido numerado (dos partidas sin reloj + 20 posiciones del Radar), aviso local-first y salida secundaria no bloqueante. Durante el recorrido se muestra progreso global 1/3–3/3; puede pausarse y reanudarse sin perder la etapa actual mientras la pestaña siga abierta. La interfaz no presenta esa pausa en memoria como persistencia entre recargas.
 
 ### 4.2 Flujo del Radar (validado en prototipo)
 1. Evaluación rápida (EvalPicker) con el tablero en solo lectura — "¿Cómo está la posición?".
@@ -138,6 +140,13 @@ El Panel separa tres intenciones mediante un control segmentado:
 - **Partidas y datos:** historial, análisis pendiente, importación, exportación y restauración.
 
 Cada vista conserva una sola acción primaria. En escritorio puede aprovechar hasta dos columnas; en celular mantiene una secuencia vertical guiada por prioridad.
+
+### 4.4 Carga y recuperación asíncronas
+
+- Una carga inicial reserva la geometría del contenido final con skeletons de la misma familia visual; no usa una pantalla vacía ni desplaza la estructura al resolver.
+- `status` y `aria-busy` anuncian la espera sin robar el foco. Tras 4 segundos se explica la demora y aparece un reintento manual; el error usa `alert` y conserva una salida recuperable.
+- El Panel carga cada fuente de datos de forma independiente. Un repositorio lento o fallido solo reemplaza su sección; el resto de las métricas permanece visible y los datos previos se conservan durante una recarga.
+- Los arranques que dependen del motor o del almacenamiento vuelven a un estado estable si fallan y ofrecen reintento; nunca dejan un tablero o botón aparentemente listo pero inerte.
 
 ## 5. Componentes núcleo
 

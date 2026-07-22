@@ -14,6 +14,7 @@ import { SegmentedControl } from '../components/SegmentedControl';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { useCompromisoStore } from '../state/compromisoStore';
 import { useStoykoStore } from '../state/stoykoStore';
+import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
 
 type Modo = 'comprometida' | 'stoyko';
@@ -50,6 +51,7 @@ export function CalculoScreen() {
 
 function LineaComprometida() {
   const s = useCompromisoStore();
+  const slow = useSlowLoading(s.phase === 'cargando');
 
   // Solo al montar (deps []): empezar() ya pone phase en 'cargando' como
   // primer paso, así que depender de todo el store ([s]) reengancha el
@@ -63,7 +65,10 @@ function LineaComprometida() {
     if (store.phase === 'cargando' && store.pool.length === 0 && !store.item) void store.empezar();
   }, []);
 
-  if (s.phase === 'cargando') return <Centro texto={t.calculo.cargando} />;
+  if (s.phase === 'cargando') {
+    return <CargaCalculo slow={slow} onRetry={() => void s.empezar(true)} />;
+  }
+  if (s.phase === 'error') return <ErrorCalculo onRetry={() => void s.empezar(true)} />;
   if (s.phase === 'sinContenido') return <Centro texto={t.calculo.sinContenido} />;
 
   const item = s.item;
@@ -103,6 +108,50 @@ function Centro({ texto }: { texto: string }) {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-2">
       <p className="m-0 text-secondary">{texto}</p>
+    </div>
+  );
+}
+
+function CargaCalculo({ slow, onRetry }: { slow: boolean; onRetry: () => void }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      className="flex w-full flex-col gap-3 sm:flex-row sm:items-start"
+    >
+      <div
+        aria-hidden="true"
+        className="mx-auto grid aspect-square w-full min-w-[320px] max-w-[640px] grid-cols-8 overflow-hidden rounded-sm border border-subtle sm:mx-0 sm:w-[60%]"
+      >
+        {Array.from({ length: 64 }, (_, index) => (
+          <span key={index} className={(Math.floor(index / 8) + index) % 2 === 0 ? 'bg-surface' : 'bg-elevated'} />
+        ))}
+      </div>
+      <aside className="flex w-full flex-col gap-3 rounded-lg border border-subtle bg-surface p-4 sm:w-[40%] sm:max-w-xs">
+        <p className="m-0 font-display text-xl font-medium text-primary">{t.calculo.cargando}</p>
+        <p className="m-0 text-sm text-secondary">{t.calculo.cargaDetalle}</p>
+        {slow && (
+          <div className="flex flex-col gap-3 border-t border-subtle pt-3">
+            <p className="m-0 text-sm text-secondary">{t.calculo.cargaLenta}</p>
+            <button type="button" onClick={onRetry} className="btn-secondary">
+              {t.calculo.reintentarCarga}
+            </button>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function ErrorCalculo({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="mx-auto flex w-full max-w-md flex-col gap-3 rounded-lg border border-error/35 bg-error-subtle p-4 sm:mx-0">
+      <p className="m-0 font-display text-xl font-medium text-primary">{t.calculo.cargaErrorTitulo}</p>
+      <p className="m-0 text-sm text-secondary">{t.calculo.cargaErrorTexto}</p>
+      <button type="button" onClick={onRetry} className="btn-secondary">
+        {t.calculo.reintentarCarga}
+      </button>
     </div>
   );
 }
@@ -175,6 +224,7 @@ const EVAL_LABELS: Record<EvalSymbol, string> = { '+-': '+−', '±': '±', '=':
 
 function Stoyko() {
   const s = useStoykoStore();
+  const slow = useSlowLoading(s.phase === 'cargando');
 
   // Solo al montar: mismo motivo que en LineaComprometida más arriba.
   useEffect(() => {
@@ -182,7 +232,8 @@ function Stoyko() {
     if (store.phase === 'cargando' && store.pool.length === 0 && !store.item) void store.empezar();
   }, []);
 
-  if (s.phase === 'cargando') return <Centro texto={t.stoyko.cargando} />;
+  if (s.phase === 'cargando') return <CargaCalculo slow={slow} onRetry={() => void s.empezar(true)} />;
+  if (s.phase === 'error') return <ErrorCalculo onRetry={() => void s.empezar(true)} />;
   if (s.phase === 'sinContenido') return <Centro texto={t.stoyko.sinContenido} />;
   if (s.phase === 'enfriamiento') return <StoykoEnfriamiento />;
 

@@ -8,15 +8,31 @@ import { SectionHeading } from '../components/SectionHeading';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import { useFinalesStore } from '../state/finalesStore';
+import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import type { Color } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
 import { t } from '../i18n/es';
 
 export function JugarScreen() {
+  const diagnosticoPhase = useDiagnosticoStore((state) => state.phase);
   const [modo, setModo] = useState<'partida' | 'finales'>('partida');
+  if (diagnosticoPhase !== 'inactivo' && diagnosticoPhase !== 'resultado') return <DiagnosticoEnCurso />;
   return modo === 'finales'
     ? <FinalesScreen onPartida={() => setModo('partida')} />
     : <PartidaScreen onFinales={() => setModo('finales')} />;
+}
+
+function DiagnosticoEnCurso() {
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <h1 className="m-0 font-display text-3xl font-medium">{t.jugar.titulo}</h1>
+      <section className="flex flex-col gap-3 rounded-lg border border-accent/45 bg-surface p-5">
+        <p className="m-0 font-display text-xl font-medium">{t.jugar.diagnosticoEnCursoTitulo}</p>
+        <p className="m-0 text-sm text-secondary">{t.jugar.diagnosticoEnCursoTexto}</p>
+        <a href="#/hoy" className="btn-primary text-center no-underline">{t.jugar.volverDiagnostico}</a>
+      </section>
+    </div>
+  );
 }
 
 function PartidaScreen({ onFinales }: { onFinales: () => void }) {

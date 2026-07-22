@@ -3,10 +3,10 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.5 |
+| Versión | 0.2.6 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
-| Última actualización | 2026-07-18 |
+| Última actualización | 2026-07-22 |
 | Documentos hermanos | `CONTRIBUTING.md`, `roadmap.md`, `design-system.md`, `adr/`, `evidence/` |
 
 > **Cómo usar este documento.** Es la fuente de verdad de producto. Cada épica tiene requisitos numerados (RF = requisito funcional, RNF = no funcional) con criterios de aceptación. Al construirlo —sea una persona o un agente de IA—: implementar de a una épica, citando los números de requisito en los commits; las reglas de trabajo completas están en `CONTRIBUTING.md`. Si una decisión técnica contradice o excede lo escrito acá, se documenta en un ADR antes de codear. Este documento cambia por pull request y cada cambio se refleja en el changelog.
@@ -163,7 +163,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-11.1 (P0)** La pantalla principal es **"Tu sesión de hoy"**: una secuencia de bloques con duración total visible (por defecto 25 min; mínima viable 15; configurable).
 - **RF-11.2 (P0)** Composición de la sesión, en orden: (1) repasos vencidos de la Cola; (2) dieta base por banda de Elo (tabla versionada en configuración, no hardcodeada — ver §9); (3) ajuste por fugas del último mes (ejemplo: si >35% de derrotas son por reloj, sube Triage).
 - **RF-11.3 (P0)** Cada bloque muestra su **porqué** en una línea ("Radar 12 min — tus errores graves en posiciones tranquilas duplican tu promedio").
-- **RF-11.4 (P0)** Diagnóstico inicial: importación + análisis en lote (E2/E3 exprés) → banda de Elo y perfil de fugas → primera dieta. Sin historial: 2 partidas cortas contra Maia escalonada + 20 posiciones de Radar.
+- **RF-11.4 (P0)** Diagnóstico inicial: importación + análisis en lote (E2/E3 exprés) → banda de Elo y perfil de fugas → primera dieta. Sin historial: 2 partidas sin reloj contra Maia escalonada + 20 posiciones de Radar.
 - **RF-11.5 (P1)** El usuario puede saltear un bloque (se registra) pero no reordenar la prioridad de la Cola.
 - **RF-11.6 (P1)** Las reglas del Prescriptor viven en un archivo de configuración versionado (JSON) con su propio changelog: iterar la dieta no toca código.
 - **RF-11.7 (P2)** Modo "partida lenta programada": el Prescriptor reserva bloques semanales para partidas completas + análisis (no todo es ejercicio).

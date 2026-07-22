@@ -100,7 +100,7 @@ const PUNTOS_PARTIDA: Record<ResultadoPartida, number> = { gano: 1, tablas: 0.5,
 
 /**
  * Estima la banda de Elo a partir del diagnóstico inicial (RF-11.4): dos
- * partidas cortas contra el motor local en niveles escalonados (fallback de
+ * partidas sin reloj contra el motor local en niveles escalonados (fallback de
  * Maia, bloqueada por red — ver docs/roadmap.md) más la tasa de acierto en
  * 20 posiciones del Radar. Heurística v1 simple y documentada, no una
  * calibración estadística — deliberado hasta tener datos reales de uso.

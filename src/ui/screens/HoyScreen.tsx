@@ -10,6 +10,7 @@ import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { ReminderCard } from '../components/ReminderCard';
+import { SectionHeading } from '../components/SectionHeading';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
@@ -17,19 +18,23 @@ import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { nivelCiegas } from '../../core/curriculum';
 import type { PlanSemanal, ReminderConfig } from '../../core/types';
 import { profileRepo } from '../../services/storage/profileRepo';
+import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
-  const s = useSessionStore();
+  const sessionPhase = useSessionStore((s) => s.phase);
+  const summaryStatus = useSessionStore((s) => s.summaryStatus);
   const diagnosticoPhase = useDiagnosticoStore((d) => d.phase);
 
   useEffect(() => {
-    if (s.phase === 'sinEmpezar' && s.dueCount === null) void s.loadSummary();
-  }, [s]);
+    if (sessionPhase === 'sinEmpezar' && summaryStatus === 'idle') {
+      void useSessionStore.getState().loadSummary();
+    }
+  }, [sessionPhase, summaryStatus]);
 
   if (diagnosticoPhase !== 'inactivo') return <DiagnosticoScreen />;
-  if (s.phase === 'sinEmpezar' || s.phase === 'cargando') return <Portada />;
-  if (s.phase === 'fin') return <Fin />;
+  if (sessionPhase === 'sinEmpezar' || sessionPhase === 'cargando') return <Portada />;
+  if (sessionPhase === 'fin') return <Fin />;
   return <SesionActiva />;
 }
 
@@ -98,6 +103,7 @@ function fechaDeHoy(): string {
 
 function Portada() {
   const s = useSessionStore();
+  const loadingSlow = useSlowLoading(s.summaryStatus === 'idle' || s.summaryStatus === 'loading');
 
   async function saveWeeklyPlan(planSemanal: PlanSemanal) {
     const profile = { ...s.profile, planSemanal };
@@ -111,14 +117,8 @@ function Portada() {
     useSessionStore.setState({ profile });
   }
 
-  if (s.dueCount === null) {
-    return (
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-        <p className="m-0 text-secondary">{t.sesion.cargando}</p>
-      </div>
-    );
-  }
+  if (s.summaryStatus === 'error') return <PortadaError />;
+  if (s.summaryStatus !== 'ready' || s.dueCount === null) return <PortadaLoading slow={loadingSlow} />;
 
   if (!s.profile.diagnosticoCompletadoEn) return <DiagnosticoPrompt />;
 
@@ -136,15 +136,6 @@ function Portada() {
         </div>
       </div>
 
-      <WeeklyPlanCard
-        records={s.sessions ?? []}
-        profile={s.profile}
-        editable
-        onSave={saveWeeklyPlan}
-      />
-
-      <ReminderCard config={s.profile.recordatorio} onSave={saveReminder} />
-
       {/* Bloque héroe (design system §4.1): el siguiente bloque, destacado con
           borde accent y el único botón primario de la pantalla. */}
       <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
@@ -153,6 +144,7 @@ function Portada() {
         </span>
         <p className="m-0 font-display text-2xl font-medium">{siguiente.texto}</p>
         <p className="m-0 text-sm text-secondary">{siguiente.porque}</p>
+        {s.startError && <p role="alert" className="m-0 text-sm text-error">{t.hoy.inicioError}</p>}
         <button
           onClick={() => void useSessionStore.getState().start()}
           disabled={s.phase === 'cargando'}
@@ -179,6 +171,65 @@ function Portada() {
           ))}
         </ul>
       )}
+
+      <div className="mt-2 flex flex-col gap-1 border-t border-subtle pt-4">
+        <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
+        <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
+      </div>
+
+      <WeeklyPlanCard
+        records={s.sessions ?? []}
+        profile={s.profile}
+        editable
+        onSave={saveWeeklyPlan}
+      />
+
+      <ReminderCard config={s.profile.recordatorio} onSave={saveReminder} />
+    </div>
+  );
+}
+
+function PortadaLoading({ slow }: { slow: boolean }) {
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
+        <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+      </div>
+      <section role="status" aria-live="polite" aria-busy="true" className="flex min-h-52 flex-col justify-between gap-4 rounded-lg border border-accent/45 bg-surface p-5">
+        <div className="flex flex-col gap-3">
+          <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.sesion.cargando}</span>
+          <div aria-hidden="true" className="flex flex-col gap-2">
+            <span className="h-7 w-4/5 rounded-sm bg-elevated" />
+            <span className="h-4 w-full rounded-sm bg-elevated" />
+            <span className="h-4 w-2/3 rounded-sm bg-elevated" />
+          </div>
+          <p className="m-0 text-sm text-secondary">{t.hoy.cargaDetalle}</p>
+        </div>
+        {slow && (
+          <div className="flex flex-col gap-3 border-t border-subtle pt-3">
+            <p className="m-0 text-sm text-secondary">{t.hoy.cargaLenta}</p>
+            <button type="button" onClick={() => void useSessionStore.getState().loadSummary(true)} className="btn-secondary">
+              {t.hoy.reintentar}
+            </button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function PortadaError() {
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+      <section role="alert" className="flex flex-col gap-3 rounded-lg border border-error/35 bg-error-subtle p-5">
+        <p className="m-0 font-display text-xl font-medium">{t.hoy.cargaErrorTitulo}</p>
+        <p className="m-0 text-sm text-secondary">{t.hoy.cargaErrorTexto}</p>
+        <button type="button" onClick={() => void useSessionStore.getState().loadSummary(true)} className="btn-secondary">
+          {t.hoy.reintentar}
+        </button>
+      </section>
     </div>
   );
 }
@@ -189,16 +240,45 @@ function DiagnosticoPrompt() {
   // desmontada), empezar el diagnóstico la resetearía sin aviso al llamar
   // useGameStore().reset() (RF-1.3). Se deshabilita el botón y se explica
   // por qué, en vez de perder la partida en silencio.
-  const partidaEnCurso = useGameStore((g) => g.phase === 'playing');
+  const partidaEnCurso = useGameStore((g) => g.phase === 'playing' || g.phase === 'loading');
+  const sessionPhase = useSessionStore((s) => s.phase);
+  const startError = useSessionStore((s) => s.startError);
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-      <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
+      <section className="flex flex-col gap-4 rounded-lg border border-accent bg-surface p-5">
         <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.diagnostico.titulo}</span>
-        <p className="m-0 text-sm text-secondary">{t.diagnostico.introTexto}</p>
-        <p className="m-0 text-xs text-tertiary">{t.diagnostico.introNota}</p>
+        <div>
+          <h2 className="m-0 font-display text-2xl font-medium">{t.diagnostico.bienvenidaTitulo}</h2>
+          <p className="m-0 mt-2 text-sm text-secondary">{t.diagnostico.introTexto}</p>
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t.diagnostico.resumenLabel}>
+          {[t.diagnostico.duracion, t.diagnostico.etapas, t.diagnostico.pausable].map((texto) => (
+            <span key={texto} className="rounded-full border border-subtle bg-elevated px-3 py-1.5 text-xs text-secondary">{texto}</span>
+          ))}
+        </div>
+        <ol className="m-0 flex list-none flex-col gap-3 p-0">
+          {[
+            [t.diagnostico.etapa1Titulo, t.diagnostico.etapa1Texto],
+            [t.diagnostico.etapa2Titulo, t.diagnostico.etapa2Texto],
+            [t.diagnostico.etapa3Titulo, t.diagnostico.etapa3Texto],
+          ].map(([titulo, texto], index) => (
+            <li key={titulo} className="flex gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-accent/50 font-mono text-xs text-accent">{index + 1}</span>
+              <span className="flex flex-col gap-0.5">
+                <strong className="text-sm font-semibold text-primary">{titulo}</strong>
+                <span className="text-xs text-secondary">{texto}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <div className="rounded-md border border-info/35 bg-info-subtle p-3">
+          <p className="m-0 text-sm font-semibold text-primary">{t.diagnostico.privacidadTitulo}</p>
+          <p className="m-0 mt-1 text-xs text-secondary">{t.diagnostico.privacidadTexto}</p>
+        </div>
         {partidaEnCurso && <p className="m-0 text-xs text-error">{t.diagnostico.partidaEnCurso}</p>}
+        {startError && <p role="alert" className="m-0 text-xs text-error">{t.hoy.inicioError}</p>}
         <button
           onClick={() => void useDiagnosticoStore.getState().empezarJuego1()}
           disabled={partidaEnCurso}
@@ -206,10 +286,14 @@ function DiagnosticoPrompt() {
         >
           {t.diagnostico.empezar}
         </button>
-        <button onClick={() => void useSessionStore.getState().start()} className="btn-secondary">
-          {t.diagnostico.saltear}
+        <button
+          onClick={() => void useSessionStore.getState().start()}
+          disabled={sessionPhase === 'cargando'}
+          className="btn-secondary"
+        >
+          {sessionPhase === 'cargando' ? t.sesion.cargando : t.diagnostico.saltear}
         </button>
-      </div>
+      </section>
     </div>
   );
 }

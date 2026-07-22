@@ -98,7 +98,7 @@ test('doble solución: conformarse con la familiar acierta pero avisa que había
   await seedCurriculumAutomatizado(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
-  await page.getByRole('button', { name: 'Empezar sin diagnóstico' }).click();
+  await page.getByRole('button', { name: 'Entrenar ahora y hacerlo después' }).click();
 
   const board = page.locator('cg-board');
   await board.waitFor({ timeout: 15_000 });

@@ -2,11 +2,12 @@
 // anotan candidatas antes de revelar, se compara con la línea del motor y
 // se registra para calibración (E10) y para el enfriamiento semanal.
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStoykoStore } from './stoykoStore';
 import { db } from '../../services/storage/db';
 import { STOYKO_DATASET_VERSION } from '../../services/puzzles/stoykoSeedData';
 import type { Profile, StoykoItem } from '../../core/types';
+import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
 
 const item: StoykoItem = {
   id: 'stoyko-test-1',
@@ -21,6 +22,7 @@ async function seedProfile(overrides: Partial<Profile> = {}) {
 }
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   await db.stoykoItems.clear();
   await db.stoykoDatasetMeta.clear();
   await db.calibrationRecords.clear();
@@ -31,6 +33,17 @@ beforeEach(async () => {
 });
 
 describe('stoykoStore', () => {
+  it('sale de la carga ante un fallo del catálogo y permite reintentar', async () => {
+    const failure = vi.spyOn(stoykoItemRepo, 'ensureSeeded').mockRejectedValueOnce(new Error('indexeddb'));
+
+    await useStoykoStore.getState().empezar(true);
+    expect(useStoykoStore.getState().phase).toBe('error');
+
+    failure.mockRestore();
+    await useStoykoStore.getState().empezar(true);
+    expect(useStoykoStore.getState().phase).toBe('analizando');
+  });
+
   it('sin perfil (nunca se hizo), sirve el ítem apto determinísticamente', async () => {
     await useStoykoStore.getState().empezar();
     const s = useStoykoStore.getState();

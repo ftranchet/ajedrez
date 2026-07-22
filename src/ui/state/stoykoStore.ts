@@ -21,7 +21,7 @@ import { t } from '../i18n/es';
 
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
 
-type Phase = 'cargando' | 'sinContenido' | 'enfriamiento' | 'analizando' | 'confianza' | 'revelado';
+type Phase = 'cargando' | 'error' | 'sinContenido' | 'enfriamiento' | 'analizando' | 'confianza' | 'revelado';
 
 interface StoykoState {
   phase: Phase;
@@ -37,7 +37,7 @@ interface StoykoState {
   lineaMotorSan: string[];
   inicioMs: number | null;
 
-  empezar(): Promise<void>;
+  empezar(force?: boolean): Promise<void>;
   setInputActual(value: string): void;
   setEvalSeleccionada(value: EvalSymbol): void;
   agregarCandidata(): void;
@@ -45,6 +45,9 @@ interface StoykoState {
   terminarAnalisis(): void;
   confirmarConfianza(valor: number): Promise<void>;
 }
+
+let loadGeneration = 0;
+let loadPromise: { generation: number; promise: Promise<void> } | null = null;
 
 export const useStoykoStore = create<StoykoState>((set, get) => ({
   phase: 'cargando',
@@ -60,33 +63,47 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   lineaMotorSan: [],
   inicioMs: null,
 
-  async empezar() {
+  async empezar(force = false) {
+    if (loadPromise && !force) return loadPromise.promise;
+    const generation = ++loadGeneration;
     set({ phase: 'cargando' });
-    const profile = await profileRepo.get();
-    if (!stoykoDisponible(profile)) {
-      set({ phase: 'enfriamiento', proximaDisponibleEn: stoykoProximaDisponibleEn(profile) });
-      return;
-    }
-    await stoykoItemRepo.ensureSeeded();
-    const pool = await stoykoItemRepo.list();
-    if (pool.length === 0) {
-      set({ phase: 'sinContenido', pool });
-      return;
-    }
-    const item = pool[Math.floor(Math.random() * pool.length)];
-    set({
-      phase: 'analizando',
-      pool,
-      item,
-      candidatas: [],
-      inputActual: '',
-      evalSeleccionada: '=',
-      inputError: null,
-      confianza: null,
-      acierto: null,
-      lineaMotorSan: [],
-      inicioMs: Date.now(),
-    });
+    const promise = (async () => {
+      try {
+        const profile = await profileRepo.get();
+        if (generation !== loadGeneration) return;
+        if (!stoykoDisponible(profile)) {
+          set({ phase: 'enfriamiento', proximaDisponibleEn: stoykoProximaDisponibleEn(profile) });
+          return;
+        }
+        await stoykoItemRepo.ensureSeeded();
+        const pool = await stoykoItemRepo.list();
+        if (generation !== loadGeneration) return;
+        if (pool.length === 0) {
+          set({ phase: 'sinContenido', pool });
+          return;
+        }
+        const item = pool[Math.floor(Math.random() * pool.length)];
+        set({
+          phase: 'analizando',
+          pool,
+          item,
+          candidatas: [],
+          inputActual: '',
+          evalSeleccionada: '=',
+          inputError: null,
+          confianza: null,
+          acierto: null,
+          lineaMotorSan: [],
+          inicioMs: Date.now(),
+        });
+      } catch {
+        if (generation === loadGeneration) set({ phase: 'error', item: null });
+      } finally {
+        if (loadPromise?.generation === generation) loadPromise = null;
+      }
+    })();
+    loadPromise = { generation, promise };
+    return promise;
   },
 
   setInputActual(value) {

@@ -24,7 +24,7 @@ function replayLinea(fen: string, uciMoves: string[]): Chess {
   return chess;
 }
 
-type Phase = 'cargando' | 'sinContenido' | 'jugando' | 'feedback';
+type Phase = 'cargando' | 'error' | 'sinContenido' | 'jugando' | 'feedback';
 
 interface CompromisoState {
   phase: Phase;
@@ -40,12 +40,15 @@ interface CompromisoState {
   /** Marca de tiempo al servir el ítem, para el cronómetro silencioso (RF-7.3: nunca visible). */
   inicioMs: number | null;
 
-  empezar(): Promise<void>;
+  empezar(force?: boolean): Promise<void>;
   setInputActual(value: string): void;
   agregarJugada(): void;
   borrarUltima(): void;
   siguiente(): void;
 }
+
+let loadGeneration = 0;
+let loadPromise: { generation: number; promise: Promise<void> } | null = null;
 
 export const useCompromisoStore = create<CompromisoState>((set, get) => {
   function elegirItem() {
@@ -80,13 +83,26 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
     resultado: null,
     inicioMs: null,
 
-    async empezar() {
+    async empezar(force = false) {
+      if (loadPromise && !force) return loadPromise.promise;
+      const generation = ++loadGeneration;
       set({ phase: 'cargando' });
-      await radarItemRepo.ensureSeeded();
-      const todos = await radarItemRepo.list();
-      const pool = itemsParaCompromiso(todos);
-      set({ pool });
-      elegirItem();
+      const promise = (async () => {
+        try {
+          await radarItemRepo.ensureSeeded();
+          const todos = await radarItemRepo.list();
+          if (generation !== loadGeneration) return;
+          const pool = itemsParaCompromiso(todos);
+          set({ pool });
+          elegirItem();
+        } catch {
+          if (generation === loadGeneration) set({ phase: 'error', item: null });
+        } finally {
+          if (loadPromise?.generation === generation) loadPromise = null;
+        }
+      })();
+      loadPromise = { generation, promise };
+      return promise;
     },
 
     setInputActual(value) {
