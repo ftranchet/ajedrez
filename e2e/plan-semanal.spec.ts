@@ -67,20 +67,65 @@ test('Hoy móvil prioriza empezar la sesión antes que constancia y recordatorio
   const start = page.getByRole('button', { name: 'Empezar sesión' });
   const plan = page.getByRole('heading', { name: 'Plan semanal' });
   const reminder = page.getByRole('heading', { name: 'Recordatorio diario' });
+  const sensory = page.getByRole('heading', { name: 'Respuesta sensorial' });
   await expect(start).toBeVisible();
   await expect(plan).toBeVisible();
   await expect(reminder).toBeVisible();
+  await expect(sensory).toBeVisible();
 
-  const [startBox, planBox, reminderBox] = await Promise.all([
+  const [startBox, planBox, reminderBox, sensoryBox] = await Promise.all([
     start.boundingBox(),
     plan.boundingBox(),
     reminder.boundingBox(),
+    sensory.boundingBox(),
   ]);
   expect(startBox).not.toBeNull();
   expect(planBox).not.toBeNull();
   expect(reminderBox).not.toBeNull();
+  expect(sensoryBox).not.toBeNull();
   expect(startBox!.y + startBox!.height).toBeLessThan(844 - 56);
   expect(startBox!.y).toBeLessThan(planBox!.y);
   expect(startBox!.y).toBeLessThan(reminderBox!.y);
+  expect(reminderBox!.y).toBeLessThan(sensoryBox!.y);
   await expect(page.locator('main .btn-primary')).toHaveCount(1);
+});
+
+test('feedback sensorial: empieza apagado, separa canales y persiste', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'vibrate', {
+      configurable: true,
+      value: () => true,
+    });
+  });
+  await page.goto('./#/hoy');
+  await page.getByRole('button', { name: 'Empezar diagnóstico' }).waitFor();
+  await seedDiagnosticado(page);
+  await page.reload();
+
+  const sound = page.getByRole('checkbox', { name: /^Sonido/ });
+  const vibration = page.getByRole('checkbox', { name: /^Vibración/ });
+  await expect(sound).not.toBeChecked();
+  await expect(vibration).not.toBeChecked();
+  await sound.check();
+  await expect(sound).toBeEnabled();
+  await vibration.check();
+  await expect(vibration).toBeEnabled();
+  await expect(sound).toBeChecked();
+  await expect(vibration).toBeChecked();
+
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: /^Sonido/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /^Vibración/ })).toBeChecked();
+  const persisted = await page.evaluate(() =>
+    new Promise<{ sonido: boolean; vibracion: boolean }>((resolve, reject) => {
+      const request = indexedDB.open('elomax');
+      request.onsuccess = () => {
+        const get = request.result.transaction('profile').objectStore('profile').get('principal');
+        get.onsuccess = () => resolve(get.result.preferenciasSensoriales);
+        get.onerror = () => reject(get.error);
+      };
+      request.onerror = () => reject(request.error);
+    }),
+  );
+  expect(persisted).toEqual({ sonido: true, vibracion: true });
 });

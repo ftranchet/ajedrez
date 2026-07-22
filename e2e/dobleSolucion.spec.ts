@@ -3,7 +3,7 @@
 // superior. La clasificación en sí ya está probada en
 // core/dobleSolucion.test.ts y sessionStore.dobleSolucion.test.ts — acá se
 // verifica que la UI está bien conectada.
-import { test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { RADAR_DATASET_VERSION } from '../src/services/puzzles/seedData';
 import { seedCurriculumItems } from '../src/services/puzzles/curriculumSeedData';
 
@@ -112,4 +112,8 @@ test('doble solución: conformarse con la familiar acierta pero avisa que había
 
   await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
   await page.getByText('d5c6').waitFor(); // el feedback menciona la jugada superior
+  // La flecha valida lo que el usuario encontró (f1→b5), no sustituye esa
+  // respuesta aceptada por la variante principal d5→c6.
+  await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback-move', 'f1-b5');
+  await expect(page.locator('.cg-shapes line')).toHaveCount(2);
 });

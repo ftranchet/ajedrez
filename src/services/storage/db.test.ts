@@ -702,4 +702,73 @@ describe('migración de esquema Dexie', () => {
     expect(await current.n1Experiments.count()).toBe(1);
     current.close();
   });
+
+  it('migra de v14 a v15: conserva los datos y completa preferencias sensoriales sin pisar valores existentes', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v14 = new Dexie(name);
+    v14.version(14).stores({
+      games: 'id, fecha, fuente',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
+      stoykoAttempts: 'id, itemId, fecha',
+      triageAttempts: 'id, itemId, fecha',
+      sessions: 'id, fechaInicio, estado',
+      transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+      n1Experiments: 'id, creadoEn, estado',
+    });
+    await v14.open();
+    await v14.table('profile').bulkAdd([
+      {
+        id: 'legacy',
+        bandaElo: 'intermedio',
+        diagnosticoCompletadoEn: '2026-07-19T10:00:00.000Z',
+      },
+      {
+        id: 'configurado',
+        bandaElo: 'avanzado',
+        preferenciasSensoriales: { sonido: true, vibracion: true },
+      },
+    ]);
+    await v14.table('games').add({
+      id: 'g14',
+      pgn: '1. e4 e5 *',
+      fuente: 'local',
+      ritmo: 'sin-reloj',
+      resultado: '*',
+      tiemposPorJugadaMs: [800, 750],
+      analizada: true,
+      fecha: '2026-07-19T11:00:00.000Z',
+    });
+    v14.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.profile.get('legacy')).toMatchObject({
+      bandaElo: 'intermedio',
+      diagnosticoCompletadoEn: '2026-07-19T10:00:00.000Z',
+      preferenciasSensoriales: { sonido: false, vibracion: false },
+    });
+    expect(await current.profile.get('configurado')).toMatchObject({
+      bandaElo: 'avanzado',
+      preferenciasSensoriales: { sonido: true, vibracion: true },
+    });
+    expect(await current.games.get('g14')).toMatchObject({
+      id: 'g14',
+      pgn: '1. e4 e5 *',
+      analizada: true,
+    });
+    current.close();
+  });
 });

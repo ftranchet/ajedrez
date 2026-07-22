@@ -2,22 +2,26 @@
 // docs/prototipos/sesion-de-hoy.dc.html). Cola vencida → currículo vencido →
 // Radar (E4 + E6 + E5 + E10), compuestos por el Prescriptor (E11) según la
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Square } from 'chess.js';
-import { Board } from '../components/Board';
+import { Board, type BoardFeedback } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { ReminderCard } from '../components/ReminderCard';
+import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { SectionHeading } from '../components/SectionHeading';
+import { Transition } from '../components/Transition';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { nivelCiegas } from '../../core/curriculum';
-import type { PlanSemanal, ReminderConfig } from '../../core/types';
+import type { PlanSemanal, ReminderConfig, SensoryPreferences } from '../../core/types';
+import { normalizeSensoryPreferences } from '../../core/sensory';
 import { profileRepo } from '../../services/storage/profileRepo';
+import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
 
@@ -106,14 +110,17 @@ function Portada() {
   const loadingSlow = useSlowLoading(s.summaryStatus === 'idle' || s.summaryStatus === 'loading');
 
   async function saveWeeklyPlan(planSemanal: PlanSemanal) {
-    const profile = { ...s.profile, planSemanal };
-    await profileRepo.save(profile);
+    const profile = await profileRepo.update({ planSemanal });
     useSessionStore.setState({ profile });
   }
 
   async function saveReminder(recordatorio: ReminderConfig) {
-    const profile = { ...s.profile, recordatorio };
-    await profileRepo.save(profile);
+    const profile = await profileRepo.update({ recordatorio });
+    useSessionStore.setState({ profile });
+  }
+
+  async function saveSensoryPreferences(preferenciasSensoriales: SensoryPreferences) {
+    const profile = await profileRepo.update({ preferenciasSensoriales });
     useSessionStore.setState({ profile });
   }
 
@@ -138,15 +145,18 @@ function Portada() {
 
       {/* Bloque héroe (design system §4.1): el siguiente bloque, destacado con
           borde accent y el único botón primario de la pantalla. */}
-      <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
+      <div className="flex min-h-56 flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
         <span className="font-mono text-xs tracking-wider text-accent uppercase">
           {t.sesion.siguiente} · {t.sesion.minutos.replace('{n}', String(siguiente.minutos))}
         </span>
         <p className="m-0 font-display text-2xl font-medium">{siguiente.texto}</p>
         <p className="m-0 text-sm text-secondary">{siguiente.porque}</p>
-        {s.startError && <p role="alert" className="m-0 text-sm text-error">{t.hoy.inicioError}</p>}
+        {s.startError && <p role="alert" className="m-0 text-sm text-error-text">{t.hoy.inicioError}</p>}
         <button
-          onClick={() => void useSessionStore.getState().start()}
+          onClick={() => {
+            unlockSoundFeedback(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido);
+            void useSessionStore.getState().start();
+          }}
           disabled={s.phase === 'cargando'}
           className="btn-primary"
         >
@@ -185,36 +195,49 @@ function Portada() {
       />
 
       <ReminderCard config={s.profile.recordatorio} onSave={saveReminder} />
+
+      <SensoryPreferencesCard
+        preferences={s.profile.preferenciasSensoriales}
+        onSave={saveSensoryPreferences}
+      />
     </div>
   );
 }
 
 function PortadaLoading({ slow }: { slow: boolean }) {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
-        <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-      </div>
-      <section role="status" aria-live="polite" aria-busy="true" className="flex min-h-52 flex-col justify-between gap-4 rounded-lg border border-accent/45 bg-surface p-5">
-        <div className="flex flex-col gap-3">
-          <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.sesion.cargando}</span>
-          <div aria-hidden="true" className="flex flex-col gap-2">
-            <span className="h-7 w-4/5 rounded-sm bg-elevated" />
-            <span className="h-4 w-full rounded-sm bg-elevated" />
-            <span className="h-4 w-2/3 rounded-sm bg-elevated" />
+    <div className="mx-auto w-full max-w-md">
+      <span role="status" className="sr-only">
+        {slow ? t.hoy.cargaLenta : t.sesion.cargando}
+      </span>
+      <div aria-busy="true" className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
+          <div className="flex items-baseline justify-between gap-3">
+            <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+            <span aria-hidden="true" className="h-4 w-12 rounded-sm bg-elevated" />
           </div>
-          <p className="m-0 text-sm text-secondary">{t.hoy.cargaDetalle}</p>
         </div>
-        {slow && (
-          <div className="flex flex-col gap-3 border-t border-subtle pt-3">
-            <p className="m-0 text-sm text-secondary">{t.hoy.cargaLenta}</p>
-            <button type="button" onClick={() => void useSessionStore.getState().loadSummary(true)} className="btn-secondary">
-              {t.hoy.reintentar}
-            </button>
+        <section className="flex min-h-56 flex-col justify-between gap-4 rounded-lg border border-accent/45 bg-surface p-5">
+          <div className="flex flex-col gap-3">
+            <span className="font-mono text-xs tracking-wider text-accent uppercase">{t.sesion.cargando}</span>
+            <div aria-hidden="true" className="flex flex-col gap-2">
+              <span className="h-7 w-4/5 rounded-sm bg-elevated" />
+              <span className="h-4 w-full rounded-sm bg-elevated" />
+              <span className="h-4 w-2/3 rounded-sm bg-elevated" />
+            </div>
+            <p className="m-0 text-sm text-secondary">{t.hoy.cargaDetalle}</p>
           </div>
-        )}
-      </section>
+          {slow && (
+            <div className="flex flex-col gap-3 border-t border-subtle pt-3">
+              <p className="m-0 text-sm text-secondary">{t.hoy.cargaLenta}</p>
+              <button type="button" onClick={() => void useSessionStore.getState().loadSummary(true)} className="btn-secondary">
+                {t.hoy.reintentar}
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -277,8 +300,8 @@ function DiagnosticoPrompt() {
           <p className="m-0 text-sm font-semibold text-primary">{t.diagnostico.privacidadTitulo}</p>
           <p className="m-0 mt-1 text-xs text-secondary">{t.diagnostico.privacidadTexto}</p>
         </div>
-        {partidaEnCurso && <p className="m-0 text-xs text-error">{t.diagnostico.partidaEnCurso}</p>}
-        {startError && <p role="alert" className="m-0 text-xs text-error">{t.hoy.inicioError}</p>}
+        {partidaEnCurso && <p className="m-0 text-xs text-error-text">{t.diagnostico.partidaEnCurso}</p>}
+        {startError && <p role="alert" className="m-0 text-xs text-error-text">{t.hoy.inicioError}</p>}
         <button
           onClick={() => void useDiagnosticoStore.getState().empezarJuego1()}
           disabled={partidaEnCurso}
@@ -287,7 +310,10 @@ function DiagnosticoPrompt() {
           {t.diagnostico.empezar}
         </button>
         <button
-          onClick={() => void useSessionStore.getState().start()}
+          onClick={() => {
+            unlockSoundFeedback(normalizeSensoryPreferences(useSessionStore.getState().profile.preferenciasSensoriales).sonido);
+            void useSessionStore.getState().start();
+          }}
           disabled={sessionPhase === 'cargando'}
           className="btn-secondary"
         >
@@ -323,8 +349,22 @@ function SesionActiva() {
       : enTriage
         ? false // Triage es una decisión (RF-9.2), no una jugada en el tablero.
         : s.radarSubPhase === 'jugando';
+  const sensoryPreferences = normalizeSensoryPreferences(s.profile.preferenciasSensoriales);
+  const soundEnabled = sensoryPreferences.sonido;
+  const vibrationEnabled = sensoryPreferences.vibracion;
+  const boardFeedback = feedbackForSession(s);
+  const feedbackKey = feedbackKeyForSession(s, boardFeedback);
+  const previousFeedbackKey = useRef(feedbackKey);
+
+  useEffect(() => {
+    if (feedbackKey && previousFeedbackKey.current !== feedbackKey) {
+      playResolutionCue({ sonido: soundEnabled, vibracion: vibrationEnabled });
+    }
+    previousFeedbackKey.current = feedbackKey;
+  }, [feedbackKey, soundEnabled, vibrationEnabled]);
 
   function onMove(from: string, to: string) {
+    playMoveCue(soundEnabled);
     if (enCola) void s.colaUserMove(from as Square, to as Square);
     else if (enCurriculo) void s.curriculumUserMove(from as Square, to as Square);
     else if (!enTriage) void s.radarUserMove(from as Square, to as Square);
@@ -343,7 +383,7 @@ function SesionActiva() {
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
       <SessionHeader />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
           <Board
             fen={s.fen}
             orientation={s.boardOrientation}
@@ -354,15 +394,64 @@ function SesionActiva() {
             movableColor={jugando ? s.turn : null}
             onMove={onMove}
             blindMode={blindMode}
+            feedback={boardFeedback}
           />
         </div>
 
         <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
-          {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : enTriage ? <TriagePanel /> : <RadarPanel />}
+          <Transition phaseKey={panelPhaseKey(s)} label={t.sesion.panelActual} className="min-h-64">
+            {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : enTriage ? <TriagePanel /> : <RadarPanel />}
+          </Transition>
         </aside>
       </div>
     </div>
   );
+}
+
+function feedbackForSession(s: ReturnType<typeof useSessionStore.getState>): BoardFeedback {
+  if (s.phase === 'cola' && s.colaSubPhase === 'feedback') {
+    return s.colaUltimoAcierto
+      ? { kind: 'success', move: s.lastMove }
+      : { kind: 'error', move: null };
+  }
+  if (s.phase === 'curriculo' && s.curriculumSubPhase === 'feedback') {
+    return s.curriculumUltimaLimpia
+      ? { kind: 'success', move: s.lastMove }
+      : { kind: 'error', move: null };
+  }
+  if (s.phase === 'triage' && s.triageSubPhase === 'feedback') {
+    return s.triageUltimaCorrecta
+      ? { kind: 'success', move: null }
+      : { kind: 'error', move: null };
+  }
+  // El resultado del Radar ya existe durante `confianza`; gatear por la
+  // subfase evita filtrarlo antes de que el usuario se calibre.
+  if (s.phase === 'radar' && s.radarSubPhase === 'feedback') {
+    return s.radarUltimoAcierto
+      ? { kind: 'success', move: s.lastMove }
+      : { kind: 'error', move: null };
+  }
+  return null;
+}
+
+function feedbackKeyForSession(
+  s: ReturnType<typeof useSessionStore.getState>,
+  feedback: BoardFeedback,
+): string | null {
+  if (!feedback) return null;
+  if (s.phase === 'cola') return `cola:${s.colaIndex}`;
+  if (s.phase === 'curriculo') return `curriculo:${s.curriculumIndex}`;
+  if (s.phase === 'triage') return `triage:${s.triageIndex}`;
+  if (s.phase === 'radar') return `radar:${s.radarItem?.id ?? 'sin-item'}`;
+  return null;
+}
+
+function panelPhaseKey(s: ReturnType<typeof useSessionStore.getState>): string {
+  if (s.phase === 'cola') return `cola:${s.colaIndex}:${s.colaSubPhase}`;
+  if (s.phase === 'curriculo') return `curriculo:${s.curriculumIndex}:${s.curriculumSubPhase}`;
+  if (s.phase === 'triage') return `triage:${s.triageIndex}:${s.triageSubPhase}`;
+  if (s.phase === 'radar') return `radar:${s.radarItem?.id ?? 'sin-item'}:${s.radarSubPhase}`;
+  return s.phase;
 }
 
 // Encabezado siempre visible durante la sesión: la salida a Hoy que antes no

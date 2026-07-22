@@ -82,7 +82,7 @@ function Evaluaciones() {
 
   return (
     <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
-      <div className="mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+      <div className="board-stage mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board fen={move.fenAntes} orientation="w" turn={move.ladoQueMueve} lastMove={null} check={false} dests={new Map()} movableColor={null} onMove={() => {}} />
       </div>
       <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
@@ -162,7 +162,7 @@ function Resultado() {
                 <span className="font-mono text-secondary">
                   {c.valorUsuario} → {c.valorMotor}
                 </span>
-                <span className={c.coincide ? 'text-success' : 'text-error'}>
+                <span className={c.coincide ? 'text-success' : 'text-error-text'}>
                   {c.coincide ? t.analisis.comparacionCoincide : t.analisis.comparacionNoCoincide}
                 </span>
               </li>
@@ -195,7 +195,7 @@ function ConfirmarErrores() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
       <Encabezado titulo={t.analisis.confirmarTitulo} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <div className="board-stage mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
           <Board fen={entry.fenAntes} orientation="w" turn={entry.ladoQueMueve} lastMove={null} check={false} dests={new Map()} movableColor={null} onMove={() => {}} />
         </div>
         <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">

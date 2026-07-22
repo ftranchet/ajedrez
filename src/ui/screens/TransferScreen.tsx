@@ -49,7 +49,7 @@ export function TransferScreen({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
-      <div className="mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+      <div className="board-stage mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board
           fen={state.fen}
           orientation={state.orientation}

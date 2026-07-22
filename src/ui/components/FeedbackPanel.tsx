@@ -15,6 +15,9 @@ export function FeedbackPanel({
 }) {
   return (
     <div
+      role="status"
+      aria-live="polite"
+      data-outcome={acierto ? 'success' : 'error'}
       className={`flex flex-col gap-2 rounded-lg border p-4 ${
         acierto ? 'border-success/35 bg-success-subtle' : 'border-error/35 bg-error-subtle'
       }`}

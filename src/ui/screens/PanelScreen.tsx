@@ -38,6 +38,7 @@ import { TransferScreen } from './TransferScreen';
 import { N1ExperimentScreen } from './N1ExperimentScreen';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
+import { formatDecimal } from '../format';
 
 function formatJugadas(n: number): string {
   return `${n} ${n === 1 ? t.panel.jugadaCorta : t.panel.jugadasCortas}`;
@@ -290,7 +291,9 @@ function PanelResourceSlot({
   children: ReactNode;
   className?: string;
 }) {
-  if (resources.every((resource) => resource.data !== null)) return children;
+  if (resources.every((resource) => resource.data !== null)) {
+    return <div className={className}>{children}</div>;
+  }
   const failed = resources.some((resource) => resource.status === 'error');
   return <PanelSkeleton className={className} failed={failed} />;
 }
@@ -330,7 +333,7 @@ function ResumenView({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:items-start">
       <div className="flex flex-col gap-4">
-        <PanelResourceSlot resources={[games, calibraciones, profile]}>
+        <PanelResourceSlot resources={[games, calibraciones, profile]} className="min-h-[23rem] sm:min-h-44">
           <PanelDeVerdad games={games.data} calibraciones={calibraciones.data} profile={profile.data} />
         </PanelResourceSlot>
         <div className="lg:hidden">
@@ -465,7 +468,7 @@ function GamesSection({ games }: { games: GameRecord[] }) {
 function NextStepPanel({ games, profile, onView }: { games: GameRecord[]; profile: Profile; onView: (view: PanelView) => void }) {
   if (!profile.diagnosticoCompletadoEn) {
     return (
-      <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+      <section className="flex min-h-36 flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
         <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
         <p className="m-0 text-primary">{t.panel.proximoPasoDiagnostico}</p>
         <a href="#/hoy" className="btn-primary text-center no-underline">{t.panel.irAHoy}</a>
@@ -474,7 +477,7 @@ function NextStepPanel({ games, profile, onView }: { games: GameRecord[]; profil
   }
   if (games.length === 0) {
     return (
-      <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+      <section className="flex min-h-36 flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
         <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
         <p className="m-0 text-primary">{t.panel.proximoPasoPartida}</p>
         <a href="#/jugar" className="btn-primary text-center no-underline">{t.panel.irAJugar}</a>
@@ -483,14 +486,19 @@ function NextStepPanel({ games, profile, onView }: { games: GameRecord[]; profil
   }
   if (!games.some((game) => game.analizada)) {
     return (
-      <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+      <section className="flex min-h-36 flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
         <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
         <p className="m-0 text-primary">{t.panel.proximoPasoAnalisis}</p>
         <button onClick={() => onView('partidas-datos')} className="btn-primary">{t.panel.verPartidas}</button>
       </section>
     );
   }
-  return null;
+  return (
+    <section className="flex min-h-36 flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
+      <p className="m-0 text-sm text-secondary">{t.panel.proximoPasoAlDia}</p>
+    </section>
+  );
 }
 
 function N1ExperimentPanel({
@@ -709,17 +717,24 @@ function ActivityPanel({ records, profile }: { records: SessionRecord[] | null; 
 function TruthCelebrationPanel({ games }: { games: GameRecord[] | null }) {
   if (games === null) return null;
   const improvement = mejoraErroresGraves(games);
-  if (!improvement) return null;
+  if (!improvement) {
+    return (
+      <section className="flex min-h-36 flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
+        <SectionHeading>{t.panel.mejoraRealTitulo}</SectionHeading>
+        <p className="m-0 text-sm text-secondary">{t.panel.mejoraRealPendiente}</p>
+      </section>
+    );
+  }
   return (
-    <section className="flex flex-col gap-1 rounded-lg border border-success/35 bg-success-subtle p-4">
+    <section className="flex min-h-36 flex-col gap-1 rounded-lg border border-success/35 bg-success-subtle p-4">
       <SectionHeading>{t.panel.mejoraRealTitulo}</SectionHeading>
       <p className="m-0 text-primary">
         {t.panel.mejoraRealErrores.replace('{porcentaje}', String(Math.round(improvement.porcentaje)))}
       </p>
       <p className="m-0 text-sm text-secondary">
         {t.panel.mejoraRealComparacion
-          .replace('{anterior}', improvement.mediaAnterior.toFixed(1))
-          .replace('{actual}', improvement.mediaActual.toFixed(1))
+          .replace('{anterior}', formatDecimal(improvement.mediaAnterior, 1))
+          .replace('{actual}', formatDecimal(improvement.mediaActual, 1))
           .replace('{partidas}', String(improvement.partidasActuales))}
       </p>
     </section>
@@ -823,11 +838,11 @@ function PanelDeVerdad({
         />
         <TruthMetric
           label={t.panel.verdadErroresGraves}
-          value={mediaErroresGraves === null ? t.panel.verdadSinPartidas : mediaErroresGraves.toFixed(1)}
+          value={mediaErroresGraves === null ? t.panel.verdadSinPartidas : formatDecimal(mediaErroresGraves, 1)}
         />
         <TruthMetric
           label={t.panel.verdadCalibracion}
-          value={brier === null ? t.panel.verdadSinCalibracion : brier.toFixed(2)}
+          value={brier === null ? t.panel.verdadSinCalibracion : formatDecimal(brier, 2)}
         />
       </div>
     </section>
@@ -838,7 +853,7 @@ function TruthMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-h-24 flex-col justify-between gap-2 rounded-md bg-elevated p-3 sm:min-h-28">
       <span className="text-sm text-secondary">{label}</span>
-      <strong className="font-display text-2xl font-medium leading-tight text-primary">{value}</strong>
+      <strong className="font-display text-2xl font-medium leading-tight text-primary tabular-nums">{value}</strong>
     </div>
   );
 }
@@ -864,7 +879,7 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
     ? Math.round((ownErrors.filter((attempt) => attempt.acierto).length / ownErrors.length) * 100)
     : null;
   return (
-    <section className="rounded-lg border border-subtle bg-surface p-4">
+    <section className="rounded-lg border border-subtle bg-surface p-4 tabular-nums">
       <SectionHeading className="mb-2">{t.panel.radar}</SectionHeading>
       {porcentaje === null ? (
         <p className="m-0 text-secondary">{t.panel.radarSinCatalogo}</p>
@@ -895,7 +910,7 @@ function DobleSolucionSummary({ attempts }: { attempts: DobleSolucionAttempt[] |
   if (attempts === null) return null;
   const tasa = tasaConformismo(attempts.map((a) => a.resultado));
   return (
-    <section className="rounded-lg border border-subtle bg-surface p-4">
+    <section className="rounded-lg border border-subtle bg-surface p-4 tabular-nums">
       <SectionHeading className="mb-2">{t.panel.dobleSolucion}</SectionHeading>
       {tasa === null ? (
         <p className="m-0 text-secondary">{t.panel.dobleSolucionSinDatos}</p>
@@ -925,7 +940,7 @@ function TriageTimeReportPanel({ games, attempts }: { games: GameRecord[] | null
   }
   const hayFuga = infragastoEsFuga || sobregastoEsFuga;
   return (
-    <section className={`flex flex-col gap-2 rounded-lg border p-4 ${hayFuga ? 'border-accent/40 bg-accent-subtle' : 'border-subtle bg-surface'}`}>
+    <section className={`flex flex-col gap-2 rounded-lg border p-4 tabular-nums ${hayFuga ? 'border-accent/40 bg-accent-subtle' : 'border-subtle bg-surface'}`}>
       <div>
         <SectionHeading>{t.panel.triageInformeTitulo}</SectionHeading>
         <p className="m-0 mt-1 text-xs text-secondary">{t.panel.triageInformePeriodo}</p>
@@ -954,7 +969,7 @@ function TriageTimeReportPanel({ games, attempts }: { games: GameRecord[] | null
               .replace('{porcentaje}', String(Math.round(ejercicios.precision * 100)))}
           </p>
           <p className="m-0 text-xs text-tertiary">
-            {t.panel.triageEjerciciosLatencia.replace('{segundos}', (ejercicios.latenciaMedianaMs / 1000).toFixed(1))}
+            {t.panel.triageEjerciciosLatencia.replace('{segundos}', formatDecimal(ejercicios.latenciaMedianaMs / 1000, 1))}
           </p>
         </div>
       ) : null}

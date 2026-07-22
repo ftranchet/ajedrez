@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
+import { BoardSkeleton } from '../components/BoardSkeleton';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
@@ -68,26 +69,34 @@ function EstadoEtapa({
   pauseAvailable?: boolean;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <ProgresoGlobal etapa={etapa} />
-      <DiagnosticoHeading>{titulo}</DiagnosticoHeading>
-      <div
-        role={error ? 'alert' : 'status'}
-        aria-live={error ? 'assertive' : 'polite'}
-        className={`flex flex-col gap-3 rounded-lg border p-4 ${error ? 'border-error/35 bg-error-subtle' : 'border-subtle bg-surface'}`}
-      >
-        <p className="m-0 text-sm text-primary">{texto}</p>
-        {onRetry && (
-          <button onClick={onRetry} className="btn-primary">
-            {etapa === 3 ? t.diagnostico.reintentarRadar : t.diagnostico.reintentarMotor}
-          </button>
-        )}
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4">
+      <header className="flex flex-col gap-2">
+        <ProgresoGlobal etapa={etapa} />
+        <DiagnosticoHeading>{titulo}</DiagnosticoHeading>
+      </header>
+      {!error && <span role="status" className="sr-only">{texto}</span>}
+      <div aria-busy={error ? undefined : true} className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <BoardSkeleton />
+        <aside className="flex min-h-40 w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
+          <div
+            role={error ? 'alert' : undefined}
+            aria-live={error ? 'assertive' : undefined}
+            className={`flex flex-col gap-3 rounded-lg border p-4 ${error ? 'border-error/35 bg-error-subtle' : 'border-subtle bg-surface'}`}
+          >
+            <p className="m-0 text-sm text-primary">{texto}</p>
+            {onRetry && (
+              <button onClick={onRetry} className="btn-primary">
+                {etapa === 3 ? t.diagnostico.reintentarRadar : t.diagnostico.reintentarMotor}
+              </button>
+            )}
+          </div>
+          {pauseAvailable && (
+            <button onClick={() => useDiagnosticoStore.getState().pausar()} className="btn-secondary">
+              {t.diagnostico.pausar}
+            </button>
+          )}
+        </aside>
       </div>
-      {pauseAvailable && (
-        <button onClick={() => useDiagnosticoStore.getState().pausar()} className="btn-secondary">
-          {t.diagnostico.pausar}
-        </button>
-      )}
     </div>
   );
 }
@@ -128,7 +137,7 @@ function Juego() {
         <DiagnosticoHeading>{titulo}</DiagnosticoHeading>
       </header>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
           <Board
             fen={g.fen}
             orientation={g.playerColor}
@@ -206,7 +215,7 @@ function RadarDiagnostico() {
         <DiagnosticoHeading>{t.radar.titulo}</DiagnosticoHeading>
       </header>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
           <Board
             fen={s.fen}
             orientation={s.boardOrientation}

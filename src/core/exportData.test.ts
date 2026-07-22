@@ -107,6 +107,20 @@ describe('validateImportBundle', () => {
     expect(validateImportBundle(corrupt).ok).toBe(false);
   });
 
+  it('acepta preferencias sensoriales explícitas y rechaza valores corruptos', () => {
+    const valid = JSON.parse(JSON.stringify(buildExportBundle({
+      ...empty,
+      profile: {
+        ...DEFAULT_PROFILE,
+        preferenciasSensoriales: { sonido: true, vibracion: false },
+      },
+    })));
+    expect(validateImportBundle(valid).ok).toBe(true);
+
+    valid.profile.preferenciasSensoriales.sonido = 'sí';
+    expect(validateImportBundle(valid).ok).toBe(false);
+  });
+
   it('rechaza un experimento n=1 corrupto antes de restaurar', () => {
     const bundle = buildExportBundle(empty);
     const raw = JSON.parse(JSON.stringify(bundle));

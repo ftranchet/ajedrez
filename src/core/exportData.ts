@@ -171,7 +171,12 @@ function esProfileValido(x: unknown): boolean {
   return x.id === 'principal' && bands.includes(String(x.bandaElo)) &&
     (x.diagnosticoCompletadoEn === null || typeof x.diagnosticoCompletadoEn === 'string') &&
     (x.planSemanal === undefined || isValidWeeklyPlan(x.planSemanal)) &&
-    (x.recordatorio === undefined || isValidReminder(x.recordatorio));
+    (x.recordatorio === undefined || isValidReminder(x.recordatorio)) &&
+    (x.preferenciasSensoriales === undefined || (
+      isObj(x.preferenciasSensoriales) &&
+      typeof x.preferenciasSensoriales.sonido === 'boolean' &&
+      typeof x.preferenciasSensoriales.vibracion === 'boolean'
+    ));
 }
 
 function esTransferMeasurementValida(x: unknown): boolean {

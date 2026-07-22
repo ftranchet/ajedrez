@@ -25,6 +25,7 @@
   --color-success: #7fa66a;
   --color-success-subtle: rgba(127, 166, 106, 0.1);
   --color-error: #c2604f;
+  --color-error-text: #d17665;
   --color-error-subtle: rgba(194, 96, 79, 0.1);
   --color-info: #6f8fa6;
   --color-info-subtle: rgba(111, 143, 166, 0.1);
@@ -58,12 +59,49 @@
     color: var(--color-primary);
     font-family: var(--font-ui);
     font-size: 16px; /* cuerpo mínimo en celular (§2.2) */
+    font-variant-numeric: lining-nums tabular-nums;
   }
 
   /* Foco visible: nunca se suprime (§2.1 reglas de estado). */
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+}
+
+/* Primitivo único de fase: 180 ms, dentro del presupuesto de movimiento. */
+@keyframes study-transition-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.study-transition {
+  animation: study-transition-in 180ms ease-out both;
+}
+
+/* Fuera de las capas de Tailwind para complementar (y no ser sobrescrito
+   por) su utilidad de familia tipográfica homónima. */
+.font-mono,
+.tabular-nums {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* La preferencia del sistema gana sobre toda decoración CSS. Chessground se
+   desactiva aparte desde Board porque sus piezas animan por JavaScript/RAF. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

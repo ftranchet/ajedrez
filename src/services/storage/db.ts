@@ -28,7 +28,7 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -328,6 +328,47 @@ export class ElomaxDB extends Dexie {
       transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
       n1Experiments: 'id, creadoEn, estado',
     });
+
+    // v15 — preferencias sensoriales del perfil (sonido y vibración, ambas
+    // opt-in). Aunque no cambia ningún índice, se versiona el dato para que
+    // los perfiles históricos reciban defaults explícitos sin perder sus
+    // demás campos ni pisar preferencias que ya estuvieran guardadas.
+    this.version(15)
+      .stores({
+        games: 'id, fecha, fuente',
+        errorCards: 'id, fsrs.due, origen, categoria',
+        radarItems: 'id, tipo, rating',
+        calibrationRecords: 'id, contexto, fecha',
+        radarProgress: 'id, updatedAt',
+        radarDatasetMeta: 'id',
+        radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada',
+        curriculumItems: 'id, tipo, patternKey',
+        curriculumDatasetMeta: 'id',
+        curriculumProgress: 'id, fsrs.due, updatedAt',
+        profile: 'id',
+        candidataAttempts: 'id, itemId, fecha',
+        compromisoAttempts: 'id, itemId, fecha',
+        dobleSolucionAttempts: 'id, itemId, fecha',
+        stoykoItems: 'id',
+        stoykoDatasetMeta: 'id',
+        stoykoAttempts: 'id, itemId, fecha',
+        triageAttempts: 'id, itemId, fecha',
+        sessions: 'id, fechaInicio, estado',
+        transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+        n1Experiments: 'id, creadoEn, estado',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('profile')
+          .toCollection()
+          .modify((profile: Partial<Profile>) => {
+            const preferences = profile.preferenciasSensoriales;
+            profile.preferenciasSensoriales = {
+              sonido: typeof preferences?.sonido === 'boolean' ? preferences.sonido : false,
+              vibracion: typeof preferences?.vibracion === 'boolean' ? preferences.vibracion : false,
+            };
+          });
+      });
   }
 }
 

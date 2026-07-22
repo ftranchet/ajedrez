@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import type { Color, EvalSymbol } from '../../core/types';
 import { Board } from '../components/Board';
+import { BoardSkeleton } from '../components/BoardSkeleton';
 import { Chip } from '../components/Chip';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
@@ -77,7 +78,7 @@ function LineaComprometida() {
 
   return (
     <>
-      <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board
           fen={item.fen}
           orientation={turn}
@@ -114,32 +115,25 @@ function Centro({ texto }: { texto: string }) {
 
 function CargaCalculo({ slow, onRetry }: { slow: boolean; onRetry: () => void }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-      className="flex w-full flex-col gap-3 sm:flex-row sm:items-start"
-    >
-      <div
-        aria-hidden="true"
-        className="mx-auto grid aspect-square w-full min-w-[320px] max-w-[640px] grid-cols-8 overflow-hidden rounded-sm border border-subtle sm:mx-0 sm:w-[60%]"
-      >
-        {Array.from({ length: 64 }, (_, index) => (
-          <span key={index} className={(Math.floor(index / 8) + index) % 2 === 0 ? 'bg-surface' : 'bg-elevated'} />
-        ))}
+    <div className="w-full">
+      <span role="status" className="sr-only">
+        {slow ? t.calculo.cargaLenta : t.calculo.cargando}
+      </span>
+      <div aria-busy="true" className="flex w-full flex-col gap-3 sm:flex-row sm:items-start">
+        <BoardSkeleton />
+        <aside className="flex w-full flex-col gap-3 rounded-lg border border-subtle bg-surface p-4 sm:w-[40%] sm:max-w-xs">
+          <p className="m-0 font-display text-xl font-medium text-primary">{t.calculo.cargando}</p>
+          <p className="m-0 text-sm text-secondary">{t.calculo.cargaDetalle}</p>
+          {slow && (
+            <div className="flex flex-col gap-3 border-t border-subtle pt-3">
+              <p className="m-0 text-sm text-secondary">{t.calculo.cargaLenta}</p>
+              <button type="button" onClick={onRetry} className="btn-secondary">
+                {t.calculo.reintentarCarga}
+              </button>
+            </div>
+          )}
+        </aside>
       </div>
-      <aside className="flex w-full flex-col gap-3 rounded-lg border border-subtle bg-surface p-4 sm:w-[40%] sm:max-w-xs">
-        <p className="m-0 font-display text-xl font-medium text-primary">{t.calculo.cargando}</p>
-        <p className="m-0 text-sm text-secondary">{t.calculo.cargaDetalle}</p>
-        {slow && (
-          <div className="flex flex-col gap-3 border-t border-subtle pt-3">
-            <p className="m-0 text-sm text-secondary">{t.calculo.cargaLenta}</p>
-            <button type="button" onClick={onRetry} className="btn-secondary">
-              {t.calculo.reintentarCarga}
-            </button>
-          </div>
-        )}
-      </aside>
     </div>
   );
 }
@@ -182,7 +176,7 @@ function Jugando() {
           className="min-h-11 rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm text-primary"
           autoFocus
         />
-        {s.inputError && <p className="m-0 text-xs text-error">{s.inputError}</p>}
+        {s.inputError && <p className="m-0 text-xs text-error-text">{s.inputError}</p>}
         <button type="submit" className="btn-primary">
           {t.calculo.agregar}
         </button>
@@ -243,7 +237,7 @@ function Stoyko() {
 
   return (
     <>
-      <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board
           fen={item.fen}
           orientation={turn}
@@ -328,7 +322,7 @@ function StoykoAnalizando() {
           className="min-h-11 rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm text-primary"
           autoFocus
         />
-        {s.inputError && <p className="m-0 text-xs text-error">{s.inputError}</p>}
+        {s.inputError && <p className="m-0 text-xs text-error-text">{s.inputError}</p>}
         <button type="submit" className="btn-secondary">
           {t.stoyko.agregarCandidata}
         </button>

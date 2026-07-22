@@ -123,7 +123,7 @@ export function WeeklyPlanCard({
 
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <strong className="font-display text-2xl font-medium text-primary">
+          <strong className="font-display text-2xl font-medium text-primary tabular-nums">
             {t.adherencia.sesiones
               // Una vez cumplido, no convertimos el excedente en puntaje.
               .replace('{hechas}', String(Math.min(progress.sesionesCompletadas, progress.sesionesObjetivo)))

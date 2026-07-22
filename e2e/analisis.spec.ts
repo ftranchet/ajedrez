@@ -94,7 +94,7 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   // El motor real detecta el blunder: Ba6 aparece en rojo en la lista y hay
   // al menos un error a revisar.
   await expect(page.getByRole('button', { name: 'Revisar errores' })).toBeVisible();
-  await expect(page.locator('span.text-error', { hasText: 'Ba6' })).toBeVisible();
+  await expect(page.locator('span.text-error-text', { hasText: 'Ba6' })).toBeVisible();
 
   await page.getByRole('button', { name: /Revisar errores/ }).click();
   await page.getByText('Confirmá y categorizá').waitFor();

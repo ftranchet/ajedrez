@@ -81,20 +81,29 @@ async function seedCurriculumAutomatizado(page: Page) {
 // Sin perfil diagnosticado (RF-11.4, su propio spec en diagnostico.spec.ts),
 // Hoy antepone esa pantalla a "Tu sesión de hoy". Sembrarlo como completado
 // evita que se interponga en specs que no lo están probando.
-async function seedProfileDiagnosticado(page: Page) {
+async function seedProfileDiagnosticado(
+  page: Page,
+  preferenciasSensoriales: { sonido: boolean; vibracion: boolean } | null = null,
+) {
   await page.evaluate(
-    () =>
+    (preferences) =>
       new Promise<void>((resolve, reject) => {
         const request = indexedDB.open('elomax');
         request.onsuccess = () => {
           const db = request.result;
           const tx = db.transaction('profile', 'readwrite');
-          tx.objectStore('profile').put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: new Date().toISOString() });
+          tx.objectStore('profile').put({
+            id: 'principal',
+            bandaElo: 'elemental',
+            diagnosticoCompletadoEn: new Date().toISOString(),
+            ...(preferences ? { preferenciasSensoriales: preferences } : {}),
+          });
           tx.oncomplete = () => resolve();
           tx.onerror = () => reject(tx.error);
         };
         request.onerror = () => reject(request.error);
       }),
+    preferenciasSensoriales,
   );
 }
 
@@ -116,6 +125,7 @@ async function clickSquare(page: Page, board: ReturnType<Page['locator']>, file:
 
 test.describe('sesión simple: Radar', () => {
   test('evaluación → jugada → calibración muestreada → feedback con porqué → siguiente', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 780 });
     // Forzar que siempre se muestree confianza (RF-10.1 usa Math.random()),
     // para ejercitar el ConfidenceSlider de forma determinística.
     await page.addInitScript(() => {
@@ -133,6 +143,28 @@ test.describe('sesión simple: Radar', () => {
     const board = page.locator('cg-board');
     await board.waitFor({ timeout: 15_000 });
     await page.getByText('¿Cómo está la posición?').waitFor();
+    const narrowGeometry = await page.evaluate(() => {
+      const main = document.querySelector('main');
+      const boardElement = document.querySelector('cg-board');
+      return {
+        viewport: window.innerWidth,
+        documentScroll: document.documentElement.scrollWidth,
+        mainScroll: main?.scrollWidth ?? 0,
+        mainClient: main?.clientWidth ?? 0,
+        mainScrollLeft: main?.scrollLeft ?? -1,
+        boardWidth: boardElement?.getBoundingClientRect().width ?? 0,
+        boardX: boardElement?.getBoundingClientRect().x ?? -1,
+      };
+    });
+    expect(narrowGeometry).toEqual({
+      viewport: 320,
+      documentScroll: 320,
+      mainScroll: 320,
+      mainClient: 320,
+      mainScrollLeft: 0,
+      boardWidth: 320,
+      boardX: 0,
+    });
 
     // Las piezas del Radar también cargan con la CSS inyectada en runtime.
     const pieceImage = await page
@@ -143,10 +175,12 @@ test.describe('sesión simple: Radar', () => {
 
     await page.getByRole('button', { name: 'Igual' }).click();
     await page.getByText('Ahora jugá tu respuesta').waitFor();
+    await expect(page.locator('[data-phase$=":jugando"]')).toBeFocused();
 
     // El catálogo se fija dentro de IndexedDB para que el spec no dependa de
     // la versión real de datos que se publique con cada lote del Radar.
     await clickSquare(page, board, 'd', 5);
+    await expect(page.locator('square.selected')).toHaveCount(1);
     await clickSquare(page, board, 'h', 5);
 
     // Con Math.random forzado a 0, también se muestrea la regla de
@@ -156,17 +190,161 @@ test.describe('sesión simple: Radar', () => {
 
     // Con Math.random forzado a 0, shouldSampleConfidence() da true siempre.
     await page.getByText('¿Qué tan seguro estás').waitFor({ timeout: 10_000 });
+    // La app ya conoce el resultado internamente, pero no debe filtrarlo
+    // antes de que el usuario declare confianza.
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'none');
+    await expect(page.locator('.cg-shapes line')).toHaveCount(0);
+    expect(await page.locator('[data-phase$=":confianza"]').evaluate((element) => getComputedStyle(element).animationDuration)).toBe('0.18s');
     await page.getByRole('button', { name: 'Confirmar' }).click();
 
     // d5h5 es la solución registrada: acierta.
     await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'success');
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback-move', 'd5-h5');
+    await expect(page.locator('.cg-shapes line')).toHaveCount(2);
+    const successArrow = page.locator('.cg-shapes line[stroke="var(--color-success)"]');
+    const contrastHalo = page.locator('.cg-shapes line[stroke="var(--color-base)"]');
+    await expect(successArrow).toHaveCount(1);
+    await expect(contrastHalo).toHaveCount(1);
+    expect(await successArrow.evaluate((element) => getComputedStyle(element).animationDuration)).toBe('0.18s');
+    expect(await successArrow.evaluate((element) => getComputedStyle(element).stroke)).toBe('rgb(127, 166, 106)');
+    await expect(page.getByRole('button', { name: 'Siguiente' })).toBeFocused();
     // El feedback siempre explica el porqué (RF-5.3), también sin táctica.
     const explicacion = await page.locator('p.text-primary').first().innerText();
     expect(explicacion.length).toBeGreaterThan(10);
 
     await page.getByRole('button', { name: 'Siguiente' }).click();
     await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 10_000 });
+    await expect(page.locator('.cg-shapes line')).toHaveCount(0);
     await expect(page.getByText('Posición 2 de')).toBeVisible();
+  });
+
+  test('un fallo pulsa bajo el rey sin shake ni flecha de acierto', async ({ page }) => {
+    await page.addInitScript(() => {
+      Math.random = () => 0.99;
+    });
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page);
+    await page.reload();
+    await page.getByRole('button', { name: 'Empezar sesión' }).click();
+    await page.getByRole('button', { name: 'Igual' }).click();
+
+    const board = page.locator('cg-board');
+    await clickSquare(page, board, 'd', 5);
+    await clickSquare(page, board, 'd', 8);
+
+    await page.getByText('No era esa').waitFor({ timeout: 10_000 });
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'error');
+    const veil = page.locator('square.feedback-error');
+    await expect(veil).toHaveCount(1);
+    expect(await veil.evaluate((element) => (element as HTMLElement & { cgKey?: string }).cgKey)).toBe('e8');
+    expect(await veil.evaluate((element) => getComputedStyle(element).animationName)).toBe('board-error-settle');
+    const errorOutline = await veil.evaluate((element) => getComputedStyle(element).boxShadow);
+    expect(errorOutline).toContain('rgb(236, 229, 218)');
+    expect(errorOutline).toContain('rgb(23, 19, 16)');
+    await expect(page.locator('.cg-shapes line')).toHaveCount(0);
+  });
+
+  test('movimiento reducido mantiene las señales estáticas y actualiza en vivo', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      const trackedWindow = window as Window & { vibrationCalls?: VibratePattern[] };
+      trackedWindow.vibrationCalls = [];
+      Object.defineProperty(Navigator.prototype, 'vibrate', {
+        configurable: true,
+        value: (pattern: VibratePattern) => {
+          trackedWindow.vibrationCalls!.push(pattern);
+          return true;
+        },
+      });
+      Math.random = () => 0.99;
+    });
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page, { sonido: false, vibracion: true });
+    await page.reload();
+    await page.getByRole('button', { name: 'Empezar sesión' }).click();
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-reduced-motion', 'true');
+    await page.getByRole('button', { name: 'Igual' }).click();
+
+    const board = page.locator('cg-board');
+    await page.evaluate(() => {
+      const trackedWindow = window as Window & {
+        pieceAnimationObserved?: boolean;
+        pieceAnimationObserver?: MutationObserver;
+      };
+      trackedWindow.pieceAnimationObserved = false;
+      const observer = new MutationObserver((records) => {
+        if (records.some((record) => (record.target as Element).classList.contains('anim'))) {
+          trackedWindow.pieceAnimationObserved = true;
+        }
+      });
+      observer.observe(document.querySelector('cg-board')!, {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ['class'],
+      });
+      trackedWindow.pieceAnimationObserver = observer;
+    });
+    await clickSquare(page, board, 'd', 5);
+    await clickSquare(page, board, 'h', 5);
+    await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
+
+    const durationMs = await page.locator('.cg-shapes line[stroke="var(--color-success)"]').evaluate((element) => {
+      const duration = getComputedStyle(element).animationDuration;
+      return duration.endsWith('ms') ? Number.parseFloat(duration) : Number.parseFloat(duration) * 1000;
+    });
+    expect(durationMs).toBeLessThanOrEqual(0.01);
+    const reducedSignals = await page.evaluate(() => {
+      const trackedWindow = window as Window & {
+        vibrationCalls?: VibratePattern[];
+        pieceAnimationObserved?: boolean;
+        pieceAnimationObserver?: MutationObserver;
+      };
+      trackedWindow.pieceAnimationObserver?.disconnect();
+      return {
+        vibrationCalls: trackedWindow.vibrationCalls,
+        pieceAnimationObserved: trackedWindow.pieceAnimationObserved,
+      };
+    });
+    expect(reducedSignals).toEqual({ vibrationCalls: [], pieceAnimationObserved: false });
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-reduced-motion', 'false');
+  });
+
+  test('la vibración opt-in emite un único pulso sobrio al resolver', async ({ page }) => {
+    await page.addInitScript(() => {
+      const trackedWindow = window as Window & { vibrationCalls?: VibratePattern[] };
+      trackedWindow.vibrationCalls = [];
+      Object.defineProperty(Navigator.prototype, 'vibrate', {
+        configurable: true,
+        value: (pattern: VibratePattern) => {
+          trackedWindow.vibrationCalls!.push(pattern);
+          return true;
+        },
+      });
+      Math.random = () => 0.99;
+    });
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page, { sonido: false, vibracion: true });
+    await page.reload();
+    await page.getByRole('button', { name: 'Empezar sesión' }).click();
+    await page.getByRole('button', { name: 'Igual' }).click();
+
+    const board = page.locator('cg-board');
+    await clickSquare(page, board, 'd', 5);
+    await clickSquare(page, board, 'h', 5);
+    await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
+    await expect.poll(() => page.evaluate(() => (window as Window & { vibrationCalls?: VibratePattern[] }).vibrationCalls)).toEqual([16]);
   });
 
   test('RF-5.9: recicla un error propio no vencido y conserva su calendario de Cola', async ({ page }) => {

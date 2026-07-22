@@ -15,6 +15,7 @@ import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { stoykoAttemptRepo } from '../../services/storage/stoykoAttemptRepo';
 import { t } from '../i18n/es';
+import { formatDecimal } from '../format';
 
 interface Props {
   onClose: () => void;
@@ -27,7 +28,7 @@ function formatDate(iso: string): string {
 }
 
 function formatErrors(value: number | null): string {
-  return value === null ? t.n1.sinDatos : value.toFixed(2);
+  return value === null ? t.n1.sinDatos : formatDecimal(value, 1);
 }
 
 function Outcome({ value }: { value: N1OutcomeSnapshot }) {
@@ -204,8 +205,8 @@ export function N1ExperimentScreen({ onClose }: Props) {
             {comparison?.status === 'comparable' ? (
               <>
                 <div className="grid grid-cols-2 gap-2">
-                  <Metric value={comparison.errorsA.toFixed(2)} label={t.n1.comparacionA.replace('{n}', String(comparison.gamesA))} />
-                  <Metric value={comparison.errorsB.toFixed(2)} label={t.n1.comparacionB.replace('{n}', String(comparison.gamesB))} />
+                  <Metric value={formatDecimal(comparison.errorsA, 1)} label={t.n1.comparacionA.replace('{n}', String(comparison.gamesA))} />
+                  <Metric value={formatDecimal(comparison.errorsB, 1)} label={t.n1.comparacionB.replace('{n}', String(comparison.gamesB))} />
                 </div>
                 <p className="m-0 text-sm text-primary">
                   {comparison.lowerErrors === 'igual'
@@ -272,8 +273,8 @@ function ExperimentForm({
       </div>
       <ConditionField condition="A" modality={modalidadA} dose={dosisA} onModality={onModalidadA} onDose={onDosisA} />
       <ConditionField condition="B" modality={modalidadB} dose={dosisB} onModality={onModalidadB} onDose={onDosisB} />
-      {modalidadA === modalidadB && <p className="m-0 text-sm text-error">{t.n1.modalidadesDistintas}</p>}
-      {error && <p className="m-0 text-sm text-error">{error}</p>}
+      {modalidadA === modalidadB && <p className="m-0 text-sm text-error-text">{t.n1.modalidadesDistintas}</p>}
+      {error && <p className="m-0 text-sm text-error-text">{error}</p>}
       <button onClick={onStart} disabled={!valid || saving} className="btn-primary">
         {saving ? t.n1.guardando : t.n1.iniciar}
       </button>

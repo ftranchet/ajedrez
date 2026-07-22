@@ -42,9 +42,9 @@ test('navegación móvil: resetea scroll y marca el activo sin depender solo del
   expect(Number.parseFloat(markerHeight)).toBeGreaterThan(0);
 });
 
-test('texto terciario conserva contraste AA sobre superficies elevadas', async ({ page }) => {
+test('texto terciario y de error conservan contraste AA sobre superficies elevadas', async ({ page }) => {
   await page.goto('./');
-  const ratio = await page.evaluate(() => {
+  const ratios = await page.evaluate(() => {
     const parse = (color: string) => color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
     const luminance = ([r, g, b]: number[]) => {
       const values = [r, g, b].map((value) => {
@@ -53,14 +53,34 @@ test('texto terciario conserva contraste AA sobre superficies elevadas', async (
       });
       return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2];
     };
-    const sample = document.createElement('span');
-    sample.className = 'text-tertiary bg-elevated';
-    document.body.append(sample);
-    const styles = getComputedStyle(sample);
-    const foreground = luminance(parse(styles.color));
-    const background = luminance(parse(styles.backgroundColor));
-    sample.remove();
-    return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    return ['text-tertiary', 'text-error-text'].map((textClass) => {
+      const sample = document.createElement('span');
+      sample.className = `${textClass} bg-elevated`;
+      document.body.append(sample);
+      const styles = getComputedStyle(sample);
+      const foreground = luminance(parse(styles.color));
+      const background = luminance(parse(styles.backgroundColor));
+      sample.remove();
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    });
   });
-  expect(ratio).toBeGreaterThanOrEqual(4.5);
+  for (const ratio of ratios) expect(ratio).toBeGreaterThanOrEqual(4.5);
+});
+
+test('los números conservan ancho tabular sin cambiar la jerarquía tipográfica', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Empezar diagnóstico' }).waitFor();
+  expect(await page.locator('body').evaluate((element) => getComputedStyle(element).getPropertyValue('font-variant-numeric'))).toContain('tabular-nums');
+  const monoVariant = await page.locator('.font-mono').first().evaluate((element) => getComputedStyle(element).getPropertyValue('font-variant-numeric'));
+  expect(monoVariant).toContain('tabular-nums');
+
+  await page.setViewportSize({ width: 320, height: 780 });
+  await page.goto('./#/panel');
+  await page.getByRole('heading', { name: 'Panel', exact: true }).waitFor();
+  const displayMetric = page.locator('.font-display.tabular-nums').first();
+  await expect(displayMetric).toBeVisible();
+  expect(await displayMetric.evaluate((element) => getComputedStyle(element).getPropertyValue('font-variant-numeric'))).toContain('tabular-nums');
+  expect(await displayMetric.evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Newsreader');
+  const truthSlot = page.getByRole('heading', { name: 'Panel de verdad' }).locator('..').locator('..');
+  expect(await truthSlot.evaluate((element) => getComputedStyle(element).minHeight)).toBe('368px');
 });

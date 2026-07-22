@@ -1,8 +1,8 @@
-# Design System — ELOmax (v2.2)
+# Design System — ELOmax (v2.3)
 
 Documento vivo. Los tokens de esta página son la única fuente de estilos: se implementan en la configuración de Tailwind y ningún componente usa valores sueltos. Cambiar la estética = cambiar tokens acá, con entrada en el changelog.
 
-> **Cambios v2.2:** el CTA diario recupera la primera pantalla, el diagnóstico inicial pasa a ser un recorrido editorial de tres etapas y los datos asíncronos tienen estados explícitos de carga, demora, error y reintento sin vaciar toda la vista.
+> **Cambios v2.3:** el loop diario suma transición de fase, revelación animada sobre el tablero y feedback sensorial opt-in; números tabulares, movimiento reducido y skeletons con huella de tablero pasan a ser contratos explícitos.
 
 ## 1. Dirección estética: "Sala de estudio"
 
@@ -47,6 +47,7 @@ Principios visuales:
 | `success` | `#7fa66a` | Acierto, salvia apagado |
 | `success-subtle` | `#7fa66a1a` (10%) | Fondo de FeedbackPanel acierto |
 | `error` | `#c2604f` | Fallo, ladrillo (nunca rojo puro) |
+| `error-text` | `#d17665` | Texto de error pequeño; ≥4.73:1 también sobre `bg-elevated` |
 | `error-subtle` | `#c2604f1a` (10%) | Fondo de FeedbackPanel fallo |
 | `info` | `#6f8fa6` | Neutro, igualdad, sin conexión |
 | `info-subtle` | `#6f8fa61a` (10%) | Fondo informativo |
@@ -71,11 +72,26 @@ Contraste: `text-primary`/`text-secondary` sobre los tres fondos, `text-tertiary
 
 Escala: 12 / 14 / 16 (base) / 20 / 24 / 32 / 44. Cuerpo mínimo en celular: 16. Display usa peso 500 y line-height ≤1.1; los números del panel de verdad pueden usar 44 con itálica opcional para las lecturas en lenguaje claro.
 
+La interfaz hereda `font-variant-numeric: tabular-nums lining-nums`: progreso, rating, porcentajes, minutos, fechas y fracciones no bailan al actualizarse. La variante no cambia la familia; Newsreader, Instrument Sans e IBM Plex Mono conservan su rol. Los decimales visibles usan formato `es-AR` y precisión estable, y las unidades no saltan de estilo dentro de una misma lectura.
+
 ### 2.3 Espaciado y forma
 Escala: 4 / 8 / 12 / 16 / 24 / 32 / 48. Radio: `r-sm` 6 (chips, inputs), `r-md` 10 (botones, tarjetas internas), `r-lg` 16 (tarjetas de nivel de pantalla). Elevación = `bg-elevated` + borde, no sombras dramáticas.
 
 ### 2.4 Movimiento
-120 ms micro (hover, chips), 200 ms transiciones de panel, `ease-out`. Nada anima más de 200 ms salvo el deslizamiento de piezas (provisto por chessground). Sin animaciones de celebración por ítem.
+120 ms micro (hover, chips), 180 ms transición de fase, 200 ms como máximo para paneles, `ease-out`. `Transition` hace un único fade + desplazamiento vertical de 5 px; no retiene controles salientes ni duplica el árbol accesible. Nada anima más de 200 ms salvo el deslizamiento de piezas (provisto por chessground). Sin animaciones de celebración por ítem.
+
+`prefers-reduced-motion: reduce` reduce animaciones y transiciones CSS a un instante y desactiva también la animación JavaScript de piezas en chessground. Las señales permanecen visibles en su estado final: reducir movimiento nunca elimina información. La preferencia se escucha en vivo, sin recargar.
+
+### 2.5 Sonido y háptica
+
+Ambos canales son independientes, apagados por defecto y persistidos localmente en el perfil. Son mejora progresiva: si una API no existe, el control lo declara y el ejercicio continúa igual.
+
+- mover: click procedural seco de 36 ms, solo con sonido activo;
+- resolver: un tono grave neutral de 170 ms, idéntico para acierto y error;
+- háptica: un único pulso de 16 ms al resolver, nunca patrones ni vibración por jugada;
+- al activar un canal, su único preview confirma el ajuste dentro del gesto; no es feedback de entrenamiento;
+- con movimiento reducido, la vibración se suprime aunque estuviera habilitada;
+- no hay fanfarrias, melodías, refuerzos variables ni diferencia premio/castigo.
 
 ## 3. Tablero y piezas
 
@@ -99,8 +115,8 @@ Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina fuera del tabl
 | Destino con captura | anillo de 3 px `#171310` al 28%, inscripto en la casilla | forma |
 | Jaque | velo radial `error`: 85% centro → transparente al 82% del radio | gradiente radial, solo bajo el rey |
 | Flecha de análisis | `accent` al 85%, grosor 3% del tablero, punta triangular | — |
-| Flecha de jugada correcta | `success` al 85% (revelación post-respuesta) | — |
-| Casilla de error | velo `error` al 34% (revelación post-respuesta) | ícono ✕ opcional en esquina |
+| Flecha de jugada correcta | `success` pleno sobre halo `base` (revelación post-respuesta) | contorno oscuro + texto de acierto en el panel |
+| Casilla de error | velo `error` al 34%, pulso de opacidad 180 ms bajo el rey del lado que resolvió | doble borde interior claro/oscuro + texto de fallo en el panel |
 
 ### 3.4 Reglas
 - El tablero nunca baja de 320 px; escala fluida (RF-1.2).
@@ -128,7 +144,7 @@ Para un perfil nuevo, el diagnóstico ocupa ese mismo lugar prioritario con una 
 1. Evaluación rápida (EvalPicker) con el tablero en solo lectura — "¿Cómo está la posición?".
 2. Jugada por toque-toque con destinos legales marcados.
 3. (Muestreo 1 de 4–5) ConfidenceSlider antes de revelar.
-4. FeedbackPanel con porqué obligatorio + nota de Cola si hubo fallo; jugada del usuario y jugada correcta reveladas con velos `success`/`error` sobre el tablero.
+4. FeedbackPanel con porqué obligatorio + nota de Cola si hubo fallo; un acierto dibuja una flecha `success` sobre la jugada efectivamente aceptada (también si fue la familiar de una doble solución) y un fallo asienta el velo `error` bajo el rey. Nunca se revela durante ConfidenceSlider.
 5. Cierre de bloque: resumen sobrio en `font-display`, sin confeti.
 
 ### 4.3 Panel
@@ -144,7 +160,8 @@ Cada vista conserva una sola acción primaria. En escritorio puede aprovechar ha
 ### 4.4 Carga y recuperación asíncronas
 
 - Una carga inicial reserva la geometría del contenido final con skeletons de la misma familia visual; no usa una pantalla vacía ni desplaza la estructura al resolver.
-- `status` y `aria-busy` anuncian la espera sin robar el foco. Tras 4 segundos se explica la demora y aparece un reintento manual; el error usa `alert` y conserva una salida recuperable.
+- Toda espera que desemboca en tablero usa `BoardSkeleton` con el mismo `aspect-square`, mínimo, máximo y reparto responsive 60/40 que el estado listo. Hoy conserva el mismo alto mínimo del héroe y reserva la duración del encabezado.
+- `status` anuncia la espera fuera del subárbol marcado `aria-busy`, para que lectores de pantalla no retengan el mensaje hasta que el loader ya se desmontó. Tras 4 segundos se explica la demora y aparece un reintento manual; el error usa `alert` y conserva una salida recuperable.
 - El Panel carga cada fuente de datos de forma independiente. Un repositorio lento o fallido solo reemplaza su sección; el resto de las métricas permanece visible y los datos previos se conservan durante una recarga.
 - Los arranques que dependen del motor o del almacenamiento vuelven a un estado estable si fallan y ofrecen reintento; nunca dejan un tablero o botón aparentemente listo pero inerte.
 
@@ -154,7 +171,7 @@ Cada componente lista sus **estados obligatorios**; un componente sin todos sus 
 
 | Componente | Estados obligatorios | Notas de diseño |
 |---|---|---|
-| `Board` | interactivo / solo lectura / a ciegas | envoltorio de chessground; ver §3 |
+| `Board` | interactivo / solo lectura / a ciegas / feedback / movimiento reducido | envoltorio de chessground; ver §3 |
 | `Button` | default / hover / pressed / focus / disabled | primario (accent pleno, único por pantalla), secundario (borde), peligro (fondo `-subtle`, para acciones irreversibles como rendirse) |
 | `SegmentedControl` | default / seleccionado / focus | selección mutuamente excluyente con semántica `radiogroup`, foco único y flechas/Home/End; `accent-subtle` + borde `accent`, nunca relleno pleno |
 | `WeeklyPlanCard` | sin actividad / en curso / cumplido / editando | barra por sesiones, minutos como contexto; cumplido usa `success-subtle`, edición siempre secundaria al CTA de la sesión |
@@ -162,7 +179,8 @@ Cada componente lista sus **estados obligatorios**; un componente sin todos sus 
 | `EvalPicker` | default / seleccionado | 3 chips "mejor blancas / igual / mejor negras" (RF-5.2, evaluación rápida del Radar antes de jugar); selección = `accent-subtle` + borde `accent` |
 | `EvalScalePicker` | default / seleccionado | 5 chips `+− ± = ∓ −+` en `font-mono` (RF-3.1c, escala de evaluación de la fase 1 del análisis); mismo criterio de selección que `EvalPicker` |
 | `ConfidenceSlider` | default / arrastrando / confirmado | 0–100, aparece solo por muestreo; nunca descartable |
-| `FeedbackPanel` | acierto / fallo / no-había-táctica (info) | fondo `-subtle` + borde 35%; el porqué es obligatorio, también sin táctica (RF-5.3) |
+| `FeedbackPanel` | acierto / fallo / no-había-táctica (info) | fondo `-subtle` + borde 35%; `status` polite; el porqué es obligatorio, también sin táctica (RF-5.3) |
+| `SensoryPreferencesCard` | ambos apagados / canal activo / no soportado / guardando / error | controles independientes, opt-in; vive después de plan y recordatorio, nunca compite con el CTA diario |
 | `MoveList` | default / jugada activa / colapsado (celular) | `font-mono`; error grave/error/imprecisión con marca de color |
 | `EvalGraph` | default / con marcadores usuario vs motor | línea `info`; errores como puntos `error` |
 | `TruthPanel` | con datos / sin datos suficientes | números en `font-display` 44; lectura en lenguaje claro debajo |

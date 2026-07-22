@@ -4,6 +4,12 @@ import { Chessground } from 'chessground';
 import type { Api } from 'chessground/api';
 import type { Key } from 'chessground/types';
 import type { Color } from '../../core/types';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+
+export type BoardFeedback =
+  | { kind: 'success'; move: [string, string] | null }
+  | { kind: 'error'; move: null }
+  | null;
 
 export interface BoardProps {
   fen: string;
@@ -21,14 +27,36 @@ export interface BoardProps {
    * siguen ahí (arrastrables/clicables) — solo cambia lo que se ve.
    */
   blindMode?: 'normal' | 'fantasma' | 'coordenadas';
+  /** Revelación post-respuesta. Nunca se pasa durante la fase de confianza. */
+  feedback?: BoardFeedback;
 }
 
 const toCgColor = (c: Color) => (c === 'w' ? 'white' : 'black');
+
+function kingSquareFromFen(fen: string, color: Color): Key | null {
+  const target = color === 'w' ? 'K' : 'k';
+  const ranks = fen.split(' ')[0]?.split('/');
+  if (!ranks || ranks.length !== 8) return null;
+  const files = 'abcdefgh';
+  for (let rankIndex = 0; rankIndex < ranks.length; rankIndex += 1) {
+    let fileIndex = 0;
+    for (const symbol of ranks[rankIndex]) {
+      if (/\d/.test(symbol)) fileIndex += Number(symbol);
+      else {
+        if (symbol === target && fileIndex < 8) return `${files[fileIndex]}${8 - rankIndex}` as Key;
+        fileIndex += 1;
+      }
+    }
+  }
+  return null;
+}
 
 export function Board(props: BoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
   const onMoveRef = useRef(props.onMove);
+  const reducedMotion = useReducedMotion();
+  const initialReducedMotion = useRef(reducedMotion);
 
   useEffect(() => {
     onMoveRef.current = props.onMove;
@@ -37,12 +65,28 @@ export function Board(props: BoardProps) {
   useEffect(() => {
     if (!el.current) return;
     api.current = Chessground(el.current, {
-      animation: { duration: 200 }, // §2.4: deslizamiento de piezas
+      animation: {
+        enabled: !initialReducedMotion.current,
+        duration: initialReducedMotion.current ? 0 : 200,
+      }, // §2.4: deslizamiento de piezas, salvo preferencia del sistema
       coordinates: true,
+      drawable: { enabled: false, visible: true },
       events: {
         move: (from: Key, to: Key) => onMoveRef.current(from, to),
       },
     });
+    api.current.state.drawable.brushes.feedbackSuccess = {
+      key: 'feedback-success',
+      color: 'var(--color-success)',
+      opacity: 1,
+      lineWidth: 8,
+    };
+    api.current.state.drawable.brushes.feedbackSuccessHalo = {
+      key: 'feedback-success-halo',
+      color: 'var(--color-base)',
+      opacity: 0.94,
+      lineWidth: 14,
+    };
     return () => {
       api.current?.destroy();
       api.current = null;
@@ -51,11 +95,24 @@ export function Board(props: BoardProps) {
 
   useEffect(() => {
     api.current?.set({
+      animation: { enabled: !reducedMotion, duration: reducedMotion ? 0 : 200 },
+    });
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    const errorSquare = props.feedback?.kind === 'error'
+      ? kingSquareFromFen(props.fen, props.orientation) ?? (props.lastMove?.[1] as Key | undefined)
+      : undefined;
+    const customHighlights = new Map<Key, string>();
+    if (errorSquare) customHighlights.set(errorSquare, 'feedback-error');
+
+    api.current?.set({
       fen: props.fen,
       orientation: toCgColor(props.orientation),
       turnColor: toCgColor(props.turn),
       check: props.check,
       lastMove: (props.lastMove ?? undefined) as [Key, Key] | undefined,
+      highlight: { custom: customHighlights },
       movable: {
         free: false,
         color: props.movableColor ? toCgColor(props.movableColor) : undefined,
@@ -65,11 +122,26 @@ export function Board(props: BoardProps) {
       draggable: { enabled: true },
       selectable: { enabled: true }, // toque-toque (RF-1.1)
     });
-  }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor]);
+    const successMove = props.feedback?.kind === 'success' ? props.feedback.move : null;
+    api.current?.setAutoShapes(successMove
+      ? [
+          { orig: successMove[0] as Key, dest: successMove[1] as Key, brush: 'feedbackSuccessHalo' },
+          { orig: successMove[0] as Key, dest: successMove[1] as Key, brush: 'feedbackSuccess' },
+        ]
+      : []);
+  }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor, props.feedback]);
 
   // 25% de opacidad para piezas fantasma, design system §3.4/§6.5.
-  const blindClass =
-    props.blindMode === 'coordenadas' ? '[&_piece]:opacity-0' : props.blindMode === 'fantasma' ? '[&_piece]:opacity-25' : '';
-
-  return <div ref={el} className={`aspect-square h-full w-full ${blindClass}`} />;
+  return (
+    <div
+      ref={el}
+      data-blind-mode={props.blindMode ?? 'normal'}
+      data-feedback={props.feedback?.kind ?? 'none'}
+      data-feedback-move={props.feedback?.kind === 'success' && props.feedback.move
+        ? `${props.feedback.move[0]}-${props.feedback.move[1]}`
+        : undefined}
+      data-reduced-motion={reducedMotion ? 'true' : 'false'}
+      className="cg-wrap aspect-square h-full w-full"
+    />
+  );
 }

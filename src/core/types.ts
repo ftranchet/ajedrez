@@ -394,6 +394,13 @@ export interface ReminderConfig {
   hora: string;
 }
 
+/** Feedback sensorial opcional del loop de estudio. Cada canal se configura
+ * por separado y ambos quedan apagados hasta que el usuario los elige. */
+export interface SensoryPreferences {
+  sonido: boolean;
+  vibracion: boolean;
+}
+
 /**
  * Perfil del usuario (E11): banda de Elo y estado del diagnóstico inicial
  * que la produjo. `diagnosticoCompletadoEn` en null significa que la banda
@@ -416,6 +423,11 @@ export interface Profile {
    * leer perfiles creados antes del recordatorio; `undefined` = apagado.
    */
   recordatorio?: ReminderConfig;
+  /**
+   * Sonido y vibración sobrios del loop diario. Opcional para perfiles
+   * históricos; `undefined` se normaliza a ambos canales apagados.
+   */
+  preferenciasSensoriales?: SensoryPreferences;
 }
 
 /**

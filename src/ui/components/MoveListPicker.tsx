@@ -10,8 +10,8 @@ export interface MoveListEntry {
 }
 
 const COLOR_CLASIFICACION: Record<MoveClassification, string> = {
-  grave: 'text-error',
-  error: 'text-error',
+  grave: 'text-error-text',
+  error: 'text-error-text',
   imprecision: 'text-info',
   buena: 'text-secondary',
 };

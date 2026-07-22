@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.6 |
+| Versión | 0.2.7 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
 | Última actualización | 2026-07-22 |
@@ -167,6 +167,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-11.5 (P1)** El usuario puede saltear un bloque (se registra) pero no reordenar la prioridad de la Cola.
 - **RF-11.6 (P1)** Las reglas del Prescriptor viven en un archivo de configuración versionado (JSON) con su propio changelog: iterar la dieta no toca código.
 - **RF-11.7 (P2)** Modo "partida lenta programada": el Prescriptor reserva bloques semanales para partidas completas + análisis (no todo es ejercicio).
+- **RF-11.8 (P2)** El loop diario enlaza sus fases con transiciones sobrias de hasta 200 ms y asienta el resultado sobre el tablero sin filtrar la respuesta antes de confianza: flecha sobre la jugada aceptada al acertar y pulso de velo bajo el rey al fallar. Sonido y vibración son canales independientes, opcionales y apagados por defecto; nunca cambian la semántica del feedback ni adoptan patrones de premio.
 
 ### E12 — Panel de métricas y autoexperimento
 
@@ -221,7 +222,7 @@ Esta es la traducción técnica de "que permita cambios sin romperse":
 - **Definición de "hecho"**: código + tests + typecheck verde + entrada en changelog + PRD/ADR actualizados si hubo desvío.
 
 ### RNF-6 — Accesibilidad (P1)
-Navegación por teclado completa en escritorio (incluida entrada de jugadas en notación algebraica). Contraste AA. Piezas y resaltados distinguibles sin depender solo del color.
+Navegación por teclado completa en escritorio (incluida entrada de jugadas en notación algebraica). Contraste AA. Piezas y resaltados distinguibles sin depender solo del color. Respeta `prefers-reduced-motion`: corta transiciones decorativas y movimiento de piezas, conserva las señales finales estáticas y responde si la preferencia cambia con la app abierta. El feedback háptico es opt-in y se suprime bajo movimiento reducido.
 
 ### RNF-7 — Idioma (P1)
 Interfaz en español rioplatense desde el día uno; textos externalizados (i18n) para habilitar inglés después sin reescritura.

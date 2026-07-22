@@ -115,7 +115,7 @@ export default function App() {
         ))}
       </nav>
 
-      <main ref={mainRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-4 pb-24 focus:outline-none lg:pb-4">
+      <main ref={mainRef} tabIndex={-1} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24 focus:outline-none lg:pb-4">
         {tab === 'hoy' && <HoyScreen />}
         {tab === 'jugar' && <JugarScreen />}
         {tab === 'calculo' && <CalculoScreen />}

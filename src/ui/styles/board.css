@@ -8,6 +8,15 @@
   display: block;
 }
 
+/* El mínimo táctil de 320 px cabe incluso en viewports de 320–351 px: cuando
+   el padding del shell deja menos ancho, se centra dentro del viewport en vez
+   de desbordar solo hacia la derecha. */
+@media (max-width: 351px) {
+  .board-stage {
+    margin-inline: calc((100% - 320px) / 2);
+  }
+}
+
 /* Casillas §3.2: damero con board-light y board-dark.
    a8 (arriba-izquierda con blancas) es clara. */
 cg-board {
@@ -49,6 +58,44 @@ cg-board {
   );
 }
 
+/* Feedback post-respuesta: el error pulsa bajo el rey del lado que resolvió,
+   sin sacudir ni mover la casilla (Chessground usa transform para ubicarla). */
+.cg-wrap square.feedback-error {
+  background-color: rgba(194, 96, 79, 0.34);
+  box-shadow:
+    inset 0 0 0 2px var(--color-primary),
+    inset 0 0 0 4px var(--color-base);
+  animation: board-error-settle 180ms ease-out both;
+}
+
+/* La flecha automática sigue la jugada que efectivamente fue aceptada. Su
+   primera capa oscura es un halo de contraste; la segunda conserva success. */
+.cg-wrap[data-feedback='success'] .cg-shapes {
+  opacity: 1;
+}
+
+.cg-wrap[data-feedback='success'] .cg-shapes line {
+  stroke-dasharray: 12;
+  animation: board-success-reveal 180ms ease-out both;
+}
+
+@keyframes board-success-reveal {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 12;
+  }
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes board-error-settle {
+  0% { background-color: rgba(194, 96, 79, 0.16); }
+  55% { background-color: rgba(194, 96, 79, 0.46); }
+  100% { background-color: rgba(194, 96, 79, 0.34); }
+}
+
 /* Coordenadas §3.2: font-mono, chicas, en una franja fuera del tablero
    (ranks a la izquierda, files abajo — chessground `coordinates: true`, sin
    `coordinatesOnSquares`: esa variante escribe el nombre completo de la
@@ -64,6 +111,14 @@ cg-board {
   color: var(--color-secondary);
 }
 
+/* Chessground desplaza por defecto la fila de letras 24 px y la hace
+   sobresalir a la derecha. Centrarla en el ancho real de las ocho casillas
+   evita scroll horizontal y alinea cada letra con el centro de su archivo. */
+.cg-wrap coords.files {
+  left: 0;
+  width: 100%;
+}
+
 /* Piezas §3.1: set Staunty, 90% de la casilla (5% de aire por lado). Las
    reglas con la URL de cada pieza se inyectan en runtime
    (src/ui/styles/pieceTheme.ts) porque dependen de la base de despliegue
@@ -72,4 +127,14 @@ cg-board {
   background-size: 90%;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+/* Data attributes mantienen estable el className que Chessground administra
+   (orientation/manipulable) cuando cambian feedback o dificultad a ciegas. */
+.cg-wrap[data-blind-mode='fantasma'] piece {
+  opacity: 0.25;
+}
+
+.cg-wrap[data-blind-mode='coordenadas'] piece {
+  opacity: 0;
 }
