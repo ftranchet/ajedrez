@@ -2,7 +2,7 @@
 // docs/prototipos/sesion-de-hoy.dc.html). Cola vencida → currículo vencido →
 // Radar (E4 + E6 + E5 + E10), compuestos por el Prescriptor (E11) según la
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
@@ -167,8 +167,9 @@ function Portada() {
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {resto.map((b) => (
             <li key={b.texto} className="flex items-center gap-3 rounded-md border border-subtle bg-surface p-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-base font-mono text-xs text-secondary">
-                {t.sesion.minutos.replace('{n}', String(b.minutos))}
+              <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-base leading-none">
+                <span className="font-mono text-base font-semibold text-primary">{b.minutos}</span>
+                <span className="mt-0.5 font-mono text-[0.5625rem] tracking-wider text-tertiary uppercase">{t.sesion.unidadMin}</span>
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm font-semibold text-primary">{b.texto}</span>
@@ -255,24 +256,71 @@ function SesionActiva() {
       : 'normal';
 
   return (
-    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
-      <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
-        <Board
-          fen={s.fen}
-          orientation={s.boardOrientation}
-          turn={s.turn}
-          lastMove={s.lastMove}
-          check={s.check}
-          dests={s.dests}
-          movableColor={jugando ? s.turn : null}
-          onMove={onMove}
-          blindMode={blindMode}
-        />
-      </div>
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
+      <SessionHeader />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+          <Board
+            fen={s.fen}
+            orientation={s.boardOrientation}
+            turn={s.turn}
+            lastMove={s.lastMove}
+            check={s.check}
+            dests={s.dests}
+            movableColor={jugando ? s.turn : null}
+            onMove={onMove}
+            blindMode={blindMode}
+          />
+        </div>
 
-      <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
-        {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : enTriage ? <TriagePanel /> : <RadarPanel />}
-      </aside>
+        <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
+          {enCola ? <ColaPanel /> : enCurriculo ? <CurriculumPanel /> : enTriage ? <TriagePanel /> : <RadarPanel />}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+// Encabezado siempre visible durante la sesión: recuerda que estás en una
+// sesión y da la salida que faltaba —antes, una vez adentro no había forma de
+// volver a Hoy sin terminar todos los bloques—. Confirma en dos pasos para no
+// abandonar por un toque accidental; lo ya respondido queda guardado (volver()
+// marca la sesión como abandonada, no borra los ítems resueltos).
+function SessionHeader() {
+  const [confirmando, setConfirmando] = useState(false);
+  return (
+    <div className="flex min-h-11 items-center justify-between gap-3">
+      <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{t.sesion.enSesion}</span>
+      {confirmando ? (
+        <div className="flex items-center gap-2">
+          <span className="hidden text-sm text-secondary sm:inline">{t.sesion.salirConfirmar}</span>
+          <button
+            type="button"
+            onClick={() => useSessionStore.getState().volver()}
+            className="min-h-11 px-3 text-sm font-semibold text-error underline-offset-4 hover:underline"
+          >
+            {t.sesion.salirSi}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmando(false)}
+            className="min-h-11 px-3 text-sm font-semibold text-secondary hover:text-primary"
+          >
+            {t.sesion.salirCancelar}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          className="flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-secondary hover:text-primary"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          {t.sesion.salir}
+        </button>
+      )}
     </div>
   );
 }

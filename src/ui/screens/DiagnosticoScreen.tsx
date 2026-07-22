@@ -34,7 +34,7 @@ function Juego() {
   const titulo = diagPhase === 'juego1' ? t.diagnostico.juego1Titulo : t.diagnostico.juego2Titulo;
 
   return (
-    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-start">
       <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board
           fen={g.fen}
@@ -75,7 +75,7 @@ function RadarDiagnostico() {
   if (!s.radarItem) return null;
 
   return (
-    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-start">
       <div className="relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board
           fen={s.fen}
