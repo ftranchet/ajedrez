@@ -21,6 +21,7 @@ import type {
 import { SCHEMA_VERSION } from '../services/storage/db';
 import { DEFAULT_PROFILE } from './prescriptor';
 import { isValidWeeklyPlan } from './adherence';
+import { isValidReminder } from './reminder';
 
 export interface ExportManifest {
   esquema: number;
@@ -169,7 +170,8 @@ function esProfileValido(x: unknown): boolean {
   const bands = ['principiante', 'elemental', 'intermedio', 'avanzado', 'experto'];
   return x.id === 'principal' && bands.includes(String(x.bandaElo)) &&
     (x.diagnosticoCompletadoEn === null || typeof x.diagnosticoCompletadoEn === 'string') &&
-    (x.planSemanal === undefined || isValidWeeklyPlan(x.planSemanal));
+    (x.planSemanal === undefined || isValidWeeklyPlan(x.planSemanal)) &&
+    (x.recordatorio === undefined || isValidReminder(x.recordatorio));
 }
 
 function esTransferMeasurementValida(x: unknown): boolean {

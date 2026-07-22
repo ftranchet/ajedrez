@@ -9,12 +9,13 @@ import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
+import { ReminderCard } from '../components/ReminderCard';
 import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
 import { nivelCiegas } from '../../core/curriculum';
-import type { PlanSemanal } from '../../core/types';
+import type { PlanSemanal, ReminderConfig } from '../../core/types';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { t } from '../i18n/es';
 
@@ -104,6 +105,12 @@ function Portada() {
     useSessionStore.setState({ profile });
   }
 
+  async function saveReminder(recordatorio: ReminderConfig) {
+    const profile = { ...s.profile, recordatorio };
+    await profileRepo.save(profile);
+    useSessionStore.setState({ profile });
+  }
+
   if (s.dueCount === null) {
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -135,6 +142,8 @@ function Portada() {
         editable
         onSave={saveWeeklyPlan}
       />
+
+      <ReminderCard config={s.profile.recordatorio} onSave={saveReminder} />
 
       {/* Bloque héroe (design system §4.1): el siguiente bloque, destacado con
           borde accent y el único botón primario de la pantalla. */}

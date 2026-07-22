@@ -387,6 +387,13 @@ export interface PlanSemanal {
   minutosObjetivo: number;
 }
 
+/** Recordatorio diario opcional de la PWA (RF-13.3), apagado por defecto. */
+export interface ReminderConfig {
+  activo: boolean;
+  /** Hora local en formato 'HH:MM' (24 h). */
+  hora: string;
+}
+
 /**
  * Perfil del usuario (E11): banda de Elo y estado del diagnóstico inicial
  * que la produjo. `diagnosticoCompletadoEn` en null significa que la banda
@@ -404,6 +411,11 @@ export interface Profile {
   stoykoUltimaCompletadaEn?: string | null; // ISO 8601
   /** Opcional para poder leer perfiles creados antes del plan semanal. */
   planSemanal?: PlanSemanal;
+  /**
+   * Recordatorio diario opcional (RF-13.3), apagado por defecto. Opcional para
+   * leer perfiles creados antes del recordatorio; `undefined` = apagado.
+   */
+  recordatorio?: ReminderConfig;
 }
 
 /**
