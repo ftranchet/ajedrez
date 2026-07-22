@@ -22,7 +22,7 @@ export function CalculoScreen() {
   const [modo, setModo] = useState<Modo>('comprometida');
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
       <div className="mx-auto flex w-full max-w-md flex-col gap-1 sm:mx-0 sm:max-w-none">
         <h1 className="m-0 font-display text-3xl font-medium">{t.calculo.titulo}</h1>
         <p className="m-0 text-sm text-secondary">{t.calculo.subtitulo}</p>
