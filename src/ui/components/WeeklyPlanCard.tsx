@@ -1,15 +1,75 @@
 import { useState } from 'react';
 import type { PlanSemanal, Profile, SessionRecord } from '../../core/types';
 import {
+  adherenceHistory,
   isValidWeeklyPlan,
   normalizeWeeklyPlan,
   WEEKLY_PLAN_PRESETS,
   weeklyPlanPreset,
   weeklyPlanProgress,
+  type WeekAdherence,
   type WeeklyPlanPreset,
 } from '../../core/adherence';
 import { t } from '../i18n/es';
 import { SectionHeading } from './SectionHeading';
+
+function formatWeekStart(inicio: Date): string {
+  return inicio.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+}
+
+function weekCell(semana: WeekAdherence): { className: string; label: string } {
+  const fecha = formatWeekStart(semana.inicio);
+  if (!semana.dentroDelHistorial) {
+    return { className: 'border border-dashed border-subtle bg-transparent', label: t.adherencia.semanaSinHistorial.replace('{fecha}', fecha) };
+  }
+  if (semana.esActual && !semana.cumplida) {
+    return {
+      className: 'border border-accent/60 bg-accent-subtle',
+      label: t.adherencia.semanaActual
+        .replace('{fecha}', fecha)
+        .replace('{hechas}', String(semana.sesionesCompletadas))
+        .replace('{objetivo}', String(semana.sesionesObjetivo)),
+    };
+  }
+  if (semana.cumplida) {
+    return { className: 'border border-success bg-success', label: t.adherencia.semanaCumplida.replace('{fecha}', fecha) };
+  }
+  return { className: 'border border-subtle bg-elevated', label: t.adherencia.semanaFallada.replace('{fecha}', fecha) };
+}
+
+// RF-13.5: constancia (jerarquía mayor) y racha semanal, derivadas de las
+// sesiones (ADR-0013). La tira muestra las últimas ocho semanas, más antigua a
+// la izquierda; una semana fallida es una celda vacía, no un reinicio.
+function AdherenceHistorySection({ records, plan }: { records: SessionRecord[]; plan: PlanSemanal }) {
+  const history = adherenceHistory(records, plan);
+  const consistenciaTexto = !history.consistencia
+    ? t.adherencia.consistenciaSinDatos
+    : history.consistencia.consideradas === 1
+      ? t.adherencia.consistenciaUna.replace('{cumplidas}', String(history.consistencia.cumplidas))
+      : t.adherencia.consistencia
+          .replace('{cumplidas}', String(history.consistencia.cumplidas))
+          .replace('{consideradas}', String(history.consistencia.consideradas));
+  const rachaTexto = history.rachaSemanas >= 2
+    ? t.adherencia.racha.replace('{n}', String(history.rachaSemanas))
+    : history.rachaSemanas === 1
+      ? t.adherencia.rachaUna
+      : t.adherencia.rachaCero;
+  const semanasCronologicas = [...history.semanas].reverse(); // más antigua primero
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-subtle pt-3">
+      <SectionHeading>{t.adherencia.historialTitulo}</SectionHeading>
+      <ul aria-label={t.adherencia.tiraLabel} className="m-0 flex list-none gap-1 p-0">
+        {semanasCronologicas.map((semana) => {
+          const { className, label } = weekCell(semana);
+          return <li key={semana.inicio.toISOString()} title={label} aria-label={label} className={`h-4 flex-1 rounded-sm ${className}`} />;
+        })}
+      </ul>
+      <p className="m-0 text-sm text-primary">{consistenciaTexto}</p>
+      {history.consistencia && <p className="m-0 text-xs text-tertiary">{rachaTexto}</p>}
+    </div>
+  );
+}
 
 export function WeeklyPlanCard({
   records,
@@ -90,6 +150,8 @@ export function WeeklyPlanCard({
         </div>
         <p className="m-0 text-sm text-secondary">{remainingText}</p>
       </div>
+
+      <AdherenceHistorySection records={records} plan={savedPlan} />
 
       {editing && (
         <div className="flex flex-col gap-3 border-t border-subtle pt-3">
