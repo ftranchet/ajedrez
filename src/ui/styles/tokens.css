@@ -46,6 +46,37 @@
   --radius-lg: 16px;
 }
 
+/* Modo claro (design system §2.1): "sala de estudio de día" — pergamino cálido,
+   mismos ámbar y semánticos, contraste AA. El oscuro sigue siendo el default
+   (tokens de @theme). Se activa con data-theme='light' en <html>, que pone el
+   script inline de index.html (sin parpadeo) y actualiza el hook useTheme.
+   La especificidad de :root[data-theme] gana sobre el :root de @theme. */
+:root[data-theme='light'] {
+  --color-base: #efe6d6;
+  --color-surface: #f7f1e6;
+  --color-elevated: #fdf9f0;
+  --color-subtle: #ddcdb4;
+  --color-strong: #c3ad8d;
+
+  --color-primary: #241d15;
+  --color-secondary: #5c4f3d;
+  --color-tertiary: #6f6047;
+  --color-on-accent: #1a1105;
+
+  --color-accent: #c68a2c;
+  --color-accent-hover: #b37f28;
+  --color-accent-pressed: #9a6b1c;
+  --color-accent-subtle: rgba(198, 138, 44, 0.16);
+  --color-success: #5f7d4a;
+  --color-success-subtle: rgba(95, 125, 74, 0.16);
+  --color-error: #b0503f;
+  --color-error-text: #98392b;
+  --color-error-subtle: rgba(176, 80, 63, 0.14);
+  --color-info: #5a7791;
+  --color-info-subtle: rgba(90, 119, 145, 0.14);
+  --color-focus: #9a6b1c;
+}
+
 @layer base {
   html,
   body,

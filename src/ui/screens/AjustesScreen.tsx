@@ -12,6 +12,7 @@ import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { ReminderCard } from '../components/ReminderCard';
 import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { DataBackupCard } from '../components/DataBackupCard';
+import { AppearanceCard } from '../components/AppearanceCard';
 import { SectionHeading } from '../components/SectionHeading';
 import { t } from '../i18n/es';
 
@@ -71,6 +72,7 @@ export function AjustesScreen() {
         <>
           <WeeklyPlanCard records={sessions} profile={profile} editable onSave={saveWeeklyPlan} />
           <ReminderCard config={profile.recordatorio} onSave={saveReminder} />
+          <AppearanceCard />
           <SensoryPreferencesCard preferences={profile.preferenciasSensoriales} onSave={saveSensoryPreferences} />
           <DataBackupCard onImported={() => void handleImported()} />
 

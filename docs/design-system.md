@@ -13,12 +13,14 @@ Principios visuales:
 2. **Una acción primaria por pantalla.** La sesión del día tiene un botón; el resto es secundario.
 3. **Feedback sobrio.** Acierto y error se comunican con color y microanimación ≤200 ms; las celebraciones se reservan para las métricas de verdad.
 4. **Densidad según dispositivo.** Celular: una cosa por pantalla. Escritorio: tablero + panel contextual, nunca tres paneles.
-5. **Modo oscuro primero.** El modo claro es fase futura; se diseña con tokens desde el día uno.
+5. **Modo oscuro primero.** El oscuro es el default; el **modo claro** ("sala de estudio de día" — pergamino cálido, mismos ámbar y semánticos, contraste AA) ya está disponible y se elige en Ajustes → Apariencia (Sistema / Claro / Oscuro). Se implementa redefiniendo los tokens `--color-*` bajo `:root[data-theme='light']`; la preferencia vive en `localStorage` y un script inline la aplica antes de pintar (sin parpadeo). "Sistema" sigue `prefers-color-scheme`.
 6. **Nada depende solo del color.** Todo estado tiene una segunda señal: borde, forma, ícono o texto (RNF-6).
 
 ## 2. Tokens
 
-### 2.1 Color (modo oscuro)
+### 2.1 Color
+
+Modo oscuro (default). El **modo claro** redefine estos mismos tokens bajo `:root[data-theme='light']` (pergamino cálido: `base #efe6d6`, `surface #f7f1e6`, `elevated #fdf9f0`; texto `primary #241d15` … `tertiary #6f6047`; ámbar de acento oscurecido a `#c68a2c` para legibilidad sobre claro), conservando la jerarquía y el contraste AA. El tablero (§3.2) no cambia entre temas.
 
 #### Fondos y bordes
 | Token | Valor | Uso |

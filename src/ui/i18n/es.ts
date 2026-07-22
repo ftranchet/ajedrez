@@ -15,6 +15,12 @@ export const es = {
   ajustes: {
     titulo: 'Ajustes',
     subtitulo: 'Tu plan, los avisos, el sonido y tus datos, en un solo lugar.',
+    aparienciaTitulo: 'Apariencia',
+    aparienciaTexto: 'Elegí el tema. “Sistema” sigue la configuración de tu dispositivo.',
+    aparienciaLabel: 'Tema de la aplicación',
+    temaSistema: 'Sistema',
+    temaClaro: 'Claro',
+    temaOscuro: 'Oscuro',
     acercaTitulo: 'Acerca de',
     acercaLocal: 'Tus datos viven en tu dispositivo. Nada se envía a la nube; para pasarlos a otro equipo, exportá desde “Tus datos” y restaurá allá.',
     acercaLicencia: 'Software libre bajo licencia GPLv3.',

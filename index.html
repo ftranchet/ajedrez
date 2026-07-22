@@ -7,6 +7,24 @@
     <meta name="description" content="ELOmax — entrenador de ajedrez basado en evidencia. Local-first: tus datos viven en tu dispositivo." />
     <link rel="icon" type="image/png" href="/icons/icon-192.png" />
     <title>ELOmax</title>
+    <!-- Aplica el tema antes de pintar para no parpadear (la preferencia vive
+         en localStorage, ver src/ui/theme.ts). Modo oscuro primero. -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('elomax-theme');
+          var resolved =
+            pref === 'light' || pref === 'dark'
+              ? pref
+              : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.dataset.theme = resolved;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', resolved === 'dark' ? '#171310' : '#efe6d6');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
