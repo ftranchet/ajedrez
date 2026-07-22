@@ -14,6 +14,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: `http://localhost:4173${base}`,
+    // La app sigue al sistema, pero su default es "modo oscuro primero": los
+    // e2e fijan oscuro para que las aserciones de color valgan igual que antes
+    // del modo claro. tema.spec.ts emula claro donde prueba ese camino.
+    colorScheme: 'dark',
     launchOptions: executablePath ? { executablePath, args: ['--no-sandbox'] } : {},
   },
   webServer: {

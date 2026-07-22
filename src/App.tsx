@@ -10,6 +10,7 @@ import { JugarScreen } from './ui/screens/JugarScreen';
 import { CalculoScreen } from './ui/screens/CalculoScreen';
 import { PanelScreen } from './ui/screens/PanelScreen';
 import { AjustesScreen } from './ui/screens/AjustesScreen';
+import { Wordmark } from './ui/components/Wordmark';
 import { t } from './ui/i18n/es';
 
 export type Tab = 'hoy' | 'jugar' | 'calculo' | 'panel';
@@ -141,7 +142,7 @@ export default function App() {
       {/* Barra superior solo en celular: identidad + acceso a Ajustes (el
           engranaje que en escritorio vive en el pie de la barra lateral). */}
       <header className="flex shrink-0 items-center justify-between border-b border-subtle px-4 py-2 lg:hidden">
-        <span className="font-display text-lg text-accent">{t.app.nombre}</span>
+        <Wordmark className="text-xl" />
         <button
           type="button"
           onClick={() => navigate('ajustes')}
@@ -157,7 +158,7 @@ export default function App() {
 
       {/* Navegación lateral fina (escritorio) */}
       <nav aria-label={t.nav.principal} className="hidden shrink-0 flex-col gap-1 border-r border-subtle p-2 lg:flex lg:w-36">
-        <span className="px-3 py-2 font-display text-lg text-accent">{t.app.nombre}</span>
+        <Wordmark className="px-3 py-2 text-xl" />
         {TABS.map((item) => (
           <NavButton key={item.id} tab={item.id} active={route === item.id} onClick={() => navigate(item.id)}>
             {item.label}

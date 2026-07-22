@@ -86,7 +86,13 @@
 
   body {
     margin: 0;
-    background: var(--color-base);
+    /* Materiales nobles (design system §1): un grano de papel apenas perceptible
+       sobre el fondo, mezclado en soft-light para que module el color base sin
+       ensuciar el texto ni las tarjetas (que van sobre `surface`, opaco). Igual
+       de sutil en claro y oscuro. */
+    background-color: var(--color-base);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.4'/%3E%3C/svg%3E");
+    background-blend-mode: soft-light;
     color: var(--color-primary);
     font-family: var(--font-ui);
     font-size: 16px; /* cuerpo mínimo en celular (§2.2) */
