@@ -2,7 +2,7 @@
 // docs/prototipos/sesion-de-hoy.dc.html). Cola vencida → currículo vencido →
 // Radar (E4 + E6 + E5 + E10), compuestos por el Prescriptor (E11) según la
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
@@ -281,46 +281,24 @@ function SesionActiva() {
   );
 }
 
-// Encabezado siempre visible durante la sesión: recuerda que estás en una
-// sesión y da la salida que faltaba —antes, una vez adentro no había forma de
-// volver a Hoy sin terminar todos los bloques—. Confirma en dos pasos para no
-// abandonar por un toque accidental; lo ya respondido queda guardado (volver()
-// marca la sesión como abandonada, no borra los ítems resueltos).
+// Encabezado siempre visible durante la sesión: la salida a Hoy que antes no
+// existía. A la izquierda y sin repreguntar —lo ya respondido queda guardado
+// ítem por ítem; volver() solo marca la sesión como abandonada, no borra nada
+// resuelto—.
 function SessionHeader() {
-  const [confirmando, setConfirmando] = useState(false);
   return (
     <div className="flex min-h-11 items-center justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => useSessionStore.getState().volver()}
+        className="flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-secondary hover:text-primary"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+        {t.sesion.salir}
+      </button>
       <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{t.sesion.enSesion}</span>
-      {confirmando ? (
-        <div className="flex items-center gap-2">
-          <span className="hidden text-sm text-secondary sm:inline">{t.sesion.salirConfirmar}</span>
-          <button
-            type="button"
-            onClick={() => useSessionStore.getState().volver()}
-            className="min-h-11 px-3 text-sm font-semibold text-error underline-offset-4 hover:underline"
-          >
-            {t.sesion.salirSi}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmando(false)}
-            className="min-h-11 px-3 text-sm font-semibold text-secondary hover:text-primary"
-          >
-            {t.sesion.salirCancelar}
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirmando(true)}
-          className="flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-secondary hover:text-primary"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-          {t.sesion.salir}
-        </button>
-      )}
     </div>
   );
 }

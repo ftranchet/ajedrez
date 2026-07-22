@@ -36,10 +36,6 @@ export const es = {
     unidadMin: 'min',
     enSesion: 'En sesión',
     salir: 'Salir',
-    salirConfirmar: '¿Salir de la sesión?',
-    salirSi: 'Sí, salir',
-    salirCancelar: 'Seguir',
-    salirAyuda: 'Lo que ya respondiste queda guardado.',
   },
   cola: {
     titulo: 'Cola de repasos',
