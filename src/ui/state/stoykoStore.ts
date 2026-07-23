@@ -36,8 +36,11 @@ interface StoykoState {
   acierto: boolean | null;
   lineaMotorSan: string[];
   inicioMs: number | null;
+  /** Repetición libre durante el enfriamiento: no mide ni resetea la semana. */
+  practica: boolean;
 
   empezar(force?: boolean): Promise<void>;
+  practicar(): Promise<void>;
   setInputActual(value: string): void;
   setEvalSeleccionada(value: EvalSymbol): void;
   agregarCandidata(): void;
@@ -62,6 +65,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   acierto: null,
   lineaMotorSan: [],
   inicioMs: null,
+  practica: false,
 
   async empezar(force = false) {
     if (loadPromise && !force) return loadPromise.promise;
@@ -85,6 +89,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
         const item = pool[Math.floor(Math.random() * pool.length)];
         set({
           phase: 'analizando',
+          practica: false,
           pool,
           item,
           candidatas: [],
@@ -104,6 +109,42 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     })();
     loadPromise = { generation, promise };
     return promise;
+  },
+
+  // Repetir/practicar durante el enfriamiento (pedido explícito del usuario):
+  // sirve una posición saltando el chequeo semanal, pero en modo práctica —al
+  // terminar no resetea el enfriamiento ni guarda calibración/intento—, para no
+  // diluir la medición de "uno por semana" (RF-7.2).
+  async practicar() {
+    const generation = ++loadGeneration; // invalida cualquier empezar() en vuelo
+    loadPromise = null;
+    set({ phase: 'cargando' });
+    try {
+      await stoykoItemRepo.ensureSeeded();
+      const pool = await stoykoItemRepo.list();
+      if (generation !== loadGeneration) return;
+      if (pool.length === 0) {
+        set({ phase: 'sinContenido', pool });
+        return;
+      }
+      const item = pool[Math.floor(Math.random() * pool.length)];
+      set({
+        phase: 'analizando',
+        practica: true,
+        pool,
+        item,
+        candidatas: [],
+        inputActual: '',
+        evalSeleccionada: '=',
+        inputError: null,
+        confianza: null,
+        acierto: null,
+        lineaMotorSan: [],
+        inicioMs: Date.now(),
+      });
+    } catch {
+      if (generation === loadGeneration) set({ phase: 'error', item: null });
+    }
   },
 
   setInputActual(value) {
@@ -158,6 +199,10 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     const acierto = stoykoAcierto(item, s.candidatas);
     const lineaMotorSan = sanDeLinea(item.fen, item.mejorLinea);
     set({ phase: 'revelado', confianza: valor, acierto, lineaMotorSan });
+
+    // Práctica libre: se muestra la línea del motor, pero no se mide ni se
+    // resetea el enfriamiento semanal (RF-7.2).
+    if (s.practica) return;
 
     const ahora = new Date().toISOString();
     await calibrationRepo.save({

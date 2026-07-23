@@ -4,6 +4,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versionado se
 
 ## [Sin publicar]
 ### Agregado
+- Practicar Stoyko durante el enfriamiento (RF-7.2): desde la pantalla de "ya hiciste tu Stoyko de esta semana" se puede repetirlo igual, en modo práctica libre. La práctica sirve una posición y muestra la línea del motor, pero no resetea el enfriamiento semanal ni guarda calibración/intento —para no diluir la medición de "uno por semana"—; se aclara en pantalla.
 - Acordeón de bloques en "Tu sesión de hoy" y marca de "Hecho hoy" (RF-11.5): los bloques pasan a un acordeón —el abierto toma el recuadro accent con su explicación ampliada (qué es y para qué el ejercicio) y el botón de empezar; el resto queda compacto y tocable—. Por defecto se abre el primer bloque no hecho hoy. Los bloques completados hoy quedan cerrados con una marca "Hecho hoy" (leída de los registros de sesión, cuentan aunque la sesión se haya abandonado después) y siguen siendo repetibles. "Empezar sesión" (primer bloque abierto) hace la secuencia completa; abrir otro y "Empezar este bloque" hace solo ese.
 - Tarjeta de Cálculo en el Panel (E7): línea comprometida (% de líneas correctas) y Stoyko (última toma y si la tuviste entre tus candidatas), para que hacer esos ejercicios deje un rastro medible.
 - Explicación en la pantalla Cálculo ("¿Qué es y para qué?"): qué entrena cada modo —línea comprometida (cálculo íntegro) y Stoyko (amplitud y juicio; el método del MI Alexander Stoyko, no estoicismo)—.

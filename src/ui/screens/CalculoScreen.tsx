@@ -273,9 +273,13 @@ function StoykoEnfriamiento() {
   const proxima = useStoykoStore((s) => s.proximaDisponibleEn);
   const fecha = proxima ? new Date(proxima).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '';
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-2">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-3">
       <p className="m-0 font-display text-xl font-medium">{t.stoyko.enfriamientoTitulo}</p>
       <p className="m-0 text-secondary">{t.stoyko.enfriamientoTexto.replace('{fecha}', fecha)}</p>
+      <button onClick={() => void useStoykoStore.getState().practicar()} className="btn-secondary">
+        {t.stoyko.practicar}
+      </button>
+      <p className="m-0 text-xs text-tertiary">{t.stoyko.practicaNota}</p>
     </div>
   );
 }
@@ -347,11 +351,21 @@ function StoykoRevelado() {
   const s = useStoykoStore();
   const acierto = s.acierto ?? false;
   return (
-    <div className={`flex flex-col gap-2 rounded-lg border p-4 ${acierto ? 'border-success/35 bg-success-subtle' : 'border-error/35 bg-error-subtle'}`}>
-      <p className="m-0 font-display text-xl font-medium">{acierto ? t.stoyko.acierto : t.stoyko.fallo}</p>
-      <p className="m-0 font-mono text-xs text-secondary">
-        {t.stoyko.lineaMotor}: {s.lineaMotorSan.join(' ')}
-      </p>
+    <div className="flex flex-col gap-3">
+      <div className={`flex flex-col gap-2 rounded-lg border p-4 ${acierto ? 'border-success/35 bg-success-subtle' : 'border-error/35 bg-error-subtle'}`}>
+        <p className="m-0 font-display text-xl font-medium">{acierto ? t.stoyko.acierto : t.stoyko.fallo}</p>
+        <p className="m-0 font-mono text-xs text-secondary">
+          {t.stoyko.lineaMotor}: {s.lineaMotorSan.join(' ')}
+        </p>
+      </div>
+      {s.practica && (
+        <>
+          <p className="m-0 text-xs text-tertiary">{t.stoyko.practicaNota}</p>
+          <button onClick={() => void useStoykoStore.getState().practicar()} className="btn-secondary">
+            {t.stoyko.otraPractica}
+          </button>
+        </>
+      )}
     </div>
   );
 }

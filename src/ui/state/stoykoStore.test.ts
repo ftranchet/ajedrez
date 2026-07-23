@@ -134,6 +134,33 @@ describe('stoykoStore', () => {
     expect(attempts[0].tiempoMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('practicar durante el enfriamiento sirve una posición y NO mide ni resetea la semana', async () => {
+    const ultima = '2026-07-20T00:00:00.000Z';
+    await seedProfile({ stoykoUltimaCompletadaEn: ultima });
+    await useStoykoStore.getState().empezar();
+    expect(useStoykoStore.getState().phase).toBe('enfriamiento');
+
+    await useStoykoStore.getState().practicar();
+    let s = useStoykoStore.getState();
+    expect(s.phase).toBe('analizando');
+    expect(s.practica).toBe(true);
+
+    s.setInputActual('f1c4'); // coincide con la línea del motor
+    useStoykoStore.getState().agregarCandidata();
+    useStoykoStore.getState().terminarAnalisis();
+    await useStoykoStore.getState().confirmarConfianza(70);
+
+    s = useStoykoStore.getState();
+    expect(s.phase).toBe('revelado');
+    expect(s.acierto).toBe(true); // se ve el resultado
+
+    // Pero nada se persiste: sin calibración, sin intento, y el enfriamiento intacto.
+    expect(await db.calibrationRecords.toArray()).toHaveLength(0);
+    expect(await db.stoykoAttempts.toArray()).toHaveLength(0);
+    const profile = await db.profile.get('principal');
+    expect(profile?.stoykoUltimaCompletadaEn).toBe(ultima);
+  });
+
   it('no acierta si ninguna candidata coincide con la línea del motor', async () => {
     await useStoykoStore.getState().empezar();
     useStoykoStore.getState().setInputActual('d2d4');
