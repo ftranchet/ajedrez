@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
 import type { GameRecord, SessionBlockType } from '../../core/types';
+import { bloquesHechosHoy } from '../../core/session';
 import { recomendarProximoPaso } from '../../core/nextStep';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { Board, type BoardFeedback } from '../components/Board';
@@ -54,6 +55,7 @@ interface Bloque {
   tipo: SessionBlockType;
   texto: string;
   porque: string;
+  explicacion: string;
   minutos: number;
 }
 
@@ -64,6 +66,93 @@ function iniciarSesion(sonido: boolean, tipo?: SessionBlockType) {
   void useSessionStore.getState().start(tipo);
 }
 
+function MinBadge({ minutos }: { minutos: number }) {
+  return (
+    <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-base leading-none">
+      <span className="font-mono text-base font-semibold text-primary">{minutos}</span>
+      <span className="mt-0.5 font-mono text-[0.5625rem] tracking-wider text-tertiary uppercase">{t.sesion.unidadMin}</span>
+    </span>
+  );
+}
+
+// Una fila del acordeón: cerrada (compacta, tocable) o abierta (recuadro accent
+// con explicación + botón de empezar). Los bloques hechos hoy quedan marcados y
+// siguen siendo repetibles.
+function BloqueAccordion({
+  bloque,
+  esPrimero,
+  hecho,
+  abierto,
+  cargando,
+  startError,
+  onAbrir,
+  onEmpezar,
+}: {
+  bloque: Bloque;
+  esPrimero: boolean;
+  hecho: boolean;
+  abierto: boolean;
+  cargando: boolean;
+  startError: boolean;
+  onAbrir: () => void;
+  onEmpezar: () => void;
+}) {
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={onAbrir}
+        aria-expanded={false}
+        className="flex w-full items-center gap-3 rounded-md border border-subtle bg-surface p-3 text-left transition-colors duration-[120ms] hover:border-strong hover:bg-elevated"
+      >
+        <MinBadge minutos={bloque.minutos} />
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-sm font-semibold text-primary">{bloque.texto}</span>
+          <span className="text-xs text-secondary">{bloque.porque}</span>
+        </span>
+        {hecho ? (
+          <span className="ml-auto flex shrink-0 items-center gap-1 text-xs font-semibold text-success">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+            {t.sesion.hechoHoy}
+          </span>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="ml-auto shrink-0 text-tertiary">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-xs tracking-wider text-accent uppercase">
+          {esPrimero ? `${t.sesion.siguiente} · ` : ''}{t.sesion.minutos.replace('{n}', String(bloque.minutos))}
+        </span>
+        {hecho && (
+          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-success">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+            {t.sesion.hechoHoy}
+          </span>
+        )}
+      </div>
+      <p className="m-0 font-display text-2xl font-medium">{bloque.texto}</p>
+      <p className="m-0 text-sm text-secondary">{bloque.porque}</p>
+      <p className="m-0 text-sm text-secondary">{bloque.explicacion}</p>
+      {hecho && <p className="m-0 text-xs text-tertiary">{t.sesion.hechoHoyRepetir}</p>}
+      {startError && <p role="alert" className="m-0 text-sm text-error-text">{t.hoy.inicioError}</p>}
+      <button onClick={onEmpezar} disabled={cargando} className="btn-primary">
+        {cargando ? t.sesion.cargando : esPrimero ? t.sesion.empezar : t.sesion.empezarBloque}
+      </button>
+    </div>
+  );
+}
+
 function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloque[] {
   const bloques: Bloque[] = [];
   const vencidas = s.dueCount ?? 0;
@@ -72,6 +161,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       tipo: 'cola',
       texto: vencidas === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(vencidas)),
       porque: t.sesion.bloqueColaPorque,
+      explicacion: t.sesion.bloqueColaExplica,
       minutos: Math.max(1, Math.round(vencidas * MIN_POR_COLA)),
     });
   }
@@ -81,6 +171,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       tipo: 'curriculo',
       texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)),
       porque: t.sesion.bloqueCurriculoPorque,
+      explicacion: t.sesion.bloqueCurriculoExplica,
       minutos: Math.max(1, Math.round(curriculo * MIN_POR_CURRICULO)),
     });
   }
@@ -89,6 +180,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       tipo: 'triage',
       texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),
       porque: t.sesion.bloqueTriagePorque,
+      explicacion: t.sesion.bloqueTriageExplica,
       minutos: Math.max(1, Math.round(TRIAGE_SESSION_SIZE * MIN_POR_TRIAGE)),
     });
   }
@@ -96,6 +188,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
     tipo: 'radar',
     texto: t.sesion.bloqueRadar.replace('{n}', String(s.dieta.radarCount)),
     porque: s.dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
+    explicacion: t.sesion.bloqueRadarExplica,
     minutos: Math.max(1, Math.round(s.dieta.radarCount * MIN_POR_RADAR)),
   });
   return bloques;
@@ -119,6 +212,8 @@ function fechaDeHoy(): string {
 function Portada() {
   const s = useSessionStore();
   const loadingSlow = useSlowLoading(s.summaryStatus === 'idle' || s.summaryStatus === 'loading');
+  // Bloque abierto del acordeón; null = usar el primero pendiente por defecto.
+  const [abierto, setAbierto] = useState<SessionBlockType | null>(null);
 
   if (s.summaryStatus === 'error') return <PortadaError />;
   if (s.summaryStatus !== 'ready' || s.dueCount === null) return <PortadaLoading slow={loadingSlow} />;
@@ -126,8 +221,13 @@ function Portada() {
   if (!s.profile.diagnosticoCompletadoEn) return <DiagnosticoPrompt />;
 
   const bloques = bloquesDeLaSesion(s);
-  const [siguiente, ...resto] = bloques;
   const duracionMin = Math.max(DURACION_MINIMA_MIN, bloques.reduce((total, b) => total + b.minutos, 0));
+  const hechos = bloquesHechosHoy(s.sessions ?? []);
+  // Por defecto se abre el primer bloque no hecho hoy (el siguiente a hacer);
+  // si están todos hechos, el primero. El usuario puede abrir otro.
+  const primerPendiente = bloques.find((b) => !hechos.has(b.tipo))?.tipo ?? bloques[0].tipo;
+  const abiertoEfectivo = abierto ?? primerPendiente;
+  const sonido = normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido;
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -139,63 +239,25 @@ function Portada() {
         </div>
       </div>
 
-      {/* Bloque héroe (design system §4.1): el siguiente bloque, destacado con
-          borde accent y el único botón primario de la pantalla. */}
-      <div className="flex min-h-56 flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
-        <span className="font-mono text-xs tracking-wider text-accent uppercase">
-          {t.sesion.siguiente} · {t.sesion.minutos.replace('{n}', String(siguiente.minutos))}
-        </span>
-        <p className="m-0 font-display text-2xl font-medium">{siguiente.texto}</p>
-        <p className="m-0 text-sm text-secondary">{siguiente.porque}</p>
-        {s.startError && <p role="alert" className="m-0 text-sm text-error-text">{t.hoy.inicioError}</p>}
-        <button
-          onClick={() => iniciarSesion(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido)}
-          disabled={s.phase === 'cargando'}
-          className="btn-primary"
-        >
-          {s.phase === 'cargando' ? t.sesion.cargando : t.sesion.empezar}
-        </button>
-        {resto.length > 0 && (
-          <button
-            onClick={() => iniciarSesion(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido, siguiente.tipo)}
-            disabled={s.phase === 'cargando'}
-            className="min-h-11 text-sm font-semibold text-secondary underline-offset-4 hover:text-primary hover:underline"
-          >
-            {t.sesion.soloEsteBloque}
-          </button>
-        )}
+      {/* Acordeón de bloques (design system §4.1): el abierto toma el recuadro
+          accent con su explicación y el botón de empezar; el resto queda
+          compacto y tocable. Los hechos hoy quedan marcados (RF-11.5). El
+          primero abierto hace la sesión completa; otro abierto, solo ese. */}
+      <div className="flex flex-col gap-2">
+        {bloques.map((b, i) => (
+          <BloqueAccordion
+            key={b.tipo}
+            bloque={b}
+            esPrimero={i === 0}
+            hecho={hechos.has(b.tipo)}
+            abierto={b.tipo === abiertoEfectivo}
+            cargando={s.phase === 'cargando'}
+            startError={s.startError}
+            onAbrir={() => setAbierto(b.tipo)}
+            onEmpezar={() => iniciarSesion(sonido, i === 0 ? undefined : b.tipo)}
+          />
+        ))}
       </div>
-
-      {/* Bloques restantes: iniciables por separado (RF-11.5) — tocar uno hace
-          solo ese; "Empezar sesión" sigue haciendo la secuencia completa. */}
-      {resto.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="m-0 text-xs text-tertiary">{t.sesion.elegirBloque}</p>
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {resto.map((b) => (
-              <li key={b.texto}>
-                <button
-                  onClick={() => iniciarSesion(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido, b.tipo)}
-                  disabled={s.phase === 'cargando'}
-                  className="flex w-full items-center gap-3 rounded-md border border-subtle bg-surface p-3 text-left transition-colors duration-[120ms] hover:border-strong hover:bg-elevated"
-                >
-                  <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-base leading-none">
-                    <span className="font-mono text-base font-semibold text-primary">{b.minutos}</span>
-                    <span className="mt-0.5 font-mono text-[0.5625rem] tracking-wider text-tertiary uppercase">{t.sesion.unidadMin}</span>
-                  </span>
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm font-semibold text-primary">{b.texto}</span>
-                    <span className="text-xs text-secondary">{b.porque}</span>
-                  </span>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="ml-auto shrink-0 text-tertiary">
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       <ProximoPasoCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
 
@@ -224,10 +286,11 @@ function ProximoPasoCard({ fugaTactica }: { fugaTactica: boolean }) {
   const rec = recomendarProximoPaso(games);
   const texto =
     rec.kind === 'jugar-primera' ? t.hoy.proximoPasoJugarPrimera
-      : rec.kind === 'analizar' ? t.hoy.proximoPasoAnalizar
+      : rec.kind === 'analizar'
+        ? (rec.pendientes === 1 ? t.hoy.proximoPasoAnalizarUno : t.hoy.proximoPasoAnalizarOtro.replace('{n}', String(rec.pendientes ?? 0)))
         : rec.kind === 'jugar' ? t.hoy.proximoPasoJugar.replace('{n}', String(rec.dias ?? 0))
           : t.hoy.proximoPasoAlDia;
-  const href = rec.kind === 'analizar' ? '#/panel' : '#/jugar';
+  const href = rec.kind === 'analizar' ? '#/panel/partidas' : '#/jugar';
   const cta = rec.kind === 'analizar' ? t.hoy.proximoPasoIrAnalizar : t.hoy.proximoPasoIrJugar;
 
   return (

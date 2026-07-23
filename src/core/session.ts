@@ -93,6 +93,25 @@ function localDayIndex(date: Date): number {
 }
 
 /**
+ * Tipos de bloque completados hoy (día local), leídos de los registros de
+ * sesión. Un bloque cuenta si quedó en estado 'completado', aunque la sesión se
+ * haya abandonado después — p. ej. el usuario hizo todo el Repaso y salió antes
+ * del Radar: el Repaso figura hecho, el Radar no (RF-11.5). Sirve para marcar en
+ * Hoy lo ya hecho sin bloquear repetirlo.
+ */
+export function bloquesHechosHoy(records: SessionRecord[], now: Date = new Date()): Set<SessionBlockType> {
+  const hoy = localDayIndex(now);
+  const hechos = new Set<SessionBlockType>();
+  for (const record of records) {
+    if (localDayIndex(new Date(record.fechaFin ?? record.fechaInicio)) !== hoy) continue;
+    for (const bloque of record.bloques) {
+      if (bloque.estado === 'completado') hechos.add(bloque.tipo);
+    }
+  }
+  return hechos;
+}
+
+/**
  * Racha de proceso: un día suma si hubo al menos una sesión completada. Una
  * segunda sesión el mismo día, más ítems o más aciertos no agregan nada.
  * Si hoy aún no se entrenó, la racha de ayer sigue visible sin presión falsa.

@@ -12,6 +12,8 @@ export interface NextStepRecomendacion {
   kind: NextStepKind;
   /** Días desde la última partida (solo cuando kind === 'jugar'). */
   dias?: number;
+  /** Partidas sin analizar (solo cuando kind === 'analizar'). */
+  pendientes?: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -25,8 +27,8 @@ const DIAS_SIN_JUGAR = 3;
 export function recomendarProximoPaso(games: GameRecord[], now: Date = new Date()): NextStepRecomendacion {
   if (games.length === 0) return { kind: 'jugar-primera' };
 
-  const haySinAnalizar = games.some((g) => !g.analizada && plyCountFromPgn(g.pgn) > 0);
-  if (haySinAnalizar) return { kind: 'analizar' };
+  const pendientes = games.filter((g) => !g.analizada && plyCountFromPgn(g.pgn) > 0).length;
+  if (pendientes > 0) return { kind: 'analizar', pendientes };
 
   const fechas = games.map((g) => new Date(g.fecha).getTime()).filter((t) => Number.isFinite(t));
   if (fechas.length > 0) {

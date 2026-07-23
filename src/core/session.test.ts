@@ -2,14 +2,49 @@ import { describe, expect, it } from 'vitest';
 import {
   abandonSessionRecord,
   activitySummary,
+  bloquesHechosHoy,
   completeSessionRecord,
   recordSessionItem,
   processStreak,
   startSessionRecord,
   transitionSessionBlock,
 } from './session';
+import type { SessionRecord } from './types';
 
 const START = new Date('2026-07-19T10:00:00.000Z');
+
+describe('bloquesHechosHoy', () => {
+  const ahora = new Date('2026-07-22T20:00:00.000Z');
+  function sesion(overrides: Partial<SessionRecord>): SessionRecord {
+    return {
+      id: crypto.randomUUID(),
+      fechaInicio: '2026-07-22T10:00:00.000Z',
+      estado: 'abandonada',
+      bloques: [],
+      ...overrides,
+    };
+  }
+
+  it('marca los bloques completados hoy, aunque la sesión se haya abandonado', () => {
+    const record = sesion({
+      bloques: [
+        { tipo: 'cola', planificados: 2, completados: 2, estado: 'completado' },
+        { tipo: 'curriculo', planificados: 5, completados: 2, estado: 'en_curso' }, // parcial: no cuenta
+      ],
+    });
+    const hechos = bloquesHechosHoy([record], ahora);
+    expect(hechos.has('cola')).toBe(true);
+    expect(hechos.has('curriculo')).toBe(false);
+  });
+
+  it('ignora sesiones de otros días', () => {
+    const ayer = sesion({
+      fechaInicio: '2026-07-21T10:00:00.000Z',
+      bloques: [{ tipo: 'radar', planificados: 8, completados: 8, estado: 'completado' }],
+    });
+    expect(bloquesHechosHoy([ayer], ahora).size).toBe(0);
+  });
+});
 
 describe('registro de sesión', () => {
   it('crea solo bloques con trabajo y deja el primero en curso', () => {

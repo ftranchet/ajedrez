@@ -4,6 +4,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versionado se
 
 ## [Sin publicar]
 ### Agregado
+- Acordeón de bloques en "Tu sesión de hoy" y marca de "Hecho hoy" (RF-11.5): los bloques pasan a un acordeón —el abierto toma el recuadro accent con su explicación ampliada (qué es y para qué el ejercicio) y el botón de empezar; el resto queda compacto y tocable—. Por defecto se abre el primer bloque no hecho hoy. Los bloques completados hoy quedan cerrados con una marca "Hecho hoy" (leída de los registros de sesión, cuentan aunque la sesión se haya abandonado después) y siguen siendo repetibles. "Empezar sesión" (primer bloque abierto) hace la secuencia completa; abrir otro y "Empezar este bloque" hace solo ese.
+- Tarjeta de Cálculo en el Panel (E7): línea comprometida (% de líneas correctas) y Stoyko (última toma y si la tuviste entre tus candidatas), para que hacer esos ejercicios deje un rastro medible.
+- Explicación en la pantalla Cálculo ("¿Qué es y para qué?"): qué entrena cada modo —línea comprometida (cálculo íntegro) y Stoyko (amplitud y juicio; el método del MI Alexander Stoyko, no estoicismo)—.
+- Poder volver a analizar una partida ya analizada desde "Partidas y datos".
+### Cambiado
+- "Para seguir mejorando" ahora dice cuántas partidas tenés sin analizar y su enlace lleva directo a "Partidas y datos" (antes caía en el Resumen).
 - Elegir un bloque suelto en Hoy (RF-11.5): "Empezar sesión" sigue haciendo la secuencia guiada completa (Cola → currículo → Radar), pero ahora cada bloque se puede iniciar por separado —tocá "Patrones clave" o "Radar" para hacer solo ese, o "Hacer solo este bloque" en el héroe—. Al terminar el bloque elegido, la sesión termina en vez de encadenar. La Cola vencida conserva su prioridad en la sesión guiada; elegir un bloque es la contraparte de saltear (misma agencia, sin romper el orden por defecto). El registro de la sesión cuenta solo el bloque hecho.
 - "Para seguir mejorando" en Hoy (RF-11.7, evidencia tier-S): una tarjeta secundaria conecta "Tu sesión de hoy" con el bucle de mayor valor documentado —jugar y analizar partidas— y lo hace explícito en vez de dejarlo a la fuerza de voluntad. Recomienda el próximo paso real según tus datos (jugá tu primera partida → analizá una pendiente → volvé a jugar si pasaron días → al día), con enlace a Jugar/Análisis; si tus errores recientes son sobre todo tácticos, además sugiere una sesión de Cálculo. No compite con el botón primario de la sesión.
 ### Cambiado

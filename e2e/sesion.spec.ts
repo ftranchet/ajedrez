@@ -531,7 +531,7 @@ test.describe('elegir bloque (RF-11.5)', () => {
     );
   }
 
-  test('con la Cola de héroe, tocar el bloque Radar arranca solo el Radar', async ({ page }) => {
+  test('con la Cola abierta, abrir el bloque Radar y empezarlo solo arranca el Radar', async ({ page }) => {
     await page.goto('./');
     await page.getByText('Tu sesión de hoy').waitFor();
     await seedDueCard(page);
@@ -540,13 +540,53 @@ test.describe('elegir bloque (RF-11.5)', () => {
     await seedProfileDiagnosticado(page);
     await page.reload();
 
-    // El héroe es la Cola (repaso vencido); el Radar aparece como bloque elegible.
+    // El primer bloque (Cola) está abierto con "Empezar sesión".
     await page.getByText('Repaso de errores — 1 pendiente').waitFor();
-    await page.getByText('O tocá un bloque para hacer solo ese:').waitFor();
+    await expect(page.getByRole('button', { name: 'Empezar sesión' })).toBeVisible();
 
-    // Tocar el Radar arranca directo en su evaluación, sin pasar por la Cola.
+    // Abrir el bloque Radar (cerrado) y empezarlo solo.
     await page.locator('button', { hasText: 'Radar —' }).click();
+    await page.getByRole('button', { name: 'Empezar este bloque' }).click();
+
+    // Arranca directo en la evaluación del Radar, sin pasar por la Cola.
     await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 15_000 });
     await expect(page.getByText('Jugá la respuesta correcta en el tablero.')).toHaveCount(0);
+  });
+
+  test('un bloque completado hoy queda marcado "Hecho hoy" y cerrado, y se puede repetir', async ({ page }) => {
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedDueCard(page);
+    await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page);
+    // Sembrar una sesión de hoy con el bloque Cola ya completado.
+    await page.evaluate(() =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('sessions', 'readwrite');
+          tx.objectStore('sessions').put({
+            id: 'e2e-hecho-cola',
+            fechaInicio: new Date().toISOString(),
+            fechaFin: new Date().toISOString(),
+            estado: 'abandonada',
+            bloques: [{ tipo: 'cola', planificados: 1, completados: 1, estado: 'completado' }],
+            duracionMs: 60000,
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    );
+    await page.reload();
+
+    // La Cola aparece cerrada con la marca "Hecho hoy".
+    await page.getByText('Hecho hoy').first().waitFor();
+    // Y sigue siendo repetible: al abrirla vuelve el botón de empezar.
+    await page.locator('button', { hasText: 'Repaso de errores —' }).click();
+    await expect(page.getByText('Ya lo hiciste hoy. Podés repetirlo cuando quieras.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Empezar sesión' })).toBeVisible();
   });
 });

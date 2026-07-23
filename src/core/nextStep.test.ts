@@ -23,9 +23,15 @@ describe('recomendarProximoPaso (RF-11.7)', () => {
     expect(recomendarProximoPaso([], ahora).kind).toBe('jugar-primera');
   });
 
-  it('con una partida sin analizar, recomienda analizarla', () => {
-    const games = [game({ analizada: true, fecha: '2026-07-22T00:00:00.000Z' }), game({ analizada: false, fecha: '2026-07-21T00:00:00.000Z' })];
-    expect(recomendarProximoPaso(games, ahora).kind).toBe('analizar');
+  it('con partidas sin analizar, recomienda analizarlas con el conteo', () => {
+    const games = [
+      game({ analizada: true, fecha: '2026-07-22T00:00:00.000Z' }),
+      game({ analizada: false, fecha: '2026-07-21T00:00:00.000Z' }),
+      game({ analizada: false, fecha: '2026-07-20T00:00:00.000Z' }),
+    ];
+    const rec = recomendarProximoPaso(games, ahora);
+    expect(rec.kind).toBe('analizar');
+    expect(rec.pendientes).toBe(2);
   });
 
   it('ignora partidas vacías (sin jugadas) para "analizar"', () => {

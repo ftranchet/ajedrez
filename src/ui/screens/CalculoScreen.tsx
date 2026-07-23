@@ -12,6 +12,7 @@ import { Board } from '../components/Board';
 import { BoardSkeleton } from '../components/BoardSkeleton';
 import { Chip } from '../components/Chip';
 import { SegmentedControl } from '../components/SegmentedControl';
+import { SectionHeading } from '../components/SectionHeading';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { useCompromisoStore } from '../state/compromisoStore';
 import { useStoykoStore } from '../state/stoykoStore';
@@ -40,6 +41,13 @@ export function CalculoScreen() {
         onChange={setModo}
         className="mx-auto w-full max-w-md sm:mx-0 sm:max-w-xs"
       />
+
+      <section className="rounded-lg border border-info/40 bg-surface p-4">
+        <SectionHeading>{t.calculo.queEsTitulo}</SectionHeading>
+        <p className="m-0 mt-2 text-sm text-secondary">
+          {modo === 'comprometida' ? t.calculo.explicacionComprometida : t.calculo.explicacionStoyko}
+        </p>
+      </section>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start">
         {modo === 'comprometida' ? <LineaComprometida /> : <Stoyko />}

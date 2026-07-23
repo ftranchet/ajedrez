@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
+import type { CalibrationRecord, Color, CompromisoAttempt, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, StoykoAttempt, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from '../../core/panel';
@@ -15,6 +15,7 @@ import { transferAvailability, transferDelta, transferResults } from '../../core
 import { detectOverfitting } from '../../core/overfitting';
 import { informeFugasTiempo } from '../../core/triage';
 import { hitosLogrados } from '../../core/milestones';
+import { resumenCompromiso, resumenStoyko } from '../../core/calculoSummary';
 import { currentN1Phase } from '../../core/n1Experiment';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -24,6 +25,8 @@ import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAt
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
 import { triageAttemptRepo } from '../../services/storage/triageAttemptRepo';
+import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
+import { stoykoAttemptRepo } from '../../services/storage/stoykoAttemptRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
@@ -44,6 +47,15 @@ function formatJugadas(n: number): string {
 }
 
 type PanelView = 'resumen' | 'medicion' | 'partidas-datos';
+
+// Sub-ruta del Panel: `#/panel/partidas` abre directo "Partidas y datos"
+// (desde "Para seguir mejorando" en Hoy), `#/panel/medicion` la medición.
+function viewFromHash(hash: string): PanelView {
+  const sub = hash.replace(/^#\/?/, '').split('/')[1];
+  if (sub === 'partidas') return 'partidas-datos';
+  if (sub === 'medicion') return 'medicion';
+  return 'resumen';
+}
 
 type PanelResourceStatus = 'loading' | 'ready' | 'error';
 
@@ -142,7 +154,7 @@ export function PanelScreen() {
   const analysisPhase = useAnalysisStore((s) => s.phase);
   const [transferOpen, setTransferOpen] = useState(false);
   const [n1Open, setN1Open] = useState(false);
-  const [view, setView] = useState<PanelView>('resumen');
+  const [view, setView] = useState<PanelView>(() => viewFromHash(window.location.hash));
   const [importVersion, setImportVersion] = useState(0);
   const panelVisible = analysisPhase === 'inactivo';
   // Cada tabla resuelve por separado: una métrica dañada ya no bloquea las
@@ -374,8 +386,52 @@ function ResumenView({
         <PanelResourceSlot resources={[dobleSolucionAttempts]}>
           <DobleSolucionSummary attempts={dobleSolucionAttempts.data} />
         </PanelResourceSlot>
+        <CalculoSummary />
       </aside>
     </div>
+  );
+}
+
+// Cálculo (E7): que hacer los ejercicios deje rastro medible. Auto-carga sus
+// intentos (línea comprometida y Stoyko) para no acoplarse al resto del Panel.
+function CalculoSummary() {
+  const [data, setData] = useState<{ compromiso: CompromisoAttempt[]; stoyko: StoykoAttempt[] } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([compromisoAttemptRepo.list(), stoykoAttemptRepo.list()]).then(([compromiso, stoyko]) => {
+      if (alive) setData({ compromiso, stoyko });
+    });
+    return () => { alive = false; };
+  }, []);
+  if (data === null) return null;
+
+  const comp = resumenCompromiso(data.compromiso);
+  const stk = resumenStoyko(data.stoyko);
+  return (
+    <section className="rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading className="mb-2">{t.panel.calculoTitulo}</SectionHeading>
+      {!comp && !stk ? (
+        <p className="m-0 text-secondary">{t.panel.calculoSinDatos}</p>
+      ) : (
+        <div className="flex flex-col gap-1 text-sm text-secondary">
+          {comp && (
+            <p className="m-0">
+              {t.panel.calculoComprometido
+                .replace('{correctas}', String(comp.correctas))
+                .replace('{total}', String(comp.total))
+                .replace('{porcentaje}', String(Math.round(comp.precision * 100)))}
+            </p>
+          )}
+          <p className="m-0">
+            {stk
+              ? t.panel.calculoStoyko
+                  .replace('{fecha}', new Date(stk.fecha).toLocaleDateString('es-AR'))
+                  .replace('{resultado}', stk.acierto ? t.panel.calculoStoykoAcierto : t.panel.calculoStoykoFallo)
+              : t.panel.calculoStoykoNunca}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -446,7 +502,12 @@ function GamesSection({ games }: { games: GameRecord[] }) {
                   <span className="font-mono text-xs text-tertiary">{t.panel.partidaRating.replace('{rating}', String(game.ratingUsuario))}</span>
                 )}
                 {game.analizada ? (
-                  <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-tertiary">{t.analisis.yaAnalizada}</span>
+                    <button onClick={() => void useAnalysisStore.getState().iniciar(game.id)} className="min-h-11 text-sm font-semibold text-secondary underline-offset-4 hover:text-primary hover:underline">
+                      {t.analisis.volverAnalizar}
+                    </button>
+                  </div>
                 ) : jugadas === 0 ? (
                   <span className="text-xs text-tertiary">{t.analisis.muyCortaParaAnalizar}</span>
                 ) : (
