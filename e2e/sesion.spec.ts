@@ -504,3 +504,49 @@ test.describe('exportación e importación (E14)', () => {
     expect(download.suggestedFilename()).toMatch(/^elomax-export-.*\.zip$/);
   });
 });
+
+test.describe('elegir bloque (RF-11.5)', () => {
+  async function seedDueCard(page: Page) {
+    await page.evaluate(() =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('errorCards', 'readwrite');
+          tx.objectStore('errorCards').put({
+            id: 'e2e-elegir-due',
+            fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+            ladoAMover: 'b',
+            jugadaUsuario: 'e7e6',
+            jugadaCorrecta: 'e7e5',
+            categoria: 'tactico',
+            origen: 'partida',
+            fsrs: { due: '2026-01-01T00:00:00.000Z', stability: 0, difficulty: 0, elapsedDays: 0, scheduledDays: 0, reps: 0, lapses: 0, learningSteps: 0, state: 'new', lastReview: null },
+            creadaEn: '2026-01-01T00:00:00.000Z',
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    );
+  }
+
+  test('con la Cola de héroe, tocar el bloque Radar arranca solo el Radar', async ({ page }) => {
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedDueCard(page);
+    await seedRadarFixture(page);
+    await seedCurriculumAutomatizado(page);
+    await seedProfileDiagnosticado(page);
+    await page.reload();
+
+    // El héroe es la Cola (repaso vencido); el Radar aparece como bloque elegible.
+    await page.getByText('Repaso de errores — 1 pendiente').waitFor();
+    await page.getByText('O tocá un bloque para hacer solo ese:').waitFor();
+
+    // Tocar el Radar arranca directo en su evaluación, sin pasar por la Cola.
+    await page.locator('button', { hasText: 'Radar —' }).click();
+    await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 15_000 });
+    await expect(page.getByText('Jugá la respuesta correcta en el tablero.')).toHaveCount(0);
+  });
+});

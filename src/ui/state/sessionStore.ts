@@ -81,6 +81,10 @@ interface SessionState {
   // Prescriptor (E11): perfil y dieta de la sesión en curso (RF-11.2).
   profile: Profile;
   dieta: DietaSesion;
+  /** Cuando el usuario elige un bloque suelto (RF-11.5): al terminar ese bloque
+   * la sesión termina, en vez de encadenar hacia los siguientes. Null = sesión
+   * guiada completa. */
+  soloBloque: SessionBlockType | null;
   /** Snapshot persistente de la sesión en curso/completada (RF-12.1). */
   sessionRecord: SessionRecord | null;
   /** Historial necesario para mostrar el plan semanal en Hoy. */
@@ -148,7 +152,7 @@ interface SessionState {
   check: boolean;
 
   loadSummary(force?: boolean): Promise<void>;
-  start(): Promise<void>;
+  start(soloBloque?: SessionBlockType): Promise<void>;
   volver(): void;
 
   colaUserMove(from: Square, to: Square, promotion?: string): Promise<void>;
@@ -257,6 +261,17 @@ export const useSessionStore = create<SessionState>((set, get) => {
     await persistSession(completed);
   }
 
+  // Encadena al siguiente bloque en la sesión guiada; en una sesión de bloque
+  // suelto (RF-11.5) termina en vez de seguir. El bloque actual ya se marcó
+  // completado antes de llamar acá.
+  function avanzarOTerminar(next: () => Promise<void> | void): Promise<void> | void {
+    if (get().soloBloque) {
+      set({ phase: 'fin', radarItem: null });
+      return finishTrackedSession();
+    }
+    return next();
+  }
+
   function loadRadarItem(item: RadarItem | null) {
     if (!item) {
       set({ phase: 'fin', radarItem: null });
@@ -294,7 +309,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     if (!card) {
       // Cola terminada: pasar al currículo (RF-11.2: repasos vencidos primero).
       completeTrackedBlock('cola');
-      void beginCurriculum();
+      void avanzarOTerminar(beginCurriculum);
       return;
     }
     chess = new Chess(card.fen);
@@ -312,7 +327,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       // Currículo del día terminado (o sin elementos vencidos): pasar al
       // Triage si la dieta lo activó, si no directo al Radar.
       completeTrackedBlock('curriculo');
-      void beginTriage();
+      void avanzarOTerminar(beginTriage);
       return;
     }
     chess = new Chess(item.fen);
@@ -328,7 +343,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
   function loadTriageItem(item: RadarItem | null) {
     if (!item) {
       completeTrackedBlock('triage');
-      void beginRadar();
+      void avanzarOTerminar(beginRadar);
       return;
     }
     chess = new Chess(item.fen);
@@ -348,7 +363,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
   function beginTriage(): Promise<void> | void {
     const s = get();
     if (!s.dieta.triageActivo || s.radarPool.length === 0) {
-      return beginRadar();
+      return avanzarOTerminar(beginRadar);
     }
     // Fisher-Yates parcial: sort(() => random - 0.5) no baraja uniforme.
     const pool = [...s.radarPool];
@@ -381,7 +396,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     // cupo monotemático.
     const queue = due.slice(0, s.dieta.curriculumMax);
     if (queue.length === 0) {
-      return beginTriage();
+      return avanzarOTerminar(beginTriage);
     }
     set({ phase: 'curriculo', curriculumQueue: queue, curriculumIndex: 0 });
     loadCurriculumItem(queue[0]);
@@ -404,6 +419,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     curriculumDueCount: null,
     profile: DEFAULT_PROFILE,
     dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
+    soloBloque: null,
     sessionRecord: null,
     sessions: null,
     colaCards: [],
@@ -502,7 +518,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       return promise;
     },
 
-    async start() {
+    async start(soloBloque) {
       set({ phase: 'cargando', startError: false });
       try {
         await sessionWriteQueue;
@@ -527,16 +543,22 @@ export const useSessionStore = create<SessionState>((set, get) => {
           dueCurriculumItems(curriculumItems, new Map(curriculumProgressList.map((p) => [p.id, p] as const)))
             .filter((item) => item.tipo === 'patron'),
         ).slice(0, dieta.curriculumMax).length;
-        const sessionRecord = startSessionRecord([
-          { tipo: 'cola', planificados: due.length },
-          { tipo: 'curriculo', planificados: curriculumDue },
-          { tipo: 'triage', planificados: dieta.triageActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
-          { tipo: 'radar', planificados: pool.length > 0 ? dieta.radarCount : 0 },
-        ]);
+        // En una sesión de bloque suelto (RF-11.5) el registro cuenta solo ese
+        // bloque; en la guiada, los cuatro.
+        const bloquesRecord = [
+          { tipo: 'cola' as const, planificados: due.length },
+          { tipo: 'curriculo' as const, planificados: curriculumDue },
+          { tipo: 'triage' as const, planificados: dieta.triageActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
+          { tipo: 'radar' as const, planificados: pool.length > 0 ? dieta.radarCount : 0 },
+        ];
+        const sessionRecord = startSessionRecord(
+          soloBloque ? bloquesRecord.filter((b) => b.tipo === soloBloque) : bloquesRecord,
+        );
         await persistSession(sessionRecord);
         set({
           profile,
           dieta,
+          soloBloque: soloBloque ?? null,
           sessionRecord,
           radarPool: pool,
           radarOwnErrorItems: ownErrorItems,
@@ -550,7 +572,22 @@ export const useSessionStore = create<SessionState>((set, get) => {
           curriculumItemsAll: curriculumItems,
           curriculumProgressById: new Map(curriculumProgressList.map((p) => [p.id, p] as const)),
         });
-        if (due.length > 0) {
+        // Arranque: al bloque elegido (o al primero con contenido en la guiada).
+        if (soloBloque === 'radar') {
+          await beginRadar();
+        } else if (soloBloque === 'triage') {
+          await beginTriage();
+        } else if (soloBloque === 'curriculo') {
+          await beginCurriculum();
+        } else if (soloBloque === 'cola') {
+          if (due.length > 0) {
+            set({ phase: 'cola' });
+            loadColaCard(due[0]);
+          } else {
+            set({ phase: 'fin', radarItem: null });
+            await finishTrackedSession();
+          }
+        } else if (due.length > 0) {
           set({ phase: 'cola' });
           loadColaCard(due[0]);
         } else {
@@ -567,6 +604,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       chess = new Chess();
       set({
         phase: 'sinEmpezar',
+        soloBloque: null,
         summaryStatus: 'idle',
         startError: false,
         // null para que HoyScreen vuelva a pedirlo: un fallo del Radar o de

@@ -61,6 +61,8 @@ export const es = {
     bloqueRadarPorque: 'Posiciones de partidas para que decidas la mejor jugada.',
     bloqueRadarPorqueFuga: 'Reforzado: la mayoría de tus errores recientes son tácticos.',
     empezar: 'Empezar sesión',
+    soloEsteBloque: 'Hacer solo este bloque',
+    elegirBloque: 'O tocá un bloque para hacer solo ese:',
     fin: 'Sesión completa',
     finTexto: 'Por hoy es suficiente. La consistencia le gana al volumen.',
     volverAHoy: 'Volver',

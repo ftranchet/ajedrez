@@ -122,6 +122,35 @@ describe('sessionStore — bloque Radar', () => {
     expect(await db.radarItems.count()).toBe(seedRadarItems.length);
   });
 
+  const cartaVencida = () =>
+    buildErrorCard({
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      ladoAMover: 'w',
+      jugadaUsuario: 'e2e4',
+      jugadaCorrecta: 'd2d4',
+      categoria: 'tactico',
+      origen: 'radar',
+      now: new Date('2020-01-01'),
+    });
+
+  it('solo bloque: start("radar") saltea la Cola vencida y arranca en el Radar (RF-11.5)', async () => {
+    await db.errorCards.put(cartaVencida());
+    await useSessionStore.getState().start('radar');
+    const s = useSessionStore.getState();
+    expect(s.phase).toBe('radar');
+    expect(s.soloBloque).toBe('radar');
+    expect(s.sessionRecord?.bloques.map((b) => b.tipo)).toEqual(['radar']);
+  });
+
+  it('solo bloque: start("cola") arranca en la Cola con solo ese bloque en el registro', async () => {
+    await db.errorCards.put(cartaVencida());
+    await useSessionStore.getState().start('cola');
+    const s = useSessionStore.getState();
+    expect(s.phase).toBe('cola');
+    expect(s.soloBloque).toBe('cola');
+    expect(s.sessionRecord?.bloques.map((b) => b.tipo)).toEqual(['cola']);
+  });
+
   it('intercala un error de partida no vencido sin tocar FSRS ni la dificultad del catálogo (RF-5.9)', async () => {
     const source = seedRadarItems[0];
     const baseCard = buildErrorCard({

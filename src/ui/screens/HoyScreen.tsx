@@ -4,7 +4,7 @@
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
 import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
-import type { GameRecord } from '../../core/types';
+import type { GameRecord, SessionBlockType } from '../../core/types';
 import { recomendarProximoPaso } from '../../core/nextStep';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { Board, type BoardFeedback } from '../components/Board';
@@ -51,9 +51,17 @@ const MIN_POR_RADAR = 1.25;
 const DURACION_MINIMA_MIN = 15;
 
 interface Bloque {
+  tipo: SessionBlockType;
   texto: string;
   porque: string;
   minutos: number;
+}
+
+// Arranca la sesión completa (sin `tipo`) o un bloque suelto (RF-11.5).
+// Desbloquea el audio dentro del gesto del usuario (autoplay).
+function iniciarSesion(sonido: boolean, tipo?: SessionBlockType) {
+  unlockSoundFeedback(sonido);
+  void useSessionStore.getState().start(tipo);
 }
 
 function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloque[] {
@@ -61,6 +69,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
   const vencidas = s.dueCount ?? 0;
   if (vencidas > 0) {
     bloques.push({
+      tipo: 'cola',
       texto: vencidas === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(vencidas)),
       porque: t.sesion.bloqueColaPorque,
       minutos: Math.max(1, Math.round(vencidas * MIN_POR_COLA)),
@@ -69,6 +78,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
   const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
   if (curriculo > 0) {
     bloques.push({
+      tipo: 'curriculo',
       texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)),
       porque: t.sesion.bloqueCurriculoPorque,
       minutos: Math.max(1, Math.round(curriculo * MIN_POR_CURRICULO)),
@@ -76,12 +86,14 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
   }
   if (s.dieta.triageActivo) {
     bloques.push({
+      tipo: 'triage',
       texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),
       porque: t.sesion.bloqueTriagePorque,
       minutos: Math.max(1, Math.round(TRIAGE_SESSION_SIZE * MIN_POR_TRIAGE)),
     });
   }
   bloques.push({
+    tipo: 'radar',
     texto: t.sesion.bloqueRadar.replace('{n}', String(s.dieta.radarCount)),
     porque: s.dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
     minutos: Math.max(1, Math.round(s.dieta.radarCount * MIN_POR_RADAR)),
@@ -137,33 +149,52 @@ function Portada() {
         <p className="m-0 text-sm text-secondary">{siguiente.porque}</p>
         {s.startError && <p role="alert" className="m-0 text-sm text-error-text">{t.hoy.inicioError}</p>}
         <button
-          onClick={() => {
-            unlockSoundFeedback(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido);
-            void useSessionStore.getState().start();
-          }}
+          onClick={() => iniciarSesion(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido)}
           disabled={s.phase === 'cargando'}
           className="btn-primary"
         >
           {s.phase === 'cargando' ? t.sesion.cargando : t.sesion.empezar}
         </button>
+        {resto.length > 0 && (
+          <button
+            onClick={() => iniciarSesion(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido, siguiente.tipo)}
+            disabled={s.phase === 'cargando'}
+            className="min-h-11 text-sm font-semibold text-secondary underline-offset-4 hover:text-primary hover:underline"
+          >
+            {t.sesion.soloEsteBloque}
+          </button>
+        )}
       </div>
 
-      {/* Bloques restantes: tarjetas secundarias debajo del héroe. */}
+      {/* Bloques restantes: iniciables por separado (RF-11.5) — tocar uno hace
+          solo ese; "Empezar sesión" sigue haciendo la secuencia completa. */}
       {resto.length > 0 && (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {resto.map((b) => (
-            <li key={b.texto} className="flex items-center gap-3 rounded-md border border-subtle bg-surface p-3">
-              <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-base leading-none">
-                <span className="font-mono text-base font-semibold text-primary">{b.minutos}</span>
-                <span className="mt-0.5 font-mono text-[0.5625rem] tracking-wider text-tertiary uppercase">{t.sesion.unidadMin}</span>
-              </span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-sm font-semibold text-primary">{b.texto}</span>
-                <span className="text-xs text-secondary">{b.porque}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-xs text-tertiary">{t.sesion.elegirBloque}</p>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {resto.map((b) => (
+              <li key={b.texto}>
+                <button
+                  onClick={() => iniciarSesion(normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido, b.tipo)}
+                  disabled={s.phase === 'cargando'}
+                  className="flex w-full items-center gap-3 rounded-md border border-subtle bg-surface p-3 text-left transition-colors duration-[120ms] hover:border-strong hover:bg-elevated"
+                >
+                  <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-base leading-none">
+                    <span className="font-mono text-base font-semibold text-primary">{b.minutos}</span>
+                    <span className="mt-0.5 font-mono text-[0.5625rem] tracking-wider text-tertiary uppercase">{t.sesion.unidadMin}</span>
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-semibold text-primary">{b.texto}</span>
+                    <span className="text-xs text-secondary">{b.porque}</span>
+                  </span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="ml-auto shrink-0 text-tertiary">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <ProximoPasoCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
