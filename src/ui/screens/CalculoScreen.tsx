@@ -12,7 +12,6 @@ import { Board } from '../components/Board';
 import { BoardSkeleton } from '../components/BoardSkeleton';
 import { Chip } from '../components/Chip';
 import { SegmentedControl } from '../components/SegmentedControl';
-import { SectionHeading } from '../components/SectionHeading';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { useCompromisoStore } from '../state/compromisoStore';
 import { useStoykoStore } from '../state/stoykoStore';
@@ -42,12 +41,16 @@ export function CalculoScreen() {
         className="mx-auto w-full max-w-md sm:mx-0 sm:max-w-xs"
       />
 
-      <section className="rounded-lg border border-info/40 bg-surface p-4">
-        <SectionHeading>{t.calculo.queEsTitulo}</SectionHeading>
+      {/* Colapsable: en celular el ejercicio necesita el alto para el tablero y
+          el input; la explicación se lee una vez y no debe empujar todo abajo. */}
+      <details className="rounded-lg border border-info/40 bg-surface px-4 py-3">
+        <summary className="cursor-pointer list-none text-sm font-medium tracking-wider text-secondary uppercase marker:content-none">
+          {t.calculo.queEsTitulo}
+        </summary>
         <p className="m-0 mt-2 text-sm text-secondary">
           {modo === 'comprometida' ? t.calculo.explicacionComprometida : t.calculo.explicacionStoyko}
         </p>
-      </section>
+      </details>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start">
         {modo === 'comprometida' ? <LineaComprometida /> : <Stoyko />}
@@ -86,7 +89,7 @@ function LineaComprometida() {
 
   return (
     <>
-      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[52vh] sm:mx-0 sm:w-[60%] sm:max-w-[640px]">
         <Board
           fen={item.fen}
           orientation={turn}
@@ -245,7 +248,7 @@ function Stoyko() {
 
   return (
     <>
-      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[52vh] sm:mx-0 sm:w-[60%] sm:max-w-[640px]">
         <Board
           fen={item.fen}
           orientation={turn}

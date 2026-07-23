@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
 import type { GameRecord, SessionBlockType } from '../../core/types';
 import { bloquesHechosHoy } from '../../core/session';
-import { recomendarProximoPaso } from '../../core/nextStep';
+import { partidaLentaSemanal } from '../../core/slowGame';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { Board, type BoardFeedback } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
@@ -259,7 +259,7 @@ function Portada() {
         ))}
       </div>
 
-      <ProximoPasoCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
+      <PartidaLentaCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
 
       <div className="mt-2 flex flex-col gap-1 border-t border-subtle pt-4">
         <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
@@ -271,10 +271,11 @@ function Portada() {
   );
 }
 
-// "Para seguir mejorando" (RF-11.7): conecta Hoy con el bucle de mayor valor
-// documentado —jugar y analizar partidas— y, si hay fuga táctica, con Cálculo.
-// Secundaria: no compite con el botón primario de la sesión.
-function ProximoPasoCard({ fugaTactica }: { fugaTactica: boolean }) {
+// "Tu partida lenta de la semana" (RF-11.7): jugar y analizar una partida lenta
+// es el ejercicio de mayor valor documentado, así que se vuelve un compromiso
+// semanal visible en Hoy —no una sugerencia suelta—. Secundaria: no compite con
+// el botón primario de la sesión. Si hay fuga táctica, ofrece Cálculo.
+function PartidaLentaCard({ fugaTactica }: { fugaTactica: boolean }) {
   const [games, setGames] = useState<GameRecord[] | null>(null);
   useEffect(() => {
     let alive = true;
@@ -283,27 +284,29 @@ function ProximoPasoCard({ fugaTactica }: { fugaTactica: boolean }) {
   }, []);
   if (games === null) return null;
 
-  const rec = recomendarProximoPaso(games);
+  const estado = partidaLentaSemanal(games);
+  const completa = estado === 'completa';
   const texto =
-    rec.kind === 'jugar-primera' ? t.hoy.proximoPasoJugarPrimera
-      : rec.kind === 'analizar'
-        ? (rec.pendientes === 1 ? t.hoy.proximoPasoAnalizarUno : t.hoy.proximoPasoAnalizarOtro.replace('{n}', String(rec.pendientes ?? 0)))
-        : rec.kind === 'jugar' ? t.hoy.proximoPasoJugar.replace('{n}', String(rec.dias ?? 0))
-          : t.hoy.proximoPasoAlDia;
-  const href = rec.kind === 'analizar' ? '#/panel/partidas' : '#/jugar';
-  const cta = rec.kind === 'analizar' ? t.hoy.proximoPasoIrAnalizar : t.hoy.proximoPasoIrJugar;
+    estado === 'sin-jugar' ? t.hoy.partidaLentaSinJugar
+      : estado === 'sin-analizar' ? t.hoy.partidaLentaSinAnalizar
+        : t.hoy.partidaLentaCompleta;
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-info/40 bg-surface p-4">
+    <section className={`flex flex-col gap-3 rounded-lg border p-4 ${completa ? 'border-success/35 bg-success-subtle' : 'border-info/40 bg-surface'}`}>
       <div>
-        <SectionHeading>{t.hoy.proximoPasoTitulo}</SectionHeading>
-        <p className="m-0 mt-1 text-sm text-secondary">{texto}</p>
+        <SectionHeading>{t.hoy.partidaLentaTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-sm text-secondary">{completa ? '✓ ' : ''}{texto}</p>
       </div>
-      <a href={href} className="btn-secondary text-center no-underline">{cta}</a>
+      {estado === 'sin-jugar' && (
+        <a href="#/jugar" className="btn-secondary text-center no-underline">{t.hoy.partidaLentaIrJugar}</a>
+      )}
+      {estado === 'sin-analizar' && (
+        <a href="#/panel/partidas" className="btn-secondary text-center no-underline">{t.hoy.partidaLentaIrAnalizar}</a>
+      )}
       {fugaTactica && (
         <p className="m-0 border-t border-subtle pt-3 text-sm text-secondary">
-          {t.hoy.proximoPasoCalculo}{' '}
-          <a href="#/calculo" className="font-semibold text-accent underline-offset-4 hover:underline">{t.hoy.proximoPasoIrCalculo}</a>
+          {t.hoy.partidaLentaCalculo}{' '}
+          <a href="#/calculo" className="font-semibold text-accent underline-offset-4 hover:underline">{t.hoy.partidaLentaIrCalculo}</a>
         </p>
       )}
     </section>
