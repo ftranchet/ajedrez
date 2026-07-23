@@ -472,10 +472,10 @@ test.describe('sesión simple: Cola', () => {
     await seedCurriculumAutomatizado(page);
     await seedProfileDiagnosticado(page);
     await page.reload();
-    await page.getByText('Tenés 1 repaso vencido.').waitFor();
+    await page.getByText('Repaso de errores — 1 pendiente').waitFor();
 
     await page.getByRole('button', { name: 'Empezar sesión' }).click();
-    await page.getByText('Cola de repasos').waitFor({ timeout: 15_000 });
+    await page.getByText('Repaso de errores', { exact: true }).waitFor({ timeout: 15_000 });
 
     const board = page.locator('cg-board');
     await board.waitFor();

@@ -23,9 +23,12 @@ export function stoykoDisponible(profile: Pick<Profile, 'stoykoUltimaCompletadaE
 }
 
 /** Fecha ISO en que vuelve a estar disponible; null si ya lo está. */
-export function stoykoProximaDisponibleEn(profile: Pick<Profile, 'stoykoUltimaCompletadaEn'>): string | null {
+export function stoykoProximaDisponibleEn(
+  profile: Pick<Profile, 'stoykoUltimaCompletadaEn'>,
+  now: Date = new Date(),
+): string | null {
   const ultima = profile.stoykoUltimaCompletadaEn;
-  if (!ultima || stoykoDisponible(profile)) return null;
+  if (!ultima || stoykoDisponible(profile, now)) return null;
   return new Date(new Date(ultima).getTime() + ENFRIAMIENTO_DIAS * 24 * 60 * 60 * 1000).toISOString();
 }
 

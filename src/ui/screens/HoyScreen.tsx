@@ -2,8 +2,11 @@
 // docs/prototipos/sesion-de-hoy.dc.html). Cola vencida → currículo vencido →
 // Radar (E4 + E6 + E5 + E10), compuestos por el Prescriptor (E11) según la
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
+import type { GameRecord } from '../../core/types';
+import { recomendarProximoPaso } from '../../core/nextStep';
+import { gameRepo } from '../../services/storage/gameRepo';
 import { Board, type BoardFeedback } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
@@ -59,7 +62,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
   if (vencidas > 0) {
     bloques.push({
       texto: vencidas === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(vencidas)),
-      porque: vencidas === 1 ? t.sesion.cardsVencidas_uno : t.sesion.cardsVencidas_otro.replace('{n}', String(vencidas)),
+      porque: t.sesion.bloqueColaPorque,
       minutos: Math.max(1, Math.round(vencidas * MIN_POR_COLA)),
     });
   }
@@ -163,6 +166,8 @@ function Portada() {
         </ul>
       )}
 
+      <ProximoPasoCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
+
       <div className="mt-2 flex flex-col gap-1 border-t border-subtle pt-4">
         <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
         <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
@@ -170,6 +175,44 @@ function Portada() {
 
       <WeeklyPlanCard records={s.sessions ?? []} profile={s.profile} />
     </div>
+  );
+}
+
+// "Para seguir mejorando" (RF-11.7): conecta Hoy con el bucle de mayor valor
+// documentado —jugar y analizar partidas— y, si hay fuga táctica, con Cálculo.
+// Secundaria: no compite con el botón primario de la sesión.
+function ProximoPasoCard({ fugaTactica }: { fugaTactica: boolean }) {
+  const [games, setGames] = useState<GameRecord[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void gameRepo.list().then((g) => { if (alive) setGames(g); });
+    return () => { alive = false; };
+  }, []);
+  if (games === null) return null;
+
+  const rec = recomendarProximoPaso(games);
+  const texto =
+    rec.kind === 'jugar-primera' ? t.hoy.proximoPasoJugarPrimera
+      : rec.kind === 'analizar' ? t.hoy.proximoPasoAnalizar
+        : rec.kind === 'jugar' ? t.hoy.proximoPasoJugar.replace('{n}', String(rec.dias ?? 0))
+          : t.hoy.proximoPasoAlDia;
+  const href = rec.kind === 'analizar' ? '#/panel' : '#/jugar';
+  const cta = rec.kind === 'analizar' ? t.hoy.proximoPasoIrAnalizar : t.hoy.proximoPasoIrJugar;
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-info/40 bg-surface p-4">
+      <div>
+        <SectionHeading>{t.hoy.proximoPasoTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-sm text-secondary">{texto}</p>
+      </div>
+      <a href={href} className="btn-secondary text-center no-underline">{cta}</a>
+      {fugaTactica && (
+        <p className="m-0 border-t border-subtle pt-3 text-sm text-secondary">
+          {t.hoy.proximoPasoCalculo}{' '}
+          <a href="#/calculo" className="font-semibold text-accent underline-offset-4 hover:underline">{t.hoy.proximoPasoIrCalculo}</a>
+        </p>
+      )}
+    </section>
   );
 }
 

@@ -31,8 +31,9 @@ describe('stoykoProximaDisponibleEn', () => {
   });
 
   it('calcula la fecha exacta 7 días después de la última vez', () => {
+    const ahora = new Date('2026-07-18T00:00:00.000Z');
     const haceDosDias = new Date('2026-07-16T00:00:00.000Z').toISOString();
-    expect(stoykoProximaDisponibleEn({ stoykoUltimaCompletadaEn: haceDosDias })).toBe('2026-07-23T00:00:00.000Z');
+    expect(stoykoProximaDisponibleEn({ stoykoUltimaCompletadaEn: haceDosDias }, ahora)).toBe('2026-07-23T00:00:00.000Z');
   });
 });
 

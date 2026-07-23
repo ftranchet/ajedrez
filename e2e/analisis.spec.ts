@@ -106,7 +106,7 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   const total = Number(/de (\d+)/.exec(progresoTexto)?.[1] ?? '1');
 
   await page.getByRole('button', { name: 'Táctico' }).click();
-  await page.getByRole('button', { name: 'Agregar a la Cola' }).click();
+  await page.getByRole('button', { name: 'Agregar a mis repasos' }).click();
   for (let i = 1; i < total; i++) {
     await page.getByRole('button', { name: 'Descartar' }).click();
   }
@@ -120,5 +120,5 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   // (criterio de salida de Fase 2: "verlas aparecer en la sesión del día siguiente").
   await page.locator('nav:visible button', { hasText: 'Hoy' }).first().click();
   await page.reload();
-  await page.getByText(/Tenés \d+ repasos? vencidos?\./).waitFor();
+  await page.getByText(/Repaso de errores — \d+ pendientes?/).waitFor();
 });
