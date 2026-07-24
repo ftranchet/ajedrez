@@ -230,46 +230,57 @@ function Portada() {
   const abiertoEfectivo = abierto ?? primerPendiente;
   const sonido = normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido;
 
+  // Escritorio (design system §1.4, "tablero + panel contextual, nunca tres
+  // paneles"): la acción de hoy a la izquierda y el contexto semanal a la
+  // derecha, en vez de una sola columna angosta que dejaba el 65% del ancho
+  // vacío y empujaba el plan semanal abajo del pliegue. En celular no cambia
+  // nada: las dos columnas se apilan en el mismo orden de siempre.
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
-        <div className="flex items-baseline justify-between">
-          <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-          <span className="font-mono text-sm text-secondary">{t.sesion.minutos.replace('{n}', String(duracionMin))}</span>
+    <div className="mx-auto grid w-full max-w-md grid-cols-1 items-start gap-4 lg:max-w-5xl lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
+          <div className="flex items-baseline justify-between">
+            <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
+            <span className="font-mono text-sm text-secondary">{t.sesion.minutos.replace('{n}', String(duracionMin))}</span>
+          </div>
+        </div>
+
+        {/* Acordeón de bloques (design system §4.1): el abierto toma el recuadro
+            accent con su explicación y el botón de empezar; el resto queda
+            compacto y tocable. Los hechos hoy quedan marcados (RF-11.5). El
+            primero abierto hace la sesión completa; otro abierto, solo ese. */}
+        <div className="flex flex-col gap-2">
+          {bloques.map((b, i) => (
+            <BloqueAccordion
+              key={b.tipo}
+              bloque={b}
+              esPrimero={i === 0}
+              hecho={hechos.has(b.tipo)}
+              abierto={b.tipo === abiertoEfectivo}
+              cargando={s.phase === 'cargando'}
+              startError={s.startError}
+              onAbrir={() => setAbierto(b.tipo)}
+              onEmpezar={() => iniciarSesion(sonido, i === 0 ? undefined : b.tipo)}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Acordeón de bloques (design system §4.1): el abierto toma el recuadro
-          accent con su explicación y el botón de empezar; el resto queda
-          compacto y tocable. Los hechos hoy quedan marcados (RF-11.5). El
-          primero abierto hace la sesión completa; otro abierto, solo ese. */}
-      <div className="flex flex-col gap-2">
-        {bloques.map((b, i) => (
-          <BloqueAccordion
-            key={b.tipo}
-            bloque={b}
-            esPrimero={i === 0}
-            hecho={hechos.has(b.tipo)}
-            abierto={b.tipo === abiertoEfectivo}
-            cargando={s.phase === 'cargando'}
-            startError={s.startError}
-            onAbrir={() => setAbierto(b.tipo)}
-            onEmpezar={() => iniciarSesion(sonido, i === 0 ? undefined : b.tipo)}
-          />
-        ))}
-      </div>
+      {/* Contexto: cómo venís esta semana. Nunca compite con el botón primario
+          —todo acá es secundario— y acompaña el scroll en pantallas altas. */}
+      <aside className="flex flex-col gap-4 lg:sticky lg:top-0">
+        <PartidaLentaCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
 
-      <PartidaLentaCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
+        <FinalesHoyCard />
 
-      <FinalesHoyCard />
+        <div className="flex flex-col gap-1 border-t border-subtle pt-4 lg:border-t-0 lg:pt-0">
+          <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
+          <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
+        </div>
 
-      <div className="mt-2 flex flex-col gap-1 border-t border-subtle pt-4">
-        <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
-        <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
-      </div>
-
-      <WeeklyPlanCard records={s.sessions ?? []} profile={s.profile} />
+        <WeeklyPlanCard records={s.sessions ?? []} profile={s.profile} />
+      </aside>
     </div>
   );
 }

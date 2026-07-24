@@ -266,6 +266,11 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
   if (s.phase === 'lista' || s.phase === 'cargando') {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <header>
+          <h1 className="m-0 font-display text-3xl font-medium">{t.finales.titulo}</h1>
+          <p className="mt-1 mb-0 text-secondary">{t.finales.subtitulo}</p>
+        </header>
+
         <SegmentedControl
           label={t.finales.modosLabel}
           value="finales"
@@ -274,12 +279,7 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
             { value: 'finales', label: t.finales.modoFinales },
           ]}
           onChange={(value) => { if (value === 'partida') onPartida(); }}
-          className="lg:max-w-md"
         />
-        <header>
-          <h1 className="m-0 font-display text-3xl font-medium">{t.finales.titulo}</h1>
-          <p className="mt-1 mb-0 text-secondary">{t.finales.subtitulo}</p>
-        </header>
         {s.engineError && (
           <div className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
             <p className="m-0 text-sm">{t.finales.errorMotor}</p>

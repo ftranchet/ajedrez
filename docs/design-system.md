@@ -12,7 +12,7 @@ Principios visuales:
 1. **El tablero manda.** Siempre el elemento de mayor jerarquía visual; nada compite en tamaño ni saturación.
 2. **Una acción primaria por pantalla.** La sesión del día tiene un botón; el resto es secundario.
 3. **Feedback sobrio.** Acierto y error se comunican con color y microanimación ≤200 ms; las celebraciones se reservan para las métricas de verdad.
-4. **Densidad según dispositivo.** Celular: una cosa por pantalla. Escritorio: tablero + panel contextual, nunca tres paneles.
+4. **Densidad según dispositivo.** Celular: una cosa por pantalla. Escritorio: dos zonas, nunca tres paneles — una de **acción** y otra de **contexto**. En las pantallas de ejercicio la de acción es el tablero; en "Tu sesión de hoy" es el acordeón de bloques con su único botón primario, y el contexto (partida lenta de la semana, finales pendientes, constancia y plan) va en una columna lateral `sticky`. La zona de contexto nunca lleva acciones primarias.
 5. **Modo oscuro primero.** El oscuro es el default; el **modo claro** ("sala de estudio de día" — pergamino cálido, mismos ámbar y semánticos, contraste AA) ya está disponible y se elige en Ajustes → Apariencia (Sistema / Claro / Oscuro). Se implementa redefiniendo los tokens `--color-*` bajo `:root[data-theme='light']`; la preferencia vive en `localStorage` y un script inline la aplica antes de pintar (sin parpadeo). "Sistema" sigue `prefers-color-scheme`.
 6. **Nada depende solo del color.** Todo estado tiene una segunda señal: borde, forma, ícono o texto (RNF-6).
 
