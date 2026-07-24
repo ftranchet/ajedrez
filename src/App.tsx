@@ -118,6 +118,11 @@ export default function App() {
       const heading = mainRef.current?.querySelector<HTMLElement>('h1');
       if (heading) {
         heading.tabIndex = -1;
+        // Marca para suprimir el anillo (ver tokens.css): mover el foco acá
+        // reubica al lector de pantalla, pero un h1 no es un destino de
+        // tabulación y el anillo sobre un bloque de ancho completo lee como
+        // un campo de texto.
+        heading.dataset.routeHeading = '';
         heading.focus({ preventScroll: true });
       } else {
         mainRef.current?.focus({ preventScroll: true });

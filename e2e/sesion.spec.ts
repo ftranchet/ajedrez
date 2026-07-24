@@ -156,14 +156,20 @@ test.describe('sesión simple: Radar', () => {
         boardX: boardElement?.getBoundingClientRect().x ?? -1,
       };
     });
+    // Lo que este contrato protege es que en el viewport mínimo no haya scroll
+    // horizontal y el tablero entre entero. Desde que las coordenadas viven en
+    // una franja fuera del tablero (design system §3.2), esa franja toma 14 px
+    // a la izquierda: el tablero arranca en x=14 y mide 304 (chessground
+    // redondea el lado a múltiplo de 8 para que las casillas sean enteras),
+    // sin desbordar.
     expect(narrowGeometry).toEqual({
       viewport: 320,
       documentScroll: 320,
       mainScroll: 320,
       mainClient: 320,
       mainScrollLeft: 0,
-      boardWidth: 320,
-      boardX: 0,
+      boardWidth: 304,
+      boardX: 14,
     });
 
     // Las piezas del Radar también cargan con la CSS inyectada en runtime.

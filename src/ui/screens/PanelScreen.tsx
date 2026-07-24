@@ -897,25 +897,36 @@ function PanelDeVerdad({
         <TruthMetric
           label={latestRatedGame ? t.panel.verdadRating : t.panel.verdadBanda}
           value={String(latestRatedGame?.ratingUsuario ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico))}
+          vacio={!latestRatedGame && !profile.diagnosticoCompletadoEn}
         />
         <TruthMetric
           label={t.panel.verdadErroresGraves}
           value={mediaErroresGraves === null ? t.panel.verdadSinPartidas : formatDecimal(mediaErroresGraves, 1)}
+          vacio={mediaErroresGraves === null}
         />
         <TruthMetric
           label={t.panel.verdadCalibracion}
           value={brier === null ? t.panel.verdadSinCalibracion : formatDecimal(brier, 2)}
+          vacio={brier === null}
         />
       </div>
     </section>
   );
 }
 
-function TruthMetric({ label, value }: { label: string; value: string }) {
+/** Un dato del panel de verdad. Cuando todavía no hay dato, el texto que lo
+ * explica NO toma la tipografía de la métrica: un estado vacío con el peso de
+ * un número desalinea la fila (tres renglones contra una cifra) y se lee como
+ * si fuera el valor medido. */
+function TruthMetric({ label, value, vacio = false }: { label: string; value: string; vacio?: boolean }) {
   return (
     <div className="flex min-h-24 flex-col justify-between gap-2 rounded-md bg-elevated p-3 sm:min-h-28">
       <span className="text-sm text-secondary">{label}</span>
-      <strong className="font-display text-2xl font-medium leading-tight text-primary tabular-nums">{value}</strong>
+      {vacio ? (
+        <span className="text-sm text-tertiary">{value}</span>
+      ) : (
+        <strong className="font-display text-2xl font-medium leading-tight text-primary tabular-nums">{value}</strong>
+      )}
     </div>
   );
 }

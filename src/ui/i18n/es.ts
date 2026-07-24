@@ -216,8 +216,12 @@ export const es = {
     continuar: 'Siguiente',
   },
   calculo: {
-    titulo: 'Cálculo comprometido',
-    subtitulo: 'Declarás tu línea completa antes de que el tablero se mueva.',
+    // El título nombra la pantalla (igual que la navegación) y el subtítulo
+    // describe el modo elegido: antes el encabezado decía siempre "Cálculo
+    // comprometido", incluso con Stoyko abierto.
+    titulo: 'Cálculo',
+    subtituloComprometida: 'Línea comprometida: declarás tu línea completa antes de que el tablero se mueva.',
+    subtituloStoyko: 'Stoyko semanal: anotás todas tus candidatas, sin reloj, antes de ver la línea del motor.',
     cargando: 'Buscando una posición…',
     cargaDetalle: 'Preparando el catálogo local y una posición verificada.',
     cargaLenta: 'La búsqueda está tardando más de lo esperado.',

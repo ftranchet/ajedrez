@@ -4,7 +4,6 @@ import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { Chip } from '../components/Chip';
 import { SegmentedControl } from '../components/SegmentedControl';
-import { SectionHeading } from '../components/SectionHeading';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import { useFinalesStore } from '../state/finalesStore';
@@ -190,8 +189,16 @@ function Setup({ onFinales }: { onFinales: () => void }) {
   const [levelId, setLevelId] = useState(ENGINE_LEVELS[0].id);
   const [color, setColor] = useState<Color | 'random'>('w');
 
+  // El título encabeza la pantalla y recién después viene el selector de modo,
+  // igual que en el Panel: al revés, las pestañas aparecían sobre el <h1> y
+  // cada pantalla ordenaba su encabezado distinto.
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+      <header>
+        <h1 className="m-0 font-display text-3xl font-medium">{t.jugar.titulo}</h1>
+        <p className="mt-1 mb-0 text-secondary">{t.jugar.subtitulo}</p>
+      </header>
+
       <SegmentedControl
         label={t.finales.modosLabel}
         value="partida"
@@ -200,15 +207,9 @@ function Setup({ onFinales }: { onFinales: () => void }) {
           { value: 'finales', label: t.finales.modoFinales },
         ]}
         onChange={(value) => { if (value === 'finales') onFinales(); }}
-        className="lg:max-w-md"
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div>
         <section className="flex flex-col gap-4">
-          <header>
-            <h1 className="m-0 font-display text-3xl font-medium">{t.jugar.titulo}</h1>
-            <p className="mt-1 mb-0 text-secondary">{t.jugar.subtitulo}</p>
-          </header>
-
           <fieldset className="m-0 border-0 p-0">
             <legend className="mb-2 p-0 text-sm text-secondary">{t.jugar.nivel}</legend>
             <div className="flex flex-col gap-2">
@@ -242,24 +243,12 @@ function Setup({ onFinales }: { onFinales: () => void }) {
           >
             {s.phase === 'loading' ? t.jugar.cargandoMotor : t.jugar.empezar}
           </button>
-        </section>
 
-        <aside className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
-          <SectionHeading>{t.jugar.configuracionTitulo}</SectionHeading>
-          <dl className="m-0 flex flex-col gap-3">
-            <div>
-              <dt className="text-sm text-secondary">{t.jugar.nivel}</dt>
-              <dd className="m-0 mt-1 text-primary">{t.jugar.niveles[levelId] ?? levelId}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-secondary">{t.jugar.color}</dt>
-              <dd className="m-0 mt-1 text-primary">
-                {color === 'w' ? t.jugar.blancas : color === 'b' ? t.jugar.negras : t.jugar.aleatorio}
-              </dd>
-            </div>
-          </dl>
-          <p className="m-0 text-sm text-secondary">{t.jugar.notaMotor}</p>
-        </aside>
+          {/* La tarjeta "Configuración elegida" que iba acá repetía el nivel y
+              el color que ya se ven seleccionados unos centímetros más arriba.
+              Se conserva solo la nota sobre el motor, que sí agrega algo. */}
+          <p className="m-0 text-sm text-tertiary">{t.jugar.notaMotor}</p>
+        </section>
       </div>
     </div>
   );

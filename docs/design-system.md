@@ -106,7 +106,7 @@ Set **Staunty** (Lichess, autor sadsnake1, licencia CC BY-NC-SA 4.0 — ver `pub
 | `board-light` | `#e8d9b7` | Casilla clara (crema) |
 | `board-dark` | `#a67c52` | Casilla oscura (nogal) |
 
-Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina fuera del tablero (ranks a la izquierda, files abajo — chessground `coordinates: true`), en `text-secondary`. *(Corregido 2026-07-18: la versión anterior de esta línea describía coordenadas dentro de la casilla; nunca se implementó así — chessground las pone dentro de la casilla solo con `coordinatesOnSquares`, y ahí escribe el nombre completo de cada casilla (p. ej. "a1") en las 64, no una sola letra/número solo en el borde. Se corrigió el texto para que describa lo que la app realmente muestra.)*
+Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina **fuera** del tablero (ranks a la izquierda, files abajo — chessground `coordinates: true`), en `text-secondary`. La franja la reserva un marco externo (`.board-frame`), no el propio `.cg-wrap`: chessground mide ese elemento para calcular el lado del tablero y lo fija por estilo inline, así que darle padding a él desborda el tablero en vez de achicarlo. Las `<coords>` viven dentro de `cg-container` y se sacan a la franja con un desplazamiento negativo. *(Auditoría 2026-07: hasta acá el código las dibujaba **encima** de las casillas —el default de chessground—, compitiendo con las piezas y con poco contraste sobre el damero; una nota anterior daba por implementada la franja externa sin estarlo. Ahora el código sigue esta especificación.)*
 
 ### 3.3 Estados del tablero (velos sobre la casilla, nunca reemplazo del fondo)
 | Estado | Especificación | Segunda señal (RNF-6) |

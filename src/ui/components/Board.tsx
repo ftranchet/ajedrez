@@ -125,17 +125,21 @@ export function Board(props: BoardProps) {
       : []);
   }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor, props.feedback]);
 
-  // 40% de opacidad para piezas fantasma, design system §3.4/§6.5.
+  // 40% de opacidad para piezas fantasma, design system §3.4/§6.5. El marco
+  // externo reserva la franja de coordenadas (§3.2) sin que chessground la
+  // confunda con espacio de tablero al medir.
   return (
-    <div
-      ref={el}
-      data-blind-mode={props.blindMode ?? 'normal'}
-      data-feedback={props.feedback?.kind ?? 'none'}
-      data-feedback-move={props.feedback?.kind === 'success' && props.feedback.move
-        ? `${props.feedback.move[0]}-${props.feedback.move[1]}`
-        : undefined}
-      data-reduced-motion={reducedMotion ? 'true' : 'false'}
-      className="cg-wrap aspect-square h-full w-full"
-    />
+    <div className="board-frame">
+      <div
+        ref={el}
+        data-blind-mode={props.blindMode ?? 'normal'}
+        data-feedback={props.feedback?.kind ?? 'none'}
+        data-feedback-move={props.feedback?.kind === 'success' && props.feedback.move
+          ? `${props.feedback.move[0]}-${props.feedback.move[1]}`
+          : undefined}
+        data-reduced-motion={reducedMotion ? 'true' : 'false'}
+        className="cg-wrap aspect-square w-full"
+      />
+    </div>
   );
 }

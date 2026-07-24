@@ -99,27 +99,60 @@ cg-board {
   100% { background-color: rgba(194, 96, 79, 0.34); }
 }
 
-/* Coordenadas §3.2: font-mono, chicas, en una franja fuera del tablero
-   (ranks a la izquierda, files abajo — chessground `coordinates: true`, sin
-   `coordinatesOnSquares`: esa variante escribe el nombre completo de la
-   casilla, p. ej. "a1", en cada una de las 64 casillas — no el esquema de
-   una sola letra/número solo en el borde que describía una versión previa
-   de este documento; corregido para que coincida con lo implementado). Sin
-   esta regla no tenían color asignado y caían al valor por defecto del
-   navegador. */
+/* Coordenadas §3.2: font-mono, chicas, en una franja FUERA del tablero (ranks
+   a la izquierda, files abajo). Chessground las dibuja por defecto encima de
+   las casillas, donde compiten con las piezas y quedan con poco contraste
+   sobre el damero.
+   La franja la reserva un marco externo, no el propio .cg-wrap: chessground
+   mide ese elemento para calcular el tamaño del tablero y lo fija con estilos
+   inline, así que darle padding a él desbordaba el tablero en vez de achicarlo. */
+.board-frame {
+  --coord-gutter: 1.125rem;
+  padding-left: var(--coord-gutter);
+  padding-bottom: var(--coord-gutter);
+}
+
+/* En el viewport mínimo soportado (320 px) cada píxel del tablero cuenta: la
+   franja se ajusta a lo justo para que las coordenadas sigan legibles sin
+   comerle ancho de más a las casillas. */
+@media (max-width: 380px) {
+  .board-frame {
+    --coord-gutter: 0.875rem;
+  }
+}
+
 .cg-wrap coords {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   color: var(--color-secondary);
+  opacity: 1;
 }
 
-/* Chessground desplaza por defecto la fila de letras 24 px y la hace
-   sobresalir a la derecha. Centrarla en el ancho real de las ocho casillas
-   evita scroll horizontal y alinea cada letra con el centro de su archivo. */
+/* Las <coords> viven dentro de <cg-container>, que ya está corrido por el
+   gutter: se las saca del tablero con un desplazamiento negativo, así caen
+   justo en la franja reservada. */
+
+/* Números: franja izquierda, centrados en la altura de cada fila. */
+.cg-wrap coords.ranks {
+  left: calc(-1 * var(--coord-gutter));
+  top: 0;
+  width: var(--coord-gutter);
+  height: 100%;
+  align-items: center;
+}
+
+.cg-wrap coords.ranks coord {
+  transform: none; /* el desplazamiento servía para centrar sobre la casilla */
+}
+
+/* Letras: franja inferior, alineadas al ancho real de las ocho columnas. */
 .cg-wrap coords.files {
   left: 0;
+  bottom: calc(-1 * var(--coord-gutter));
   width: 100%;
+  height: var(--coord-gutter);
+  align-items: center;
 }
 
 /* Piezas §3.1: set Staunty, 90% de la casilla (5% de aire por lado). Las

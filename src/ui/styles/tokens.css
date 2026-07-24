@@ -22,6 +22,10 @@
   --color-accent-hover: #e2b356;
   --color-accent-pressed: #b8862f;
   --color-accent-subtle: rgba(217, 164, 65, 0.12);
+  /* Tinta del wordmark. Sobre el fondo oscuro el ámbar de acento ya rinde
+     8,2:1; el tema claro la oscurece aparte (el accent tal cual daba 2,4:1
+     sobre pergamino, ilegible para el elemento que lleva la marca). */
+  --color-wordmark: #d9a441;
   --color-success: #7fa66a;
   --color-success-subtle: rgba(127, 166, 106, 0.1);
   --color-error: #c2604f;
@@ -67,6 +71,9 @@
   --color-accent-hover: #b37f28;
   --color-accent-pressed: #9a6b1c;
   --color-accent-subtle: rgba(198, 138, 44, 0.16);
+  /* Bronce: conserva la familia ámbar de la marca y alcanza AA (≈4,8:1)
+     sobre el pergamino, donde el accent quedaba en 2,4:1. */
+  --color-wordmark: #8a5a12;
   --color-success: #5f7d4a;
   --color-success-subtle: rgba(95, 125, 74, 0.16);
   --color-error: #b0503f;
@@ -103,6 +110,16 @@
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+
+  /* Única excepción, y no es un control: al cambiar de vista el foco se mueve
+     al <h1> para que el lector de pantalla anuncie dónde quedó parado. Ese
+     título no es un destino de tabulación —no se llega a él con Tab ni se
+     opera—, y el anillo sobre un bloque de ancho completo lo hace leer como
+     un campo de texto vacío. Se anuncia igual; solo no se dibuja. */
+  h1[data-route-heading]:focus,
+  h1[data-route-heading]:focus-visible {
+    outline: none;
   }
 }
 
