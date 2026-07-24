@@ -36,4 +36,23 @@ describe('partidaLentaSemanal (RF-11.7)', () => {
     const g = game({ analizada: true, fecha: new Date(2026, 6, 21, 10).toISOString() });
     expect(partidaLentaSemanal([g], ahora)).toBe('completa');
   });
+
+  // Borde clásico de `(getDay() + 6) % 7`: el domingo es el ÚLTIMO día de la
+  // semana (lunes a domingo), no el primero. Si se calculara mal, el domingo
+  // "reiniciaría" la semana y una partida del lunes anterior dejaría de contar.
+  it('el domingo sigue perteneciendo a la semana que arrancó el lunes', () => {
+    const domingo = new Date(2026, 6, 26, 22); // domingo 26/07, cierre de esa semana
+    const delLunes = game({ analizada: true, fecha: new Date(2026, 6, 20, 9).toISOString() });
+    expect(partidaLentaSemanal([delLunes], domingo)).toBe('completa');
+
+    // Y el lunes siguiente ya es una semana nueva: esa misma partida no cuenta.
+    const lunesSiguiente = new Date(2026, 6, 27, 9);
+    expect(partidaLentaSemanal([delLunes], lunesSiguiente)).toBe('sin-jugar');
+  });
+
+  it('una partida del mismo lunes a la madrugada entra en la semana en curso', () => {
+    const lunes = new Date(2026, 6, 20, 23, 30);
+    const madrugada = game({ fecha: new Date(2026, 6, 20, 0, 5).toISOString() });
+    expect(partidaLentaSemanal([madrugada], lunes)).toBe('sin-analizar');
+  });
 });

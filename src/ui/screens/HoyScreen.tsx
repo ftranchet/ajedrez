@@ -19,9 +19,7 @@ import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
-import { dueCurriculumItems, nivelCiegas } from '../../core/curriculum';
-import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
-import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
+import { nivelCiegas } from '../../core/curriculum';
 import { readBlindTrainingEnabled } from '../trainingPrefs';
 import { normalizeSensoryPreferences } from '../../core/sensory';
 import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
@@ -323,18 +321,10 @@ function PartidaLentaCard({ fugaTactica }: { fugaTactica: boolean }) {
 // una tarjeta secundaria las surge con enlace directo al modo finales. Se juegan
 // enteras contra el motor, por eso no entran en la sesión de un solo movimiento.
 function FinalesHoyCard() {
-  const [pendientes, setPendientes] = useState<number | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      await curriculumItemRepo.ensureSeeded();
-      const [items, progress] = await Promise.all([curriculumItemRepo.list(), curriculumProgressRepo.list()]);
-      const progressById = new Map(progress.map((p) => [p.id, p] as const));
-      const finales = items.filter((item) => item.tipo === 'final');
-      if (alive) setPendientes(dueCurriculumItems(finales, progressById).length);
-    })();
-    return () => { alive = false; };
-  }, []);
+  // El conteo lo calcula `loadSummary` con el catálogo y el progreso que ya
+  // carga: pedirlos de nuevo acá duplicaba el sembrado y la lectura del
+  // catálogo en cada visita a Hoy.
+  const pendientes = useSessionStore((s) => s.finalesPendientes);
   if (pendientes === null || pendientes === 0) return null;
 
   return (

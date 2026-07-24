@@ -78,8 +78,6 @@ export const es = {
     hechoHoyRepetir: 'Ya lo hiciste hoy. Podés repetirlo cuando quieras.',
     empezarBloque: 'Empezar este bloque',
     empezar: 'Empezar sesión',
-    soloEsteBloque: 'Hacer solo este bloque',
-    elegirBloque: 'O tocá un bloque para hacer solo ese:',
     fin: 'Sesión completa',
     finTexto: 'Por hoy es suficiente. La consistencia le gana al volumen.',
     volverAHoy: 'Volver',

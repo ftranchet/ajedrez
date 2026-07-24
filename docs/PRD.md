@@ -76,8 +76,8 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-1.2 (P0)** El tablero escala fluidamente y es utilizable con precisión táctil en pantallas desde 320 px de ancho.
 - **RF-1.3 (P0)** El usuario puede jugar partidas locales contra el motor con niveles de fuerza limitada (fallback cuando no hay conexión o cuenta de Lichess).
 - **RF-1.4 (P0)** El usuario puede jugar partidas contra los bots Maia (maia1/maia5/maia9) a través de la interfaz de programación de Lichess, con su token personal (ver ADR-0004).
-- **RF-1.5 (P0)** Toda partida jugada se persiste localmente con: PGN completo, tiempos por jugada, fuente, resultado y fecha.
-- **RF-1.6 (P1)** Controles de partida: relojes configurables (mínimo: 15+10 y 30+0 predefinidos), rendirse, ofrecer tablas (contra bots: tablas automáticas por regla).
+- **RF-1.5 (P0)** Toda partida jugada se persiste localmente con: PGN completo, fuente, resultado y fecha. El campo de tiempos por jugada se conserva en el esquema para partidas **importadas** que los traigan en el PGN, pero las partidas jugadas dentro de la app ya **no se cronometran**: se quitó el cronómetro silencioso junto con la métrica de reloj (ver E9).
+- **RF-1.6 (P1)** Controles de partida: rendirse y ofrecer tablas (contra bots: tablas automáticas por regla). Los **relojes configurables** que pedía la versión original de este RF quedan **fuera de alcance** mientras el producto sostenga el juego sin reloj (ver E9): reintroducirlos exigiría revisar esa decisión de forma explícita, no darlos por implícitos.
 - **RF-1.7 (P2)** Sonidos discretos de jugada/captura/jaque, desactivables.
 
 *Criterios de aceptación E1:* una partida completa contra el motor local se juega de punta a punta en un celular en orientación vertical y en una computadora, queda guardada, y su PGN exportado abre sin errores en Lichess.
@@ -146,11 +146,13 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-8.2 (P2)** Variante con reloj corto (conversión bajo presión).
 - **RF-8.3 (P2)** Fallback sin conexión/sin Lichess: motor local con fuerza limitada, señalando la limitación ("la resistencia del motor no es humana").
 
-### E9 — Triage de reloj
+### E9 — Criterio de cálculo ("¿Calcular o ya alcanza?")
 
-- **RF-9.1 (P1)** El sistema construye el perfil de gestión de tiempo del usuario desde sus partidas (tiempos por jugada del PGN) e identifica sobregasto e infragasto por tipo de posición.
-- **RF-9.2 (P1)** Ejercicio: dada una posición, decidir en pocos segundos "calcular en profundidad" o "jugada suficientemente buena ya". Feedback contra la evaluación: cuánto costaba la jugada rápida.
-- **RF-9.3 (P2)** Informe mensual de fugas de tiempo integrado al panel (E11).
+> **Revisión 2026-07 — de "Triage de reloj" a criterio de cálculo.** Esta épica nació como gestión del reloj: un perfil de sobregasto/infragasto construido con los tiempos por jugada (RF-9.1) y un informe mensual de fugas de tiempo (RF-9.3). Se retiró por incoherente con el producto: ELOmax se juega **sin reloj** (RF-11.4, E7, E8 y el propio diagnóstico lo dicen explícitamente), y sostener esa métrica obligaba a cronometrar cada jugada en silencio, con datos que el usuario nunca veía ni consentía. Lo que sí tenía valor —y se conserva— es el ejercicio de decidir si una posición merece cálculo profundo: eso es **calibración del esfuerzo**, no del reloj.
+
+- **RF-9.1 (P1)** ~~Perfil de gestión de tiempo desde los tiempos por jugada.~~ **Retirado** (ver nota). El disparador del ejercicio pasa a ser la fuga táctica ya medida sobre errores reales de partida (RF-11.2), que es observable y explicable al usuario.
+- **RF-9.2 (P1)** Ejercicio: dada una posición, decidir si **pide cálculo profundo** o **alcanza con una jugada sólida**. Sin cronómetro: se evalúa el criterio, no la velocidad. Recicla los cinco tipos ya verificados del Radar (E5) en vez de pedir contenido nuevo.
+- **RF-9.3 (P2)** Informe mensual en el panel (E11): precisión del ejercicio en los últimos 30 días. ~~Fugas de tiempo.~~
 
 ### E10 — Calibración del juicio
 
@@ -161,7 +163,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 ### E11 — Prescriptor y sesión diaria
 
 - **RF-11.1 (P0)** La pantalla principal es **"Tu sesión de hoy"**: una secuencia de bloques con duración total visible (por defecto 25 min; mínima viable 15; configurable).
-- **RF-11.2 (P0)** Composición de la sesión, en orden: (1) repasos vencidos de la Cola; (2) dieta base por banda de Elo (tabla versionada en configuración, no hardcodeada — ver §9); (3) ajuste por fugas del último mes (ejemplo: si >35% de derrotas son por reloj, sube Triage).
+- **RF-11.2 (P0)** Composición de la sesión, en orden: (1) repasos vencidos de la Cola; (2) dieta base por banda de Elo (tabla versionada en configuración, no hardcodeada — ver §9); (3) ajuste por fugas del último mes. El ejemplo original de este RF era "si >35% de derrotas son por reloj, sube Triage"; al retirarse la métrica de reloj (ver E9), la fuga que se mide es la **táctica**: si >35% de los errores recientes de partidas propias son tácticos, se refuerza el Radar y se suma el bloque "¿Calcular o ya alcanza?".
 - **RF-11.3 (P0)** Cada bloque muestra su **porqué** en una línea ("Radar 12 min — tus errores graves en posiciones tranquilas duplican tu promedio").
 - **RF-11.4 (P0)** Diagnóstico inicial: importación + análisis en lote (E2/E3 exprés) → banda de Elo y perfil de fugas → primera dieta. Sin historial: 2 partidas sin reloj contra Maia escalonada + 20 posiciones de Radar.
 - **RF-11.5 (P1)** El usuario puede saltear un bloque (se registra) pero no reordenar la prioridad de la Cola.

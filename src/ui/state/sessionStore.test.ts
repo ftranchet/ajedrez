@@ -544,7 +544,7 @@ describe('sessionStore — volver()', () => {
 });
 
 describe('sessionStore — Triage (E9)', () => {
-  it('triageDecidir persiste la decisión, si fue correcta y la latencia (RF-9.2/9.3)', async () => {
+  it('triageDecidir persiste la decisión y si fue correcta, sin cronometrar (RF-9.2)', async () => {
     // Poner el store directo en el bloque de Triage con una posición ofensiva
     // (decisión correcta = "calcular"): montar la fuga de tiempo real que lo
     // activa es caro y ya está cubierto por e2e/triage.spec.ts.
@@ -573,7 +573,10 @@ describe('sessionStore — Triage (E9)', () => {
       decisionCorrecta: 'calcular',
       correcta: true,
     });
-    expect(typeof attempts[0].tiempoMs).toBe('number');
+    // No se cronometra: el ejercicio mide criterio, no velocidad (auditoría
+    // 2026-07 — cronometrar en silencio algo que nunca se muestra es la misma
+    // incoherencia que se quitó con el "perfil de tiempo").
+    expect(attempts[0].tiempoMs).toBeUndefined();
   });
 
   it('registra una decisión equivocada como incorrecta', async () => {

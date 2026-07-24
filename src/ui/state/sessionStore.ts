@@ -76,6 +76,8 @@ interface SessionState {
   dueCount: number | null;
   /** Patrones del currículo vencidos hoy, antes de topar por la dieta. Para el resumen de "Tu sesión de hoy" (RF-11.1). */
   curriculumDueCount: number | null;
+  /** Finales teóricos pendientes (RF-6.2), para surgirlos desde Hoy. null = sin cargar todavía. */
+  finalesPendientes: number | null;
 
   // Prescriptor (E11): perfil y dieta de la sesión en curso (RF-11.2).
   profile: Profile;
@@ -172,8 +174,6 @@ interface SessionState {
 }
 
 let chess = new Chess();
-/** Marca de tiempo al servir el ítem de Triage, para la latencia de la decisión (RF-9.2). */
-let triageInicioMs = 0;
 /** Serializa snapshots de una misma sesión para que un put viejo no pise uno nuevo. */
 let sessionWriteQueue: Promise<void> = Promise.resolve();
 /** Deduplica el doble montaje de React StrictMode y permite invalidar una carga lenta al reintentar. */
@@ -347,7 +347,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
       return;
     }
     chess = new Chess(item.fen);
-    triageInicioMs = Date.now(); // para la latencia de la decisión (RF-9.2)
     set({
       triageSubPhase: 'decidiendo',
       triageUltimaCorrecta: null,
@@ -417,6 +416,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     startError: false,
     dueCount: null,
     curriculumDueCount: null,
+    finalesPendientes: null,
     profile: DEFAULT_PROFILE,
     dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
     soloBloque: null,
@@ -484,6 +484,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
               dieta: dietaPorBanda(profile.bandaElo, []),
               dueCount: 0,
               curriculumDueCount: 0,
+              finalesPendientes: 0,
               sessions: [],
               summaryStatus: 'ready',
             });
@@ -499,9 +500,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
           ]);
           if (generation !== summaryGeneration) return;
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
+          const due = dueCurriculumItems(curriculumItems, progressById);
           set({
             dueCount: dueErrorCards(allCards).length,
-            curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron').length,
+            curriculumDueCount: due.filter((item) => item.tipo === 'patron').length,
+            finalesPendientes: due.filter((item) => item.tipo === 'final').length,
             profile,
             dieta: dietaPorBanda(profile.bandaElo, allCards),
             sessions,
@@ -610,6 +613,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         // inmediato, y el contador viejo quedaría desactualizado.
         dueCount: null,
         curriculumDueCount: null,
+        finalesPendientes: null,
         colaCards: [],
         colaIndex: 0,
         curriculumQueue: [],
@@ -713,8 +717,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const correcta = decisionCorrecta(item.tipo);
       updateTrackedSession((record) => recordSessionItem(record, 'triage'));
       set({ triageSubPhase: 'feedback', triageUltimaCorrecta: decision === correcta, triageDecisionCorrecta: correcta });
-      // Persistir la decisión, si fue correcta y la latencia (RF-9.2/9.3):
-      // antes la decisión se evaluaba en memoria y no quedaba registro.
+      // Persistir la decisión y si fue correcta (RF-9.2): antes se evaluaba en
+      // memoria y no quedaba registro. No se cronometra: el ejercicio mide
+      // criterio, no velocidad.
       void triageAttemptRepo.save({
         id: crypto.randomUUID(),
         itemId: item.id,
@@ -722,7 +727,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
         decisionUsuario: decision,
         decisionCorrecta: correcta,
         correcta: decision === correcta,
-        tiempoMs: Date.now() - triageInicioMs,
         fecha: new Date().toISOString(),
       });
     },

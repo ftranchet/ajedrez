@@ -1,8 +1,10 @@
-// Currículo base de patrones (E6, RF-6.1): 8 posiciones, una por patrón,
-// verificadas programáticamente con scripts/verify-curriculum-patrones.mjs
-// (mate forzado o motivo táctico confirmado con chess.js — nunca de
-// memoria). Set inicial deliberadamente chico y 100% verificado; ampliarlo
-// es trabajo futuro (ver docs/roadmap.md, Fase 3).
+// Currículo base (E6, RF-6.1/6.2): 20 posiciones de patrón (2–3 por motivo,
+// para que no sea siempre la misma) más el catálogo de finales. Todas
+// verificadas programáticamente —nunca de memoria—: los patrones con
+// scripts/verify-curriculum-patrones.mjs (mate forzado o el invariante del
+// motivo, con chess.js) y los finales con scripts/verify-curriculum-finales.mjs
+// (Stockfish). Ambos scripts corren en CI, y curriculumSeedData.test.ts
+// re-chequea los invariantes clave ante una edición a mano.
 import type { CurriculumItem } from '../../core/types';
 import finalesCatalogo from '../../config/finales-catalogo.json' with { type: 'json' };
 

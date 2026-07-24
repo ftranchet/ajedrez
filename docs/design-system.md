@@ -117,13 +117,13 @@ Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina fuera del tabl
 | Destino con captura | anillo de 3 px `#171310` al 28%, inscripto en la casilla | forma |
 | Jaque | velo radial `error`: 85% centro → transparente al 82% del radio | gradiente radial, solo bajo el rey |
 | Flecha de análisis | `accent` al 85%, grosor 3% del tablero, punta triangular | — |
-| Flecha de jugada correcta | `success` pleno sobre halo `base` (revelación post-respuesta) | contorno oscuro + texto de acierto en el panel |
+| Flecha de jugada correcta | una sola flecha `success` plena, con halo `base` por `drop-shadow` (revelación post-respuesta) | contorno oscuro + texto de acierto en el panel |
 | Casilla de error | velo `error` al 34%, pulso de opacidad 180 ms bajo el rey del lado que resolvió | doble borde interior claro/oscuro + texto de fallo en el panel |
 
 ### 3.4 Reglas
 - El tablero nunca baja de 320 px; escala fluida (RF-1.2).
 - Movimiento por arrastre y por toque-toque, targets ≥44 px (RNF-1).
-- Modo a ciegas: piezas fantasma al 25% de opacidad → solo coordenadas (RF-6.5).
+- Modo a ciegas: piezas fantasma al 40% de opacidad → solo coordenadas (RF-6.5). El 40% mantiene la pieza legible: al 25% original se leía como un fallo de render, no como una dificultad deliberada. Se puede desactivar en Ajustes → Modo a ciegas.
 
 ## 4. Layouts responsive
 

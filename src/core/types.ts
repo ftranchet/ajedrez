@@ -480,10 +480,9 @@ export interface StoykoAttempt {
 }
 
 /**
- * Registro de un ejercicio de Triage de reloj (E9, RF-9.2/9.3): la decisión
- * rápida "¿pide cálculo o alcanza?", si fue correcta, y cuánto tardó en
- * decidir (la latencia es justamente lo que Triage entrena). Antes la decisión
- * se evaluaba en memoria y no se persistía nada.
+ * Registro de un ejercicio de criterio "¿Calcular o ya alcanza?" (E9, RF-9.2):
+ * la decisión tomada y si fue correcta. (El identificador `triage` se conserva
+ * para no migrar los registros ya guardados.)
  */
 export interface TriageAttempt {
   id: string;
@@ -492,8 +491,13 @@ export interface TriageAttempt {
   decisionUsuario: 'calcular' | 'alcanza';
   decisionCorrecta: 'calcular' | 'alcanza';
   correcta: boolean;
-  /** Milisegundos desde que se sirvió la posición hasta decidir. */
-  tiempoMs: number;
+  /**
+   * @deprecated Latencia de la decisión. Ya no se registra: el ejercicio mide
+   * criterio, no velocidad, y cronometrar en silencio algo que nunca se muestra
+   * es la misma incoherencia que se quitó del "perfil de tiempo". Se conserva
+   * opcional solo para leer registros anteriores.
+   */
+  tiempoMs?: number;
   fecha: string; // ISO 8601
 }
 
