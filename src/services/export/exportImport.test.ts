@@ -4,7 +4,7 @@
 // importando de vuelta.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { exportAllData, importAllData } from './exportImport';
+import { deleteAllUserData, exportAllData, importAllData } from './exportImport';
 import { db } from '../storage/db';
 import { buildGameRecord } from '../../core/game';
 import { buildErrorCard } from '../../core/errorCard';
@@ -192,6 +192,28 @@ describe('exportAllData / importAllData', () => {
     expect(await db.games.count()).toBe(1);
     // Una tabla vacía en el respaldo vacía la local (antes bulkPut no podía).
     expect(await db.errorCards.count()).toBe(0);
+  });
+
+  it('deleteAllUserData borra los datos del usuario pero conserva los catálogos reseedables', async () => {
+    const game = buildGameRecord({ pgn: '1. e4 e5 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(game);
+    await db.profile.put({ id: 'principal', bandaElo: 'avanzado', diagnosticoCompletadoEn: new Date().toISOString() });
+    await db.curriculumProgress.put({
+      id: 'patron-mate-pasillo-1',
+      fsrs: { due: '2026-01-01T00:00:00.000Z', stability: 5, difficulty: 5, elapsedDays: 0, scheduledDays: 0, reps: 1, lapses: 0, learningSteps: 0, state: 'review', lastReview: '2026-01-01T00:00:00.000Z' },
+      demostracionesLimpias: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    // Un catálogo reseedable (contenido, no dato del usuario) que NO debe borrarse.
+    await db.radarItems.put({ id: 'radar-seed-1', fen: '8/8/8/8/8/8/8/8 w - - 0 1', tipo: 'envenenada', temas: [], rating: 1200, solucion: ['a1a2'], fuente: 'seed-dev' });
+
+    await deleteAllUserData();
+
+    expect(await db.games.count()).toBe(0);
+    expect(await db.profile.count()).toBe(0);
+    expect(await db.curriculumProgress.count()).toBe(0);
+    // El catálogo sigue intacto.
+    expect(await db.radarItems.get('radar-seed-1')).toBeDefined();
   });
 
   it('importar dos veces el mismo respaldo deja el mismo estado (idempotente)', async () => {

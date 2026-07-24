@@ -522,6 +522,12 @@ export const es = {
     importando: 'Restaurando…',
     importadoOk: 'Restaurado: {partidas} partidas, {tarjetas} tarjetas, {calibraciones} registros de calibración y {radar} respuestas del Radar',
     importadoError: 'No se pudo restaurar',
+    eliminar: 'Eliminar todos mis datos',
+    eliminarAdvertencia: 'Se borran tu perfil, partidas, repasos y todo tu progreso. No se puede deshacer. Si querés conservarlos, exportá primero.',
+    eliminarConfirmar: 'Sí, borrar todo',
+    eliminarCancelar: 'Cancelar',
+    eliminando: 'Eliminando…',
+    eliminarError: 'No se pudo eliminar',
   },
   adherencia: {
     titulo: 'Plan semanal',

@@ -24,6 +24,40 @@ function pgnFileName(gameId: string): string {
   return `games/${gameId}.pgn`;
 }
 
+/** Tablas con datos del usuario: todo lo exportable/borrable. Los catálogos
+ * reseedables (radarItems/curriculumItems/stoykoItems y su meta) quedan afuera
+ * a propósito —son contenido, no datos personales, y se repueblan solos—. */
+function userDataTables() {
+  return [
+    db.games,
+    db.errorCards,
+    db.calibrationRecords,
+    db.radarProgress,
+    db.radarAttempts,
+    db.curriculumProgress,
+    db.profile,
+    db.candidataAttempts,
+    db.compromisoAttempts,
+    db.dobleSolucionAttempts,
+    db.stoykoAttempts,
+    db.triageAttempts,
+    db.sessions,
+    db.transferMeasurements,
+    db.n1Experiments,
+  ];
+}
+
+/** Borra TODOS los datos del usuario (E14): perfil, partidas, tarjetas de
+ * error, progreso, intentos, sesiones y mediciones. Deja la app como recién
+ * instalada —los catálogos reseedables se repueblan solos—. Es irreversible;
+ * la confirmación vive en la UI. */
+export async function deleteAllUserData(): Promise<void> {
+  const tables = userDataTables();
+  await db.transaction('rw', tables, async () => {
+    await Promise.all(tables.map((table) => table.clear()));
+  });
+}
+
 /** Arma el .zip completo (RF-14.1): manifiesto + JSON + PGN legible aparte. */
 export async function exportAllData(): Promise<Uint8Array> {
   const data: ExportSourceData = {
@@ -163,41 +197,9 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   // son contenido reseedable, no datos del usuario, y se repueblan solos.
   await db.transaction(
     'rw',
-    [
-      db.games,
-      db.errorCards,
-      db.calibrationRecords,
-      db.radarProgress,
-      db.radarAttempts,
-      db.curriculumProgress,
-      db.profile,
-      db.candidataAttempts,
-      db.compromisoAttempts,
-      db.dobleSolucionAttempts,
-      db.stoykoAttempts,
-      db.triageAttempts,
-      db.sessions,
-      db.transferMeasurements,
-      db.n1Experiments,
-    ],
+    userDataTables(),
     async () => {
-      await Promise.all([
-        db.games.clear(),
-        db.errorCards.clear(),
-        db.calibrationRecords.clear(),
-        db.radarProgress.clear(),
-        db.radarAttempts.clear(),
-        db.curriculumProgress.clear(),
-        db.profile.clear(),
-        db.candidataAttempts.clear(),
-        db.compromisoAttempts.clear(),
-        db.dobleSolucionAttempts.clear(),
-        db.stoykoAttempts.clear(),
-        db.triageAttempts.clear(),
-        db.sessions.clear(),
-        db.transferMeasurements.clear(),
-        db.n1Experiments.clear(),
-      ]);
+      await Promise.all(userDataTables().map((table) => table.clear()));
       if (bundle.games.length > 0) await db.games.bulkPut(bundle.games);
       if (bundle.errorCards.length > 0) await db.errorCards.bulkPut(bundle.errorCards);
       if (bundle.calibrationRecords.length > 0) await db.calibrationRecords.bulkPut(bundle.calibrationRecords);

@@ -3,13 +3,15 @@
 // tras restaurar avisa por `onImported` para que quien lo use recargue el
 // estado dependiente (perfil, sesión) sin quedar mostrando datos viejos.
 import { useRef, useState } from 'react';
-import { exportAllData, importAllData } from '../../services/export/exportImport';
+import { deleteAllUserData, exportAllData, importAllData } from '../../services/export/exportImport';
 import { t } from '../i18n/es';
 import { SectionHeading } from './SectionHeading';
 
 export function DataBackupCard({ onImported }: { onImported?: () => void }) {
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -56,6 +58,22 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
     }
   }
 
+  async function handleDelete() {
+    setEliminando(true);
+    setMensaje(null);
+    try {
+      await deleteAllUserData();
+      // Recarga en limpio: todos los stores re-inician desde la base vacía y
+      // Hoy vuelve al diagnóstico inicial, sin quedar mostrando datos borrados.
+      window.location.hash = '#/hoy';
+      window.location.reload();
+    } catch {
+      setEliminando(false);
+      setConfirmandoBorrado(false);
+      setMensaje(t.panel.eliminarError);
+    }
+  }
+
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
       <SectionHeading className="mb-1">{t.panel.datos}</SectionHeading>
@@ -76,6 +94,29 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
         {importando ? t.panel.importando : t.panel.importar}
       </button>
       {mensaje && <p className="m-0 text-sm text-secondary">{mensaje}</p>}
+
+      <div className="mt-1 border-t border-subtle pt-3">
+        {confirmandoBorrado ? (
+          <div className="flex flex-col gap-2">
+            <p className="m-0 text-sm text-secondary">{t.panel.eliminarAdvertencia}</p>
+            <div className="flex gap-2">
+              <button onClick={() => void handleDelete()} disabled={eliminando} className="btn-danger flex-1">
+                {eliminando ? t.panel.eliminando : t.panel.eliminarConfirmar}
+              </button>
+              <button onClick={() => setConfirmandoBorrado(false)} disabled={eliminando} className="btn-secondary flex-1">
+                {t.panel.eliminarCancelar}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setConfirmandoBorrado(true); setMensaje(null); }}
+            className="btn-danger w-full"
+          >
+            {t.panel.eliminar}
+          </button>
+        )}
+      </div>
     </section>
   );
 }

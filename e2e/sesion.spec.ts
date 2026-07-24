@@ -503,6 +503,48 @@ test.describe('exportación e importación (E14)', () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^elomax-export-.*\.zip$/);
   });
+
+  test('eliminar todos mis datos borra todo (con confirmación) y vuelve a empezar', async ({ page }) => {
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    // Sembrar perfil + una partida para tener algo que borrar.
+    await page.evaluate(() =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const tx = req.result.transaction(['profile', 'games'], 'readwrite');
+          tx.objectStore('profile').put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: new Date().toISOString() });
+          tx.objectStore('games').put({ id: 'g-borrar', pgn: '1. e4 *', fuente: 'local', ritmo: 'sin-reloj', resultado: '*', tiemposPorJugadaMs: [], analizada: false, fecha: new Date().toISOString() });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    );
+
+    await page.locator('button[aria-label="Ajustes"]:visible').click();
+    await page.getByRole('heading', { name: 'Tus datos' }).waitFor();
+
+    // Requiere confirmación: un solo toque no borra.
+    await page.getByRole('button', { name: 'Eliminar todos mis datos' }).click();
+    await page.getByText('No se puede deshacer', { exact: false }).waitFor();
+    await page.getByRole('button', { name: 'Sí, borrar todo' }).click();
+
+    // Recarga en limpio a Hoy y la base queda vacía.
+    await page.getByText('Tu sesión de hoy').waitFor();
+    const games = await page.evaluate(() =>
+      new Promise<number>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const count = req.result.transaction('games').objectStore('games').count();
+          count.onsuccess = () => resolve(count.result);
+          count.onerror = () => reject(count.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    );
+    expect(games).toBe(0);
+  });
 });
 
 test.describe('elegir bloque (RF-11.5)', () => {
