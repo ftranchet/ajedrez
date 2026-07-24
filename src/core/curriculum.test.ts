@@ -135,8 +135,9 @@ describe('esDemostracionLimpia', () => {
   });
 
   it('acepta cualquiera de las jugadas registradas cuando hay varias', () => {
-    const descubierta = '4k3/8/8/8/8/4R3/4N3/4K3 w - - 0 1';
-    expect(esDemostracionLimpia(descubierta, 'e2d4', ['e2c3', 'e2d4', 'e2f4'])).toBe(true);
+    const inicial = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    expect(esDemostracionLimpia(inicial, 'b1c3', ['g1f3', 'b1c3'])).toBe(true);
+    expect(esDemostracionLimpia(inicial, 'e2e4', ['g1f3', 'b1c3'])).toBe(false);
   });
 });
 

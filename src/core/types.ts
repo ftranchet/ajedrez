@@ -291,7 +291,9 @@ export type PatternKey =
   | 'final-rey-peon'
   | 'final-lucena'
   | 'final-philidor'
-  | 'final-cuadrado';
+  | 'final-cuadrado'
+  | 'final-torre'
+  | 'final-dama';
 
 /**
  * Elemento del catálogo del currículo base (E6): un patrón táctico/mate para

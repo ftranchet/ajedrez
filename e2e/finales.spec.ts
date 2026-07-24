@@ -39,7 +39,7 @@ test('finales: promocionar contra Stockfish registra una demostración limpia', 
           fen: '8/P7/8/8/8/8/4k3/7K w - - 0 1', solucion: [], resultadoEsperado: 'gana', ladoUsuario: 'w',
         });
         tx.objectStore('curriculumDatasetMeta').put({
-          id: 'catalogo', version: 'curriculo-patrones-finales-v2', seededAt: new Date().toISOString(),
+          id: 'catalogo', version: 'curriculo-patrones-finales-v3', seededAt: new Date().toISOString(),
         });
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);

@@ -10,11 +10,31 @@
     "ladoUsuario": "w"
   },
   {
+    "id": "final-oposicion-2",
+    "tipo": "final",
+    "patternKey": "final-rey-peon",
+    "nombre": "Oposición: el rey adelante del peón",
+    "fen": "3k4/8/3K4/3P4/8/8/8/8 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
+  },
+  {
     "id": "final-cuadrado-1",
     "tipo": "final",
     "patternKey": "final-cuadrado",
     "nombre": "Regla del cuadrado",
     "fen": "7k/8/8/8/2P5/8/8/4K3 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
+  },
+  {
+    "id": "final-cuadrado-2",
+    "tipo": "final",
+    "patternKey": "final-cuadrado",
+    "nombre": "Regla del cuadrado: el peón corre solo",
+    "fen": "7k/8/8/8/P7/8/8/1K6 w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
     "ladoUsuario": "w"
@@ -38,5 +58,25 @@
     "solucion": [],
     "resultadoEsperado": "tablas",
     "ladoUsuario": "b"
+  },
+  {
+    "id": "final-torre-1",
+    "tipo": "final",
+    "patternKey": "final-torre",
+    "nombre": "Mate de rey y torre contra rey",
+    "fen": "8/8/8/4k3/8/8/8/4K2R w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
+  },
+  {
+    "id": "final-dama-1",
+    "tipo": "final",
+    "patternKey": "final-dama",
+    "nombre": "Mate de rey y dama contra rey",
+    "fen": "8/8/8/4k3/8/8/8/3QK3 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w"
   }
 ]
