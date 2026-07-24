@@ -1,6 +1,6 @@
-// Historial del Triage de reloj (E9, RF-9.2/9.3): decisión "¿pide cálculo o
-// alcanza?", si fue correcta y cuánto tardó en decidir (la latencia es lo que
-// el ejercicio entrena).
+// Historial del ejercicio de criterio "¿Calcular o ya alcanza?" (E9, RF-9.2):
+// la decisión "¿pide cálculo o alcanza?" y si fue correcta. (El identificador
+// interno sigue siendo `triage` para no migrar los registros ya guardados.)
 import type { TriageAttempt } from '../../core/types';
 import { db, type ElomaxDB } from './db';
 

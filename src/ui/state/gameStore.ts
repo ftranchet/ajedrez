@@ -45,8 +45,6 @@ interface GameState {
 }
 
 const chess = new Chess();
-let moveTimesMs: number[] = [];
-let turnStartedAt = 0;
 
 function levelById(id: string): EngineLevel {
   return ENGINE_LEVELS.find((l) => l.id === id) ?? ENGINE_LEVELS[0];
@@ -95,7 +93,7 @@ export const useGameStore = create<GameState>((set, get) => {
     const record = buildGameRecord({
       pgn: chess.pgn(),
       resultado,
-      tiemposPorJugadaMs: moveTimesMs,
+      tiemposPorJugadaMs: [],
       fuente: 'local',
       ritmo: 'sin-reloj',
       jugadorColor: playerColor,
@@ -106,7 +104,6 @@ export const useGameStore = create<GameState>((set, get) => {
 
   async function engineTurn() {
     snapshot({ thinking: true });
-    turnStartedAt = performance.now();
     try {
       const uci = await engine.bestMove(chess.fen(), levelById(get().levelId));
       // La partida pudo terminar mientras el motor pensaba (p. ej. el usuario
@@ -117,8 +114,6 @@ export const useGameStore = create<GameState>((set, get) => {
       const to = uci.slice(2, 4) as Square;
       const promotion = uci.slice(4, 5) || undefined;
       chess.move({ from, to, promotion });
-      moveTimesMs.push(Math.round(performance.now() - turnStartedAt));
-      turnStartedAt = performance.now();
       if (isOver()) {
         await finish();
       } else {
@@ -149,7 +144,6 @@ export const useGameStore = create<GameState>((set, get) => {
     async start(levelId, color) {
       const playerColor: Color = color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
       chess.reset();
-      moveTimesMs = [];
       set({ phase: 'loading', levelId, playerColor, engineError: false, resultado: null, endReason: null, saved: false, lastMove: null, pendingPromotion: null });
       try {
         await engine.init();
@@ -158,7 +152,6 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
       snapshot({ phase: 'playing', thinking: false });
-      turnStartedAt = performance.now();
       if (playerColor === 'b') {
         await engineTurn();
       }
@@ -178,8 +171,6 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
       chess.move({ from, to, promotion });
-      moveTimesMs.push(Math.round(performance.now() - turnStartedAt));
-      turnStartedAt = performance.now();
       snapshot({ lastMove: [from, to], pendingPromotion: null });
       if (isOver()) {
         await finish();
@@ -199,7 +190,6 @@ export const useGameStore = create<GameState>((set, get) => {
 
     reset() {
       chess.reset();
-      moveTimesMs = [];
       set({
         phase: 'setup',
         fen: chess.fen(),

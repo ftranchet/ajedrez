@@ -18,6 +18,7 @@ import { SectionHeading } from '../components/SectionHeading';
 import { t } from '../i18n/es';
 
 const REPO_URL = 'https://github.com/ftranchet/ajedrez';
+const AUTOR_URL = 'https://www.linkedin.com/in/ftranchet/';
 
 export function AjustesScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -90,6 +91,18 @@ export function AjustesScreen() {
             >
               {t.ajustes.acercaRepo}
             </a>
+            <p className="m-0 mt-1 text-sm text-tertiary">
+              {t.ajustes.acercaAutorPre}{' '}
+              <a
+                href={AUTOR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-accent underline-offset-4 hover:underline"
+              >
+                {t.ajustes.acercaAutorNombre}
+              </a>{' '}
+              {t.ajustes.acercaAutorSufijo}
+            </p>
           </section>
         </>
       )}

@@ -1,10 +1,9 @@
-// E2E del bloque de Triage de reloj (E9, RF-9.2/9.3): cuando la dieta
-// detecta una fuga de tiempo en las partidas recientes del usuario, la
-// sesión agrega un bloque de decisión rápida ("¿pide cálculo o alcanza?")
-// entre el currículo y el Radar. La detección de la fuga en sí ya está
-// probada exhaustivamente en src/core/triage.test.ts y
-// src/core/prescriptor.test.ts (mismo fixture de tiempos usado acá) — este
-// spec solo verifica que la UI está bien conectada a esa lógica.
+// E2E del bloque "¿Calcular o ya alcanza?" (E9, RF-9.2): cuando la dieta
+// detecta una fuga táctica en las partidas recientes del usuario (errores
+// reales, no un cronómetro invisible), la sesión agrega un bloque de decisión
+// ("¿pide cálculo o alcanza?") entre el currículo y el Radar. La detección de
+// la fuga en sí ya está probada en src/core/prescriptor.test.ts — este spec
+// solo verifica que la UI está bien conectada a esa lógica.
 import { test, type Page } from '@playwright/test';
 import { RADAR_DATASET_VERSION } from '../src/services/puzzles/seedData';
 import { seedCurriculumItems } from '../src/services/puzzles/curriculumSeedData';
@@ -92,45 +91,32 @@ async function seedProfileDiagnosticado(page: Page) {
   );
 }
 
-// Mismo fixture que core/prescriptor.test.ts ("suma Triage cuando el perfil
-// de tiempo muestra una fuga"): el usuario (blancas) juega ply0 en 50ms
-// (grave) y ply2 en 500ms; mediana propia 275, así que ply0 es "rápida"
-// (≤0.5×mediana) y salió grave → infragasto = 1, por encima del umbral 0.35.
-async function seedPartidaConFugaDeTiempo(page: Page) {
+// Fuga táctica: dos tarjetas de error de PARTIDA, categoría táctica, creadas
+// hoy (dentro de la ventana de 30 días) → 100% tácticas > umbral 0.35, así que
+// la dieta activa el bloque de criterio. Se crean NO vencidas (fsrs.due en el
+// futuro) para que no aparezca además la Cola y el bloque de criterio quede
+// primero.
+async function seedFugaTacticaDePartida(page: Page) {
   await page.evaluate(() => {
     return new Promise<void>((resolve, reject) => {
       const req = indexedDB.open('elomax');
       req.onsuccess = () => {
         const db = req.result;
-        const tx = db.transaction('games', 'readwrite');
-        const jugada = (ply: number, ladoQueMueve: 'w' | 'b', clasificacion: string) => ({
-          ply,
-          san: 'e4',
-          fenAntes: 'startpos',
-          ladoQueMueve,
-          jugadaUsuario: 'e2e4',
-          jugadaMotor: 'e2e4',
-          cpAntes: 0,
-          cpDespues: 0,
-          cpPerdidos: 0,
-          clasificacion,
+        const tx = db.transaction('errorCards', 'readwrite');
+        const ahora = new Date().toISOString();
+        const card = (id: string) => ({
+          id,
+          fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          ladoAMover: 'w',
+          jugadaUsuario: 'a2a3',
+          jugadaCorrecta: 'e2e4',
+          categoria: 'tactico',
+          origen: 'partida',
+          fsrs: { due: '2027-01-01T00:00:00.000Z', stability: 5, difficulty: 5, elapsedDays: 0, scheduledDays: 0, reps: 1, lapses: 0, learningSteps: 0, state: 'review', lastReview: ahora },
+          creadaEn: ahora,
         });
-        tx.objectStore('games').put({
-          id: 'e2e-triage-partida',
-          pgn: '1. e4 e5 2. Nf3 Nc6 *',
-          fuente: 'local',
-          ritmo: 'sin-reloj',
-          resultado: '*',
-          tiemposPorJugadaMs: [50, 500, 500, 500],
-          analizada: true,
-          fecha: '2026-01-01T00:00:00.000Z',
-          jugadorColor: 'w',
-          analisis: {
-            jugadas: [jugada(0, 'w', 'grave'), jugada(1, 'b', 'buena'), jugada(2, 'w', 'buena'), jugada(3, 'b', 'buena')],
-            comparacionEvaluaciones: [],
-            analizadaEn: '2026-01-01',
-          },
-        });
+        tx.objectStore('errorCards').put(card('e2e-fuga-1'));
+        tx.objectStore('errorCards').put(card('e2e-fuga-2'));
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       };
@@ -139,18 +125,18 @@ async function seedPartidaConFugaDeTiempo(page: Page) {
   });
 }
 
-test('Triage de reloj: una fuga de tiempo agrega el bloque de decisión antes del Radar', async ({ page }) => {
+test('¿Calcular o ya alcanza?: una fuga táctica agrega el bloque de decisión antes del Radar', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await seedRadarFixture(page);
   await seedCurriculumAutomatizado(page);
   await seedProfileDiagnosticado(page);
-  await seedPartidaConFugaDeTiempo(page);
+  await seedFugaTacticaDePartida(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
   // El resumen de "Tu sesión de hoy" ya anticipa el bloque (RF-11.1).
-  await page.getByText('Triage de reloj').waitFor();
+  await page.getByText('¿Calcular o ya alcanza?').waitFor();
 
   await page.getByRole('button', { name: 'Empezar sesión' }).click();
   await page.getByText('Posición 1 de 1').waitFor({ timeout: 15_000 });

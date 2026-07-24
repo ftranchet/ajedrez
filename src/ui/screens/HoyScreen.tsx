@@ -178,7 +178,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       minutos: Math.max(1, Math.round(curriculo * MIN_POR_CURRICULO)),
     });
   }
-  if (s.dieta.triageActivo) {
+  if (s.dieta.criterioActivo) {
     bloques.push({
       tipo: 'triage',
       texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),

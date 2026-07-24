@@ -13,7 +13,7 @@ import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
 import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
 import { detectOverfitting } from '../../core/overfitting';
-import { informeFugasTiempo } from '../../core/triage';
+import { resumenCriterio } from '../../core/triage';
 import { hitosLogrados } from '../../core/milestones';
 import { resumenCompromiso, resumenStoyko } from '../../core/calculoSummary';
 import { currentN1Phase } from '../../core/n1Experiment';
@@ -378,7 +378,7 @@ function ResumenView({
           <ActivityPanel records={sessions.data} profile={profile.data!} />
         </PanelResourceSlot>
         <PanelResourceSlot resources={[games, triageAttempts]}>
-          <TriageTimeReportPanel games={games.data} attempts={triageAttempts.data} />
+          <CriterioReportPanel attempts={triageAttempts.data} />
         </PanelResourceSlot>
         <PanelResourceSlot resources={[radarAttempts]}>
           <RadarSummary attempts={radarAttempts.data} />
@@ -980,16 +980,14 @@ function DobleSolucionSummary({ attempts }: { attempts: DobleSolucionAttempt[] |
   );
 }
 
-// Triage de reloj (E9, RF-9.3): informe mensual de fugas de tiempo integrado al
-// Panel. Lee el perfil de gestión del reloj de las partidas analizadas del
-// último mes (RF-9.1) y la práctica de decisión "¿pide cálculo o alcanza?"
-// (RF-9.2); resalta como "fuga" solo cuando supera el umbral que el Prescriptor
-// usa para sumar el bloque a la sesión.
-function TriageTimeReportPanel({ games, attempts }: { games: GameRecord[] | null; attempts: TriageAttempt[] | null }) {
-  if (games === null || attempts === null) return null;
-  const informe = informeFugasTiempo(games, attempts);
-  const { perfil, ejercicios, infragastoEsFuga, sobregastoEsFuga } = informe;
-  if (!perfil && !ejercicios) {
+// "¿Calcular o ya alcanza?" (E9, RF-9.2/9.3): resumen mensual de la práctica de
+// criterio —qué tan bien reconocés cuándo una posición pide cálculo profundo y
+// cuándo alcanza con una jugada sólida—. Sin nada de reloj: el ejercicio se
+// dispara por fuga táctica, no por tiempos (que ya no se miden).
+function CriterioReportPanel({ attempts }: { attempts: TriageAttempt[] | null }) {
+  if (attempts === null) return null;
+  const resumen = resumenCriterio(attempts);
+  if (!resumen) {
     return (
       <section className="rounded-lg border border-subtle bg-surface p-4">
         <SectionHeading className="mb-2">{t.panel.triageInformeTitulo}</SectionHeading>
@@ -997,41 +995,18 @@ function TriageTimeReportPanel({ games, attempts }: { games: GameRecord[] | null
       </section>
     );
   }
-  const hayFuga = infragastoEsFuga || sobregastoEsFuga;
   return (
-    <section className={`flex flex-col gap-2 rounded-lg border p-4 tabular-nums ${hayFuga ? 'border-accent/40 bg-accent-subtle' : 'border-subtle bg-surface'}`}>
+    <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4 tabular-nums">
       <div>
         <SectionHeading>{t.panel.triageInformeTitulo}</SectionHeading>
         <p className="m-0 mt-1 text-xs text-secondary">{t.panel.triageInformePeriodo}</p>
       </div>
-      {perfil ? (
-        <div className="flex flex-col gap-1 text-sm">
-          <p className={`m-0 ${infragastoEsFuga ? 'font-medium text-primary' : 'text-secondary'}`}>
-            {t.panel.triageInfragasto.replace('{porcentaje}', String(Math.round(perfil.infragasto * 100)))}
-            {infragastoEsFuga ? ` · ${t.panel.triageFugaEtiqueta}` : ''}
-          </p>
-          <p className={`m-0 ${sobregastoEsFuga ? 'font-medium text-primary' : 'text-secondary'}`}>
-            {t.panel.triageSobregasto.replace('{porcentaje}', String(Math.round(perfil.sobregasto * 100)))}
-            {sobregastoEsFuga ? ` · ${t.panel.triageFugaEtiqueta}` : ''}
-          </p>
-          <p className="m-0 text-xs text-tertiary">{t.panel.triageJugadasConsideradas.replace('{n}', String(perfil.jugadasConsideradas))}</p>
-        </div>
-      ) : (
-        <p className="m-0 text-sm text-secondary">{t.panel.triageInformeSinPerfil}</p>
-      )}
-      {ejercicios ? (
-        <div className="flex flex-col gap-1 text-sm text-secondary">
-          <p className="m-0">
-            {t.panel.triageEjercicios
-              .replace('{correctos}', String(ejercicios.correctos))
-              .replace('{total}', String(ejercicios.total))
-              .replace('{porcentaje}', String(Math.round(ejercicios.precision * 100)))}
-          </p>
-          <p className="m-0 text-xs text-tertiary">
-            {t.panel.triageEjerciciosLatencia.replace('{segundos}', formatDecimal(ejercicios.latenciaMedianaMs / 1000, 1))}
-          </p>
-        </div>
-      ) : null}
+      <p className="m-0 text-sm text-secondary">
+        {t.panel.triageEjercicios
+          .replace('{correctos}', String(resumen.correctos))
+          .replace('{total}', String(resumen.total))
+          .replace('{porcentaje}', String(Math.round(resumen.precision * 100)))}
+      </p>
     </section>
   );
 }

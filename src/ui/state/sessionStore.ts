@@ -41,7 +41,6 @@ import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
-import { gameRepo } from '../../services/storage/gameRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { computeDests, sanDeLinea } from './chessBoardUtils';
 
@@ -106,8 +105,9 @@ interface SessionState {
   curriculumUltimaLimpia: boolean | null;
   curriculumJugadaCorrecta: string | null;
 
-  // Triage de reloj (E9): bloque agregado solo si la dieta detecta una fuga
-  // de tiempo (RF-9.2/9.3), entre el currículo y el Radar.
+  // "¿Calcular o ya alcanza?" (E9, RF-9.2): bloque de criterio agregado solo
+  // si la dieta detecta una fuga táctica, entre el currículo y el Radar.
+  // (El identificador interno sigue siendo `triage` para no migrar registros.)
   triageQueue: RadarItem[];
   triageIndex: number;
   triageSubPhase: TriageSubPhase;
@@ -362,7 +362,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
   // en vez de dispararla sin esperar.
   function beginTriage(): Promise<void> | void {
     const s = get();
-    if (!s.dieta.triageActivo || s.radarPool.length === 0) {
+    if (!s.dieta.criterioActivo || s.radarPool.length === 0) {
       return avanzarOTerminar(beginRadar);
     }
     // Fisher-Yates parcial: sort(() => random - 0.5) no baraja uniforme.
@@ -491,11 +491,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
 
           await curriculumItemRepo.ensureSeeded();
-          const [allCards, curriculumItems, curriculumProgressList, games, sessions] = await Promise.all([
+          const [allCards, curriculumItems, curriculumProgressList, sessions] = await Promise.all([
             errorCardRepo.list(),
             curriculumItemRepo.list(),
             curriculumProgressRepo.list(),
-            gameRepo.list(),
             sessionRepo.list(),
           ]);
           if (generation !== summaryGeneration) return;
@@ -504,7 +503,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             dueCount: dueErrorCards(allCards).length,
             curriculumDueCount: dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron').length,
             profile,
-            dieta: dietaPorBanda(profile.bandaElo, allCards, games),
+            dieta: dietaPorBanda(profile.bandaElo, allCards),
             sessions,
             summaryStatus: 'ready',
           });
@@ -524,17 +523,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
         await sessionWriteQueue;
         await sessionRepo.abandonInProgress();
         await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
-        const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile, games] = await Promise.all([
+        const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile] = await Promise.all([
           errorCardRepo.list(),
           radarItemRepo.list(),
           radarProgressRepo.get(),
           curriculumItemRepo.list(),
           curriculumProgressRepo.list(),
           profileRepo.get(),
-          gameRepo.list(),
         ]);
         const due = dueErrorCards(allCards);
-        const dieta = dietaPorBanda(profile.bandaElo, allCards, games);
+        const dieta = dietaPorBanda(profile.bandaElo, allCards);
         // La Cola vencida conserva prioridad absoluta. Solo las tarjetas de
         // partidas propias que no se sirvieron ahí pueden reaparecer en Radar.
         const ownErrorItems = ownErrorRadarItems(allCards, due.map((card) => card.id));
@@ -548,7 +546,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         const bloquesRecord = [
           { tipo: 'cola' as const, planificados: due.length },
           { tipo: 'curriculo' as const, planificados: curriculumDue },
-          { tipo: 'triage' as const, planificados: dieta.triageActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
+          { tipo: 'triage' as const, planificados: dieta.criterioActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
           { tipo: 'radar' as const, planificados: pool.length > 0 ? dieta.radarCount : 0 },
         ];
         const sessionRecord = startSessionRecord(

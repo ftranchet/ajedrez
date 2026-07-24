@@ -216,8 +216,8 @@ export class ElomaxDB extends Dexie {
     });
 
     // v11 — Fase 4 (E7/E9): el intento de Stoyko (candidatas, evaluaciones,
-    // tiempo, confianza) y el de Triage de reloj (decisión, si fue correcta,
-    // latencia) pasan a persistirse — antes se evaluaban en memoria y se
+    // tiempo, confianza) y el del ejercicio de criterio (decisión, si fue
+    // correcta) pasan a persistirse — antes se evaluaban en memoria y se
     // perdían (`inicioMs` de Stoyko ni siquiera se leía). Dos tablas nuevas y
     // chicas, incluidas en la exportación (RF-14.1). Puramente aditiva.
     this.version(11).stores({
