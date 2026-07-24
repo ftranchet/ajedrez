@@ -5,6 +5,7 @@
 // currículo se sirve proactivamente hasta demostrar la técnica tres veces
 // seguidas y espaciadas ("automatización"), después de lo cual deja de
 // aparecer en la sesión.
+import { Chess } from 'chess.js';
 import type { CurriculumItem, CurriculumProgress, PatternKey } from './types';
 import { isDue, newFsrsState, reviewFsrsState } from './scheduler';
 
@@ -71,6 +72,35 @@ export function nivelCiegas(progress: CurriculumProgress | undefined): NivelCieg
   const tasaAcierto = (progress.fsrs.reps - progress.fsrs.lapses) / progress.fsrs.reps;
   if (tasaAcierto <= UMBRAL_CIEGAS) return 'normal';
   return progress.demostracionesLimpias >= 2 ? 'coordenadas' : 'fantasma';
+}
+
+function uciAObjeto(uci: string) {
+  return { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci.slice(4, 5) || undefined };
+}
+
+/**
+ * ¿La jugada del usuario demuestra el patrón? (RF-6.1). Se juzga por el
+ * resultado, no por la casilla exacta registrada: un patrón cuya solución
+ * canónica es mate se demuestra con cualquier mate legal —hay posiciones con
+ * varios mates en 1 (p. ej. "Mate de dama y rey" admite Dg7#, Dg8#, Dh1# y
+ * Dh2#)— y rechazar un mate válido sería un falso error que además cortaría la
+ * racha hacia la automatización. Para el resto de los patrones (motivos
+ * tácticos) se exige coincidir con alguna jugada registrada en la solución.
+ */
+export function esDemostracionLimpia(fen: string, jugadaUci: string, solucion: string[]): boolean {
+  if (solucion.includes(jugadaUci)) return true;
+  const canonica = solucion[0];
+  if (!canonica) return false;
+  try {
+    const referencia = new Chess(fen);
+    referencia.move(uciAObjeto(canonica));
+    if (!referencia.isCheckmate()) return false;
+    const delUsuario = new Chess(fen);
+    delUsuario.move(uciAObjeto(jugadaUci));
+    return delUsuario.isCheckmate();
+  } catch {
+    return false;
+  }
 }
 
 /**

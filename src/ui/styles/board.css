@@ -68,10 +68,13 @@ cg-board {
   animation: board-error-settle 180ms ease-out both;
 }
 
-/* La flecha automática sigue la jugada que efectivamente fue aceptada. Su
-   primera capa oscura es un halo de contraste; la segunda conserva success. */
+/* La flecha automática sigue la jugada que efectivamente fue aceptada. Es una
+   sola flecha; el halo de contraste contra el tablero lo da un drop-shadow en
+   color base (antes era una segunda flecha superpuesta que dibujaba una
+   segunda punta y se veía mal). */
 .cg-wrap[data-feedback='success'] .cg-shapes {
   opacity: 1;
+  filter: drop-shadow(0 0 2px var(--color-base)) drop-shadow(0 0 1px var(--color-base));
 }
 
 .cg-wrap[data-feedback='success'] .cg-shapes line {

@@ -22,7 +22,7 @@ import {
   selectNextRadarItem,
   type RadarSelectionState,
 } from '../../core/radar';
-import { dueCurriculumItems, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
+import { dueCurriculumItems, esDemostracionLimpia, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
 import { DEFAULT_PROFILE, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
@@ -681,7 +681,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
       const jugadaUsuario = from + to + (promo ?? '');
       const item = s.curriculumQueue[s.curriculumIndex];
-      const limpia = jugadaUsuario === item.solucion[0];
+      const limpia = esDemostracionLimpia(item.fen, jugadaUsuario, item.solucion);
       chess.move({ from, to, promotion: promo });
 
       const progresoPrevio = s.curriculumProgressById.get(item.id) ?? newCurriculumProgress(item.id);

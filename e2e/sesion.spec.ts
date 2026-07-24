@@ -201,11 +201,11 @@ test.describe('sesión simple: Radar', () => {
     await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
     await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'success');
     await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback-move', 'd5-h5');
-    await expect(page.locator('.cg-shapes line')).toHaveCount(2);
+    // Una sola flecha de acierto (el halo de contraste es un filtro CSS, no
+    // una segunda flecha superpuesta).
+    await expect(page.locator('.cg-shapes line')).toHaveCount(1);
     const successArrow = page.locator('.cg-shapes line[stroke="var(--color-success)"]');
-    const contrastHalo = page.locator('.cg-shapes line[stroke="var(--color-base)"]');
     await expect(successArrow).toHaveCount(1);
-    await expect(contrastHalo).toHaveCount(1);
     expect(await successArrow.evaluate((element) => getComputedStyle(element).animationDuration)).toBe('0.18s');
     expect(await successArrow.evaluate((element) => getComputedStyle(element).stroke)).toBe('rgb(127, 166, 106)');
     await expect(page.getByRole('button', { name: 'Siguiente' })).toBeFocused();

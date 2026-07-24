@@ -81,12 +81,6 @@ export function Board(props: BoardProps) {
       opacity: 1,
       lineWidth: 8,
     };
-    api.current.state.drawable.brushes.feedbackSuccessHalo = {
-      key: 'feedback-success-halo',
-      color: 'var(--color-base)',
-      opacity: 0.94,
-      lineWidth: 14,
-    };
     return () => {
       api.current?.destroy();
       api.current = null;
@@ -122,12 +116,12 @@ export function Board(props: BoardProps) {
       draggable: { enabled: true },
       selectable: { enabled: true }, // toque-toque (RF-1.1)
     });
+    // Una sola flecha limpia: el halo de contraste lo da un filtro CSS
+    // (board.css), no una segunda flecha superpuesta —que dibujaba una segunda
+    // punta y se veía mal (bug reportado)—.
     const successMove = props.feedback?.kind === 'success' ? props.feedback.move : null;
     api.current?.setAutoShapes(successMove
-      ? [
-          { orig: successMove[0] as Key, dest: successMove[1] as Key, brush: 'feedbackSuccessHalo' },
-          { orig: successMove[0] as Key, dest: successMove[1] as Key, brush: 'feedbackSuccess' },
-        ]
+      ? [{ orig: successMove[0] as Key, dest: successMove[1] as Key, brush: 'feedbackSuccess' }]
       : []);
   }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor, props.feedback]);
 

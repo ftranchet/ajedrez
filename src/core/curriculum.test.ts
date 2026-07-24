@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CurriculumItem, CurriculumProgress } from './types';
-import { dueCurriculumItems, interleaveByPattern, isAutomatizado, newCurriculumProgress, nivelCiegas, reviewCurriculumProgress } from './curriculum';
+import { dueCurriculumItems, esDemostracionLimpia, interleaveByPattern, isAutomatizado, newCurriculumProgress, nivelCiegas, reviewCurriculumProgress } from './curriculum';
 
 function item(id: string, patternKey: CurriculumItem['patternKey'] = 'clavada'): CurriculumItem {
   return { id, tipo: 'patron', patternKey, nombre: id, fen: 'startpos', solucion: ['e2e4'] };
@@ -103,6 +103,40 @@ describe('nivelCiegas', () => {
 
   it('por encima de 80% de acierto, con 2+ demostraciones limpias seguidas (camino a automatizar): solo coordenadas', () => {
     expect(nivelCiegas(progresoCon(6, 1, 2))).toBe('coordenadas');
+  });
+});
+
+describe('esDemostracionLimpia', () => {
+  // "Mate de dama y rey": Dg7#, Dg8#, Dh1# y Dh2# son todos mate en 1. La
+  // solución registrada es g1g7, pero rechazar los otros mates sería un falso
+  // error (bug reportado: "hay un ejercicio que está mal").
+  const mateDamaRey = '7k/5K2/8/8/8/8/8/6Q1 w - - 0 1';
+
+  it('acepta la jugada registrada', () => {
+    expect(esDemostracionLimpia(mateDamaRey, 'g1g7', ['g1g7'])).toBe(true);
+  });
+
+  it('acepta cualquier otro mate legal cuando la solución canónica es mate', () => {
+    expect(esDemostracionLimpia(mateDamaRey, 'g1g8', ['g1g7'])).toBe(true);
+    expect(esDemostracionLimpia(mateDamaRey, 'g1h1', ['g1g7'])).toBe(true);
+    expect(esDemostracionLimpia(mateDamaRey, 'g1h2', ['g1g7'])).toBe(true);
+  });
+
+  it('rechaza una jugada que no da mate en un patrón de mate', () => {
+    expect(esDemostracionLimpia(mateDamaRey, 'g1a1', ['g1g7'])).toBe(false);
+  });
+
+  it('en un motivo táctico (no mate) exige la jugada registrada, sin colar otro jaque', () => {
+    // Rayos X: Re1+ es el skewer; Ra5+ es otro jaque legal pero no demuestra
+    // el motivo (no gana la dama), así que no debe contar como limpia.
+    const rayosX = '4q3/8/8/4k3/8/8/8/R5K1 w - - 0 1';
+    expect(esDemostracionLimpia(rayosX, 'a1e1', ['a1e1'])).toBe(true);
+    expect(esDemostracionLimpia(rayosX, 'a1a5', ['a1e1'])).toBe(false);
+  });
+
+  it('acepta cualquiera de las jugadas registradas cuando hay varias', () => {
+    const descubierta = '4k3/8/8/8/8/4R3/4N3/4K3 w - - 0 1';
+    expect(esDemostracionLimpia(descubierta, 'e2d4', ['e2c3', 'e2d4', 'e2f4'])).toBe(true);
   });
 });
 

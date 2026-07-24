@@ -115,5 +115,5 @@ test('doble solución: conformarse con la familiar acierta pero avisa que había
   // La flecha valida lo que el usuario encontró (f1→b5), no sustituye esa
   // respuesta aceptada por la variante principal d5→c6.
   await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback-move', 'f1-b5');
-  await expect(page.locator('.cg-shapes line')).toHaveCount(2);
+  await expect(page.locator('.cg-shapes line')).toHaveCount(1);
 });
