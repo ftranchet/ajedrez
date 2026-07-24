@@ -533,7 +533,7 @@ function NextStepPanel({ games, profile, onView }: { games: GameRecord[]; profil
       <section className="flex min-h-36 flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
         <SectionHeading>{t.panel.proximoPasoTitulo}</SectionHeading>
         <p className="m-0 text-primary">{t.panel.proximoPasoDiagnostico}</p>
-        <a href="#/hoy" className="btn-primary text-center no-underline">{t.panel.irAHoy}</a>
+        <a href="#/hoy" className="btn-primary text-center no-underline">{t.panel.irDiagnostico}</a>
       </section>
     );
   }

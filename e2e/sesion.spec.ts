@@ -195,7 +195,7 @@ test.describe('sesión simple: Radar', () => {
     await page.getByRole('button', { name: 'No, mantener esta' }).click();
 
     // Con Math.random forzado a 0, shouldSampleConfidence() da true siempre.
-    await page.getByText('¿Qué tan seguro estás').waitFor({ timeout: 10_000 });
+    await page.getByText('¿Cuánta confianza tenés en tu jugada?').waitFor({ timeout: 10_000 });
     // La app ya conoce el resultado internamente, pero no debe filtrarlo
     // antes de que el usuario declare confianza.
     await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'none');

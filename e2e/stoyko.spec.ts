@@ -57,7 +57,7 @@ test('Stoyko semanal: anotar la jugada del motor entre las candidatas acierta y 
   await page.getByText('f1c4').waitFor();
 
   await page.getByRole('button', { name: 'Terminar análisis' }).click();
-  await page.getByText('¿Qué tan segura/o estás de haber tenido la mejor jugada').waitFor({ timeout: 10_000 });
+  await page.getByText('¿Cuánta confianza tenés en haber incluido la mejor jugada').waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Confirmar' }).click();
 
   await page.getByText('La tenías entre tus candidatas').waitFor({ timeout: 10_000 });
