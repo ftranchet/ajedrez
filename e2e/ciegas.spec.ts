@@ -77,7 +77,7 @@ test('modificador a ciegas: un patrón con acierto sostenido se sirve con piezas
 
   await page.getByRole('button', { name: 'Empezar sesión' }).click();
   await page.getByText('Patrón 1 de 1').waitFor({ timeout: 15_000 });
-  await page.getByText('Piezas fantasma').waitFor();
+  await page.getByText('Piezas atenuadas a propósito').waitFor();
 
   const board = page.locator('cg-board');
   await board.waitFor();

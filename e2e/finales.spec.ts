@@ -74,3 +74,33 @@ test('finales: promocionar contra Stockfish registra una demostración limpia', 
   );
   expect(progress).toBe(1);
 });
+
+// RF-6.2: los finales dejan de estar "descolgados" en Jugar — Hoy los surge con
+// un enlace directo cuando hay técnicas pendientes.
+test('finales: Hoy los surge con un enlace directo al modo finales', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  await page.evaluate(() =>
+    new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('elomax');
+      request.onsuccess = () => {
+        const tx = request.result.transaction('profile', 'readwrite');
+        tx.objectStore('profile').put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: new Date().toISOString() });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    }),
+  );
+  await page.reload();
+  await page.getByText('Tu sesión de hoy').waitFor();
+
+  // La tarjeta de finales aparece (hay finales nuevos, todos pendientes).
+  await page.getByRole('heading', { name: 'Finales teóricos' }).waitFor();
+  await page.getByRole('link', { name: 'Practicar finales' }).click();
+
+  // El enlace entra directo al modo finales (deep-link #/jugar/finales).
+  await expect(page).toHaveURL(/#\/jugar\/finales$/);
+  await page.getByRole('radio', { name: 'Finales teóricos' }).waitFor();
+  await expect(page.getByText('Mate de rey y torre contra rey')).toBeVisible();
+});

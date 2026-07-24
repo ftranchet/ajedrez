@@ -13,13 +13,32 @@ import type { Color } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
 import { t } from '../i18n/es';
 
+// La sub-ruta #/jugar/finales entra directo al modo finales (deep-link desde
+// Hoy), y elegir un modo actualiza el hash para que el botón "atrás" funcione.
+function modoDesdeHash(): 'partida' | 'finales' {
+  return window.location.hash.includes('/finales') ? 'finales' : 'partida';
+}
+
 export function JugarScreen() {
   const diagnosticoPhase = useDiagnosticoStore((state) => state.phase);
-  const [modo, setModo] = useState<'partida' | 'finales'>('partida');
+  const [modo, setModo] = useState<'partida' | 'finales'>(modoDesdeHash);
+
+  useEffect(() => {
+    const onHash = () => setModo(modoDesdeHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  function irA(next: 'partida' | 'finales') {
+    const target = next === 'finales' ? '#/jugar/finales' : '#/jugar';
+    if (window.location.hash !== target) window.history.pushState(null, '', target);
+    setModo(next);
+  }
+
   if (diagnosticoPhase !== 'inactivo' && diagnosticoPhase !== 'resultado') return <DiagnosticoEnCurso />;
   return modo === 'finales'
-    ? <FinalesScreen onPartida={() => setModo('partida')} />
-    : <PartidaScreen onFinales={() => setModo('finales')} />;
+    ? <FinalesScreen onPartida={() => irA('partida')} />
+    : <PartidaScreen onFinales={() => irA('finales')} />;
 }
 
 function DiagnosticoEnCurso() {

@@ -134,8 +134,10 @@ cg-board {
 
 /* Data attributes mantienen estable el className que Chessground administra
    (orientation/manipulable) cuando cambian feedback o dificultad a ciegas. */
+/* Fantasma: atenuadas pero legibles —40%, no un 25% casi invisible que se
+   leía como un glitch de render—. */
 .cg-wrap[data-blind-mode='fantasma'] piece {
-  opacity: 0.25;
+  opacity: 0.4;
 }
 
 .cg-wrap[data-blind-mode='coordenadas'] piece {

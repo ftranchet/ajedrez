@@ -19,7 +19,10 @@ import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
-import { nivelCiegas } from '../../core/curriculum';
+import { dueCurriculumItems, nivelCiegas } from '../../core/curriculum';
+import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
+import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
+import { readBlindTrainingEnabled } from '../trainingPrefs';
 import { normalizeSensoryPreferences } from '../../core/sensory';
 import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
 import { useSlowLoading } from '../hooks/useSlowLoading';
@@ -261,6 +264,8 @@ function Portada() {
 
       <PartidaLentaCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
 
+      <FinalesHoyCard />
+
       <div className="mt-2 flex flex-col gap-1 border-t border-subtle pt-4">
         <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
         <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
@@ -309,6 +314,36 @@ function PartidaLentaCard({ fugaTactica }: { fugaTactica: boolean }) {
           <a href="#/calculo" className="font-semibold text-accent underline-offset-4 hover:underline">{t.hoy.partidaLentaIrCalculo}</a>
         </p>
       )}
+    </section>
+  );
+}
+
+// Finales teóricos (RF-6.2) en Hoy: dejan de estar "descolgados" en un toggle
+// de Jugar. Cuando hay técnicas de final pendientes (nuevas o no automatizadas),
+// una tarjeta secundaria las surge con enlace directo al modo finales. Se juegan
+// enteras contra el motor, por eso no entran en la sesión de un solo movimiento.
+function FinalesHoyCard() {
+  const [pendientes, setPendientes] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      await curriculumItemRepo.ensureSeeded();
+      const [items, progress] = await Promise.all([curriculumItemRepo.list(), curriculumProgressRepo.list()]);
+      const progressById = new Map(progress.map((p) => [p.id, p] as const));
+      const finales = items.filter((item) => item.tipo === 'final');
+      if (alive) setPendientes(dueCurriculumItems(finales, progressById).length);
+    })();
+    return () => { alive = false; };
+  }, []);
+  if (pendientes === null || pendientes === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-info/40 bg-surface p-4">
+      <div>
+        <SectionHeading>{t.hoy.finalesTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-sm text-secondary">{t.hoy.finalesTexto.replace('{n}', String(pendientes))}</p>
+      </div>
+      <a href="#/jugar/finales" className="btn-secondary text-center no-underline">{t.hoy.finalesIr}</a>
     </section>
   );
 }
@@ -484,7 +519,7 @@ function SesionActiva() {
   // ve la posición entera, para poder revisarla.
   const curriculumItemActual = enCurriculo ? s.curriculumQueue[s.curriculumIndex] : null;
   const blindMode =
-    enCurriculo && s.curriculumSubPhase === 'jugando' && curriculumItemActual
+    readBlindTrainingEnabled() && enCurriculo && s.curriculumSubPhase === 'jugando' && curriculumItemActual
       ? nivelCiegas(s.curriculumProgressById.get(curriculumItemActual.id))
       : 'normal';
 
@@ -616,7 +651,7 @@ function CurriculumPanel() {
   const total = s.curriculumQueue.length;
   const actual = Math.min(s.curriculumIndex + 1, total);
   const item = s.curriculumQueue[s.curriculumIndex];
-  const nivel = s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(s.curriculumProgressById.get(item.id)) : 'normal';
+  const nivel = readBlindTrainingEnabled() && s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(s.curriculumProgressById.get(item.id)) : 'normal';
 
   return (
     <div className="flex flex-col gap-3">
@@ -627,8 +662,12 @@ function CurriculumPanel() {
         <p className="m-0 mt-1 font-display text-xl">{item?.nombre ?? t.curriculo.titulo}</p>
       </div>
       {s.curriculumSubPhase === 'jugando' && <p className="m-0 text-sm text-secondary">{t.curriculo.consigna}</p>}
-      {nivel === 'fantasma' && <p className="m-0 text-xs text-tertiary">{t.curriculo.ciegasFantasma}</p>}
-      {nivel === 'coordenadas' && <p className="m-0 text-xs text-tertiary">{t.curriculo.ciegasCoordenadas}</p>}
+      {nivel !== 'normal' && (
+        <p className="m-0 rounded-lg border border-info/40 bg-info-subtle px-3 py-2 text-sm text-secondary">
+          {nivel === 'fantasma' ? t.curriculo.ciegasFantasma : t.curriculo.ciegasCoordenadas}{' '}
+          <span className="text-tertiary">{t.curriculo.ciegasApagar}</span>
+        </p>
+      )}
       {s.curriculumSubPhase === 'feedback' && (
         <FeedbackPanel
           acierto={s.curriculumUltimaLimpia ?? false}

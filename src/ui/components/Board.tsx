@@ -125,7 +125,7 @@ export function Board(props: BoardProps) {
       : []);
   }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor, props.feedback]);
 
-  // 25% de opacidad para piezas fantasma, design system §3.4/§6.5.
+  // 40% de opacidad para piezas fantasma, design system §3.4/§6.5.
   return (
     <div
       ref={el}
