@@ -294,15 +294,25 @@ export const useSessionStore = create<SessionState>((set, get) => {
     });
   }
 
-  /** Selecciona catálogo o error propio según el lugar sorteado de RF-5.9. */
+  /** Selecciona catálogo o error propio según el lugar sorteado de RF-5.9.
+   * Excluye las posiciones ya servidas en el bloque de criterio de esta misma
+   * sesión (comparten el pool del Radar): volver a verlas acá las llegaría
+   * quemadas —ya sabés si la posición era táctica o tranquila—. Si al excluirlas
+   * el pool queda vacío, se prefiere repetir antes que dejar el bloque sin
+   * contenido. */
   function selectRadarItemForCurrentPosition(selectionState: RadarSelectionState): RadarItem | null {
     const s = get();
+    const vistasEnCriterio = new Set(s.triageQueue.map((item) => item.id));
+    const sinRepetir = (items: RadarItem[]) => {
+      const frescos = items.filter((item) => !vistasEnCriterio.has(item.id));
+      return frescos.length > 0 ? frescos : items;
+    };
     const ownErrorTurn = s.radarOwnErrorSlots.includes(s.radarServidos);
     if (ownErrorTurn) {
-      const ownItem = selectNextRadarItem(s.radarOwnErrorItems, selectionState, Math.random);
+      const ownItem = selectNextRadarItem(sinRepetir(s.radarOwnErrorItems), selectionState, Math.random);
       if (ownItem) return ownItem;
     }
-    return selectNextRadarItem(s.radarPool, selectionState, Math.random);
+    return selectNextRadarItem(sinRepetir(s.radarPool), selectionState, Math.random);
   }
 
   function loadColaCard(card: ErrorCard | null) {

@@ -15,3 +15,12 @@ export function formatDecimal(value: number, digits: number): string {
   }
   return formatter.format(value);
 }
+
+/** Duración legible de un ejercicio ("45 s", "3 min", "12 min"). Redondea a
+ * minutos enteros salvo por debajo del minuto: la precisión al segundo sugiere
+ * una carrera, y acá el tiempo es una señal de profundidad, no una marca. */
+export function formatDuracion(ms: number): string {
+  const segundos = Math.max(0, Math.round(ms / 1000));
+  if (segundos < 60) return `${segundos} s`;
+  return `${Math.round(segundos / 60)} min`;
+}

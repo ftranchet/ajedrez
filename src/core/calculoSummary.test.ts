@@ -29,6 +29,19 @@ describe('resumenStoyko', () => {
       stk(true, '2026-07-15T00:00:00.000Z'),
       stk(false, '2026-07-10T00:00:00.000Z'),
     ]);
-    expect(r).toEqual({ fecha: '2026-07-15T00:00:00.000Z', acierto: true, total: 3 });
+    expect(r).toEqual({ fecha: '2026-07-15T00:00:00.000Z', acierto: true, total: 3, tiempoMsUltima: 1000 });
+  });
+
+  it('expone el tiempo de la última toma (RF-7.3): Stoyko mide profundidad', () => {
+    const viejo = { ...stk(false, '2026-07-01T00:00:00.000Z'), tiempoMs: 60_000 };
+    const reciente = { ...stk(true, '2026-07-15T00:00:00.000Z'), tiempoMs: 720_000 };
+    expect(resumenStoyko([viejo, reciente])?.tiempoMsUltima).toBe(720_000);
+  });
+
+  it('tolera tomas sin tiempo válido, anteriores a que se registrara', () => {
+    const sinTiempo = { ...stk(true, '2026-07-15T00:00:00.000Z'), tiempoMs: undefined as unknown as number };
+    expect(resumenStoyko([sinTiempo])?.tiempoMsUltima).toBeNull();
+    const negativo = { ...stk(true, '2026-07-16T00:00:00.000Z'), tiempoMs: -5 };
+    expect(resumenStoyko([negativo])?.tiempoMsUltima).toBeNull();
   });
 });

@@ -40,7 +40,7 @@ import { TransferScreen } from './TransferScreen';
 import { N1ExperimentScreen } from './N1ExperimentScreen';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
-import { formatDecimal } from '../format';
+import { formatDecimal, formatDuracion } from '../format';
 
 function formatJugadas(n: number): string {
   return `${n} ${n === 1 ? t.panel.jugadaCorta : t.panel.jugadasCortas}`;
@@ -428,6 +428,9 @@ function CalculoSummary() {
                   .replace('{fecha}', new Date(stk.fecha).toLocaleDateString('es-AR'))
                   .replace('{resultado}', stk.acierto ? t.panel.calculoStoykoAcierto : t.panel.calculoStoykoFallo)
               : t.panel.calculoStoykoNunca}
+            {stk && stk.tiempoMsUltima !== null && (
+              <> {t.panel.calculoStoykoTiempo.replace('{duracion}', formatDuracion(stk.tiempoMsUltima))}</>
+            )}
           </p>
         </div>
       )}

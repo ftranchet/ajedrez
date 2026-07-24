@@ -598,4 +598,62 @@ describe('sessionStore — Triage (E9)', () => {
     const attempts = await db.triageAttempts.toArray();
     expect(attempts[0]).toMatchObject({ correcta: false, decisionUsuario: 'calcular', decisionCorrecta: 'alcanza' });
   });
+
+  it('el Radar no repite una posición ya vista en el bloque de criterio de la misma sesión', async () => {
+    const posicion = (id: string) => ({
+      id,
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      tipo: 'tranquila' as const,
+      temas: [],
+      rating: 1500,
+      solucion: ['e2e4'],
+      fuente: 'seed-dev' as const,
+    });
+    const vista = posicion('compartida-vista');
+    const fresca = posicion('compartida-fresca');
+
+    // Ambas en el pool del Radar, pero una ya se sirvió en el bloque de criterio.
+    useSessionStore.setState({
+      phase: 'radar',
+      radarPool: [vista, fresca],
+      triageQueue: [vista],
+      radarOwnErrorItems: [],
+      radarOwnErrorSlots: [],
+      radarServidos: 0,
+      radarUltimoAcierto: true,
+      dieta: { ...useSessionStore.getState().dieta, radarCount: 50 },
+    });
+
+    // Varias veces: ninguna debería caer en la ya vista.
+    for (let i = 0; i < 10; i++) {
+      useSessionStore.setState({ radarServidos: 0 });
+      await useSessionStore.getState().radarContinuar();
+      expect(useSessionStore.getState().radarItem?.id).toBe(fresca.id);
+    }
+  });
+
+  it('si excluir las vistas dejaría el Radar sin contenido, prefiere repetir antes que quedarse vacío', async () => {
+    const unica = {
+      id: 'unica-compartida',
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      tipo: 'tranquila' as const,
+      temas: [],
+      rating: 1500,
+      solucion: ['e2e4'],
+      fuente: 'seed-dev' as const,
+    };
+    useSessionStore.setState({
+      phase: 'radar',
+      radarPool: [unica],
+      triageQueue: [unica],
+      radarOwnErrorItems: [],
+      radarOwnErrorSlots: [],
+      radarServidos: 0,
+      radarUltimoAcierto: true,
+      dieta: { ...useSessionStore.getState().dieta, radarCount: 50 },
+    });
+
+    await useSessionStore.getState().radarContinuar();
+    expect(useSessionStore.getState().radarItem?.id).toBe(unica.id);
+  });
 });

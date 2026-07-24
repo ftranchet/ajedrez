@@ -138,7 +138,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 
 - **RF-7.1 (P0)** Modo donde el usuario **ingresa su línea completa por adelantado** (su jugada, la respuesta esperada, su continuación; profundidad configurable 3–7 plies) antes de que el tablero se mueva. Se puntúa la línea entera, no solo la primera jugada.
 - **RF-7.2 (P1)** Ejercicio de Stoyko semanal: una posición rica, sin reloj; el usuario registra todas las líneas candidatas con evaluación; al finalizar, comparación con el motor y registro para calibración (E10).
-- **RF-7.3 (P2)** Sin cronómetro visible por defecto en este modo (el objetivo es profundidad); tiempo registrado en silencio para métricas.
+- **RF-7.3 (P2)** Sin cronómetro visible **durante** el ejercicio (el objetivo es profundidad, no velocidad). El tiempo se registra y **se muestra después**, en la tarjeta de Cálculo del Panel ("le dedicaste 12 min de análisis"), como señal de proceso: guardar en silencio un dato que el usuario nunca puede ver es justamente la incoherencia que se corrigió en E9.
 
 ### E8 — Conversión de ventajas
 

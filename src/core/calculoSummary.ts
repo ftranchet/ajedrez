@@ -22,10 +22,19 @@ export interface StoykoResumen {
   fecha: string;
   acierto: boolean;
   total: number;
+  /**
+   * Cuánto duró la última toma (RF-7.3). Stoyko entrena profundidad, así que el
+   * tiempo dedicado es la métrica de proceso del ejercicio —no una carrera—.
+   * `null` en tomas anteriores a que se registrara.
+   */
+  tiempoMsUltima: number | null;
 }
 
 export function resumenStoyko(attempts: StoykoAttempt[]): StoykoResumen | null {
   if (attempts.length === 0) return null;
   const ultimo = [...attempts].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
-  return { fecha: ultimo.fecha, acierto: ultimo.acierto, total: attempts.length };
+  const tiempoMsUltima = typeof ultimo.tiempoMs === 'number' && Number.isFinite(ultimo.tiempoMs) && ultimo.tiempoMs >= 0
+    ? ultimo.tiempoMs
+    : null;
+  return { fecha: ultimo.fecha, acierto: ultimo.acierto, total: attempts.length, tiempoMsUltima };
 }

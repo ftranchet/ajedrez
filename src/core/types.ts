@@ -474,7 +474,12 @@ export interface StoykoAttempt {
   candidatas: { jugada: string; evaluacion: EvalSymbol }[];
   acierto: boolean;
   confianzaDeclarada: number; // 0–100
-  /** Milisegundos desde que se sirvió la posición hasta declarar (RF-7.3, nunca visible). */
+  /**
+   * Milisegundos desde que se sirvió la posición hasta declarar (RF-7.3). Sin
+   * cronómetro visible *durante* el ejercicio —el objetivo es profundidad, no
+   * velocidad—, pero después se muestra en el Panel: registrar un dato que el
+   * usuario nunca puede ver es la incoherencia que se corrigió en E9.
+   */
   tiempoMs: number;
   fecha: string; // ISO 8601
 }
