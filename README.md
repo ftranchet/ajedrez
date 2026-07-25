@@ -36,6 +36,7 @@ Todo el contenido es local y verificado programáticamente: 116 posiciones de Ra
 | **`docs/evidence/`** | La investigación que justifica cada módulo del producto. |
 | **`docs/radar-dataset.md`** | Origen, generación y validación del catálogo del Radar. |
 | **`docs/niveles-motor.md`** | Cómo se piden los niveles del oponente local y cómo se midieron. |
+| **`docs/maia-prueba.md`** | Guía para verificar a mano la partida contra Maia (la red a Lichess no es alcanzable desde CI). |
 | **`docs/prototipos/`** | Referencia visual del design system (se abre en el navegador). |
 | **`CHANGELOG.md`** | Historia de cambios. |
 

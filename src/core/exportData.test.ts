@@ -138,3 +138,38 @@ describe('validateImportBundle', () => {
     expect(validateImportBundle(raw).ok).toBe(false);
   });
 });
+
+// El token de Lichess (RF-1.4) es una credencial con permiso de jugar en la
+// cuenta del usuario. La exportación está pensada para moverse entre equipos y
+// para que el usuario la abra y la comparta, así que el token vive en
+// localStorage (ui/lichessToken.ts) y no en el perfil. Este test fija esa
+// frontera: si alguna vez se agregara al perfil "por comodidad", falla acá.
+describe('la exportación no transporta credenciales', () => {
+  it('el paquete no contiene ningún token de Lichess', () => {
+    const bundle = buildExportBundle({
+      games: [],
+      errorCards: [],
+      calibrationRecords: [],
+      radarProgress: [],
+      radarAttempts: [],
+      curriculumProgress: [],
+      profile: {
+        id: 'principal',
+        bandaElo: 'elemental',
+        diagnosticoCompletadoEn: null,
+        ratingsExternos: [{ valor: 1500, fuente: 'lichess', fecha: '2026-07-25T10:00:00.000Z' }],
+      },
+      candidataAttempts: [],
+      compromisoAttempts: [],
+      dobleSolucionAttempts: [],
+      stoykoAttempts: [],
+      triageAttempts: [],
+      sessions: [],
+      transferMeasurements: [],
+      n1Experiments: [],
+    });
+    const serializado = JSON.stringify(bundle);
+    expect(serializado).not.toMatch(/lip_/);
+    expect(serializado).not.toMatch(/token/i);
+  });
+});

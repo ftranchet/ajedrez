@@ -12,6 +12,7 @@ import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { ReminderCard } from '../components/ReminderCard';
 import { RatingExternoCard } from '../components/RatingExternoCard';
 import { EjerciciosCard } from '../components/EjerciciosCard';
+import { LichessCard } from '../components/LichessCard';
 import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { DataBackupCard } from '../components/DataBackupCard';
 import { AppearanceCard } from '../components/AppearanceCard';
@@ -82,6 +83,7 @@ export function AjustesScreen() {
           <RatingExternoCard ratings={profile.ratingsExternos} onSave={saveRatingExterno} />
           <ReminderCard config={profile.recordatorio} onSave={saveReminder} />
           <AppearanceCard />
+          <LichessCard />
           <EjerciciosCard />
           <BlindTrainingCard />
           <SensoryPreferencesCard preferences={profile.preferenciasSensoriales} onSave={saveSensoryPreferences} />

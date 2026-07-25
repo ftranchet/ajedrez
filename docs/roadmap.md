@@ -82,12 +82,17 @@ finales, ni conversión tenían salida mientras se jugaba; la única forma de de
 una partida era rendirse, que guarda una derrota real y además daba por cumplido
 el compromiso semanal de partida lenta.
 
-**Sigue pendiente de esta línea de trabajo:** Maia (RF-1.4) —construible: el
-bloqueo de red es del entorno de desarrollo, no del navegador del usuario, así
-que la verificación de punta a punta la hace el dueño de producto—, la amplitud
-de los catálogos (116 posiciones de Radar repiten a los ~12 días) y las
-explicaciones del Radar, que hoy son una frase fija por tipo y no dicen nada de
-la posición concreta (RF-5.3).
+**Maia (RF-1.4) ✅ construida** — Ronda B. El roadmap venía describiendo mal el
+bloqueo: no era de red sino **del entorno de desarrollo**. La app es client-side
+y la llamada a Lichess sale del navegador del usuario, donde sí funciona; lo que
+falta es verificación automática, no viabilidad. Se construyó con el adaptador
+HTTP delgado, el dominio con tests, el flujo probado contra un doble del puerto y
+una guía de verificación manual (`docs/maia-prueba.md`). Decisiones sobre el
+token y el reloj en ADR-0014.
+
+**Sigue pendiente de esta línea de trabajo:** la amplitud de los catálogos (116
+posiciones de Radar repiten a los ~12 días) y las explicaciones del Radar, que
+hoy son una frase fija por tipo y no dicen nada de la posición concreta (RF-5.3).
 
 ## Fase 6+ — Extensiones (cada una con su ADR previo)
 Candidatas: sincronización opcional en la nube, Maia self-hosted con niveles finos, inglés, cuentas para entrenadores con alumnos, cohortes agregadas con consentimiento para evidencia de eficacia.

@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.3.0 |
+| Versión | 0.3.1 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
 | Última actualización | 2026-07-25 |
@@ -78,7 +78,11 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
   - **RF-1.3a (P0)** Los niveles se piden con `UCI_LimitStrength` + `UCI_Elo`, **no** con `Skill Level`: Skill Level no es una curva de dificultad sino fuerza casi plena con errores aleatorios y un piso de ~1350 Elo, así que los niveles no se distinguían entre sí. Por debajo del piso duro de 1320 que impone `UCI_Elo`, la fuerza se baja eligiendo a veces la segunda o tercera línea del motor — nunca una jugada al azar, que no se parece a ningún rival humano.
   - **RF-1.3b (P0)** La progresión de niveles **se mide, no se declara**: `npm run measure:niveles` juega los niveles entre sí y falla si alguno no supera al inferior. Un catálogo de niveles sin medición es una promesa, y esa promesa ya se incumplió una vez sin que nadie lo notara.
   - **RF-1.3c (P0)** Jugar y analizar comparten un único worker de Stockfish. Toda búsqueda fija explícitamente si limita la fuerza o no, en los dos sentidos: si jugar dejara la limitación encendida, el análisis (E3) correría capado en silencio y clasificaría errores contra un motor débil.
-- **RF-1.4 (P0)** El usuario puede jugar partidas contra los bots Maia (maia1/maia5/maia9) a través de la interfaz de programación de Lichess, con su token personal (ver ADR-0004).
+- **RF-1.4 (P0)** El usuario puede jugar partidas contra los bots Maia (maia1/maia5/maia9) a través de la interfaz de programación de Lichess, con su token personal (ver ADR-0004 y ADR-0014).
+  - **RF-1.4a (P0)** El token es una credencial y **no forma parte de la exportación** (RF-14.1): vive en el dispositivo. Se piden los permisos mínimos (`challenge:write`, `board:play`) y la interfaz declara dónde queda guardado.
+  - **RF-1.4b (P0)** El tablero local es un espejo del estado remoto: una jugada propia no se muestra hasta que Lichess la confirma. Mostrarla antes afirmaría algo que el servidor puede rechazar.
+  - **RF-1.4c (P0)** Los modos de fallo se nombran por separado (token inválido, permisos faltantes, bot no disponible, límite de tasa, sin conexión). Un bot fuera de línea es un desenlace normal, no un error: la salida ofrece siempre el motor local.
+  - **RF-1.4d (P1)** Lichess exige un control de tiempo aunque el producto se juegue sin reloj (E9). Se usa el más largo que entra en una sentada y **se declara en pantalla**: la incoherencia es de la plataforma y no se disimula.
 - **RF-1.5 (P0)** Toda partida jugada se persiste localmente con: PGN completo, fuente, resultado y fecha. El campo de tiempos por jugada se conserva en el esquema para partidas **importadas** que los traigan en el PGN, pero las partidas jugadas dentro de la app ya **no se cronometran**: se quitó el cronómetro silencioso junto con la métrica de reloj (ver E9).
 - **RF-1.6 (P1)** Controles de partida: rendirse, **abandonar sin guardar** y ofrecer tablas (contra bots: tablas automáticas por regla). Abandonar es distinto de rendirse y no es opcional: rendirse guarda una derrota real, así que si es la única salida, probar el motor y arrepentirse ensucia el historial y —al ser una partida sin reloj— cumple el compromiso semanal de partida lenta. Todo modo con tablero (partida, finales, conversión) debe tener salida visible mientras se juega; dejar un ejercicio a mitad nunca cuenta como intento fallido. Los **relojes configurables** que pedía la versión original de este RF quedan **fuera de alcance** mientras el producto sostenga el juego sin reloj (ver E9): reintroducirlos exigiría revisar esa decisión de forma explícita, no darlos por implícitos.
 - **RF-1.7 (P2)** Sonidos discretos de jugada/captura/jaque, desactivables.

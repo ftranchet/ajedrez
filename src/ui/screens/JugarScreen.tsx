@@ -8,6 +8,10 @@ import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import { useFinalesStore } from '../state/finalesStore';
 import { useConversionStore } from '../state/conversionStore';
+import { useMaiaStore } from '../state/maiaStore';
+import { BOTS_MAIA, botParaBanda } from '../../core/maia';
+import { readLichessToken } from '../lichessToken';
+import { useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
@@ -18,16 +22,18 @@ import { t } from '../i18n/es';
 
 // La sub-ruta #/jugar/finales entra directo al modo finales (deep-link desde
 // Hoy), y elegir un modo actualiza el hash para que el botón "atrás" funcione.
-type ModoJugar = 'partida' | 'finales' | 'conversion';
+type ModoJugar = 'partida' | 'maia' | 'finales' | 'conversion';
 
 function modoDesdeHash(): ModoJugar {
   if (window.location.hash.includes('/finales')) return 'finales';
   if (window.location.hash.includes('/conversion')) return 'conversion';
+  if (window.location.hash.includes('/maia')) return 'maia';
   return 'partida';
 }
 
 const RUTA_POR_MODO: Record<ModoJugar, string> = {
   partida: '#/jugar',
+  maia: '#/jugar/maia',
   finales: '#/jugar/finales',
   conversion: '#/jugar/conversion',
 };
@@ -39,6 +45,7 @@ function ModoPicker({ modo }: { modo: ModoJugar }) {
       value={modo}
       options={[
         { value: 'partida', label: t.finales.modoPartida },
+        { value: 'maia', label: t.maia.modo },
         { value: 'finales', label: t.finales.modoFinales },
         { value: 'conversion', label: t.conversion.modo },
       ]}
@@ -68,6 +75,7 @@ export function JugarScreen() {
   }, []);
 
   if (diagnosticoPhase !== 'inactivo' && diagnosticoPhase !== 'resultado') return <DiagnosticoEnCurso />;
+  if (modo === 'maia') return <MaiaScreen />;
   if (modo === 'finales') return <FinalesScreen />;
   if (modo === 'conversion') return <ConversionScreen />;
   return <PartidaScreen />;
@@ -580,6 +588,142 @@ function ConversionScreen() {
             </p>
             <p className="m-0 text-xs text-tertiary">{t.conversion.limitacion}</p>
             <button className="btn-primary" onClick={() => s.volver()}>{t.conversion.volver}</button>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+/**
+ * Partida contra un bot Maia (RF-1.4, ADR-0004). Es el rival que el PRD quiere
+ * para el ciclo jugar → analizar: sus errores son humano-plausibles, a
+ * diferencia de Stockfish capado, que juega perfecto y de golpe regala.
+ *
+ * Todo lo que puede salir mal acá depende de un servidor ajeno, así que los
+ * estados de fallo se nombran uno por uno: "no se pudo" a secas dejaría al
+ * usuario sin saber si el problema es su token, el bot o su conexión. Y que un
+ * bot esté ocupado es un desenlace normal, no un error de la app — por eso la
+ * salida siempre ofrece el motor local, cuyos niveles ahora están medidos.
+ */
+function MaiaScreen() {
+  const s = useMaiaStore();
+  const banda = useSessionStore((state) => state.profile.bandaElo);
+  const sugerido = botParaBanda(banda);
+  const [bot, setBot] = useState(sugerido.usuario);
+  // Lectura sincrónica de localStorage: no necesita efecto.
+  const [token] = useState<string | null>(() => readLichessToken());
+
+  const encabezado = (
+    <header>
+      <h1 className="m-0 font-display text-3xl font-medium">{t.maia.titulo}</h1>
+      <p className="mt-1 mb-0 text-secondary">{t.maia.subtitulo}</p>
+    </header>
+  );
+
+  if (s.phase === 'inactivo' || s.phase === 'error') {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        {encabezado}
+        <ModoPicker modo="maia" />
+        <p className="m-0 rounded-lg border border-info/40 bg-surface p-3 text-sm text-secondary">{t.maia.porQue}</p>
+        {/* La incoherencia con el juego sin reloj (E9) es de la plataforma, y se
+            declara siempre: describe qué es este modo, no el desafío puntual. */}
+        <p className="m-0 text-xs text-tertiary">{t.maia.reloj}</p>
+
+        {s.phase === 'error' && s.fallo && (
+          <div role="alert" className="flex flex-col gap-2 rounded-lg border border-error/35 bg-error-subtle p-4">
+            <p className="m-0 text-sm text-primary">{t.maia.fallos[s.fallo]}</p>
+            <p className="m-0 text-xs text-secondary">{t.maia.caidaTexto}</p>
+            <a href="#/jugar" className="btn-secondary text-center no-underline">{t.maia.caidaIr}</a>
+          </div>
+        )}
+
+        {token === null ? (
+          <section className="flex flex-col gap-3 rounded-lg border border-accent/40 bg-surface p-4">
+            <p className="m-0 text-sm text-primary">{t.maia.tokenFalta}</p>
+            <a href="#/ajustes" className="btn-primary text-center no-underline">{t.maia.tokenIr}</a>
+          </section>
+        ) : (
+          <>
+            <fieldset className="m-0 border-0 p-0">
+              <legend className="mb-2 p-0 text-sm text-secondary">{t.maia.elegirBot}</legend>
+              <div className="flex flex-col gap-2">
+                {BOTS_MAIA.map((candidato) => (
+                  <Chip key={candidato.usuario} selected={bot === candidato.usuario} onClick={() => setBot(candidato.usuario)}>
+                    {candidato.usuario}
+                    <span className="ml-2 font-mono text-xs text-tertiary">
+                      {t.maia.botElo.replace('{elo}', String(candidato.elo))}
+                    </span>
+                    {candidato.usuario === sugerido.usuario && (
+                      <span className="ml-2 text-xs text-accent">{t.maia.sugerido}</span>
+                    )}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            <button onClick={() => void s.empezar(token, bot)} className="btn-primary">
+              {t.maia.empezar.replace('{bot}', bot)}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (s.phase === 'desafiando') {
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
+        {encabezado}
+        <p className="m-0 font-display text-xl">{t.maia.desafiando.replace('{bot}', s.bot)}</p>
+        <p className="m-0 text-sm text-secondary">{t.maia.desafiandoDetalle}</p>
+        <button onClick={() => s.volver()} className="btn-secondary">{t.maia.cancelar}</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <Board
+          fen={s.fen}
+          orientation={s.playerColor}
+          turn={s.turn}
+          lastMove={s.lastMove}
+          check={s.check}
+          dests={s.dests}
+          movableColor={s.phase === 'jugando' && !s.enviando && s.turn === s.playerColor ? s.playerColor : null}
+          onMove={(from, to) => void s.userMove(from as Square, to as Square)}
+        />
+      </div>
+      <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
+        <div className="rounded-lg border border-subtle bg-surface p-4">
+          <p className="m-0 font-display text-xl">
+            {s.phase === 'terminada'
+              ? t.maia.terminada
+              : s.enviando
+                ? t.maia.enviando
+                : s.turn === s.playerColor
+                  ? t.maia.teToca
+                  : t.maia.esperando.replace('{rival}', s.rival || s.bot)}
+          </p>
+        </div>
+
+        <MoveList moves={s.sanMoves} />
+
+        {s.phase === 'jugando' && (
+          <button onClick={() => void s.abandonar(readLichessToken() ?? '')} className="btn-secondary">
+            {t.maia.abandonar}
+          </button>
+        )}
+
+        {s.phase === 'terminada' && (
+          <div className={`flex flex-col gap-3 rounded-lg border p-4 ${s.guardada ? 'border-success/35 bg-success-subtle' : 'border-info/40 bg-surface'}`}>
+            <p className="m-0 text-sm text-primary">{s.guardada ? t.maia.guardada : t.maia.noGuardada}</p>
+            {s.guardada && (
+              <a href="#/panel/partidas" className="btn-primary text-center no-underline">{t.maia.analizar}</a>
+            )}
+            <button onClick={() => s.volver()} className="btn-secondary">{t.maia.volver}</button>
           </div>
         )}
       </aside>
