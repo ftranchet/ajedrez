@@ -95,9 +95,10 @@ test('finales: Hoy los surge con un enlace directo al modo finales', async ({ pa
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
-  // La tarjeta de finales aparece (hay finales nuevos, todos pendientes).
-  await page.getByRole('heading', { name: 'Finales teóricos' }).waitFor();
-  await page.getByRole('link', { name: 'Practicar finales' }).click();
+  // Los finales aparecen entre las prescripciones de hoy (hay técnicas nuevas,
+  // todas pendientes), con su enlace directo.
+  await page.getByRole('heading', { name: 'También te toca hoy' }).waitFor();
+  await page.getByRole('link', { name: /Finales teóricos/ }).click();
 
   // El enlace entra directo al modo finales (deep-link #/jugar/finales).
   await expect(page).toHaveURL(/#\/jugar\/finales$/);

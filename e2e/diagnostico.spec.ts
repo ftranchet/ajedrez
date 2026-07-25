@@ -134,6 +134,9 @@ test('diagnóstico inicial: dos partidas y 20 posiciones del Radar arman la prim
   await page.getByRole('button', { name: 'Empezar sesión' }).waitFor({ timeout: 10_000 });
 
   // Y las partidas del diagnóstico no ocupan el compromiso semanal (RF-11.7):
-  // el usuario no jugó todavía ninguna partida lenta propia.
-  await expect(page.getByText('Todavía no jugaste una partida lenta esta semana.', { exact: false })).toBeVisible();
+  // la partida lenta sigue prescripta como pendiente, porque el usuario todavía
+  // no jugó ninguna a propósito.
+  await page.getByRole('heading', { name: 'También te toca hoy' }).waitFor();
+  await expect(page.getByRole('link', { name: /Tu partida lenta de la semana/ })).toBeVisible();
+  await expect(page.getByText('de acá salen tus repasos', { exact: false })).toBeVisible();
 });

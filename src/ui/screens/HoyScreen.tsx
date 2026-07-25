@@ -4,10 +4,9 @@
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
 import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
-import type { GameRecord, SessionBlockType } from '../../core/types';
+import type { SessionBlockType } from '../../core/types';
 import { bloquesHechosHoy } from '../../core/session';
-import { partidaLentaSemanal } from '../../core/slowGame';
-import { gameRepo } from '../../services/storage/gameRepo';
+import type { PrescripcionExterna } from '../../core/prescripcionesExternas';
 import { Board, type BoardFeedback } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
@@ -267,12 +266,11 @@ function Portada() {
         </div>
       </div>
 
-      {/* Contexto: cómo venís esta semana. Nunca compite con el botón primario
-          —todo acá es secundario— y acompaña el scroll en pantallas altas. */}
+      {/* Contexto: lo que el Prescriptor recomienda además de la sesión, y cómo
+          venís esta semana. Nunca compite con el botón primario —todo acá es
+          secundario— y acompaña el scroll en pantallas altas. */}
       <aside className="flex flex-col gap-4 lg:sticky lg:top-0">
-        <PartidaLentaCard fugaTactica={s.dieta.ajusteFugas.categoria === 'tactico'} />
-
-        <FinalesHoyCard />
+        <PrescripcionesExternasCard prescripciones={s.prescripcionesExternas ?? []} />
 
         <div className="flex flex-col gap-1 border-t border-subtle pt-4 lg:border-t-0 lg:pt-0">
           <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
@@ -285,67 +283,81 @@ function Portada() {
   );
 }
 
-// "Tu partida lenta de la semana" (RF-11.7): jugar y analizar una partida lenta
-// es el ejercicio de mayor valor documentado, así que se vuelve un compromiso
-// semanal visible en Hoy —no una sugerencia suelta—. Secundaria: no compite con
-// el botón primario de la sesión. Si hay fuga táctica, ofrece Cálculo.
-function PartidaLentaCard({ fugaTactica }: { fugaTactica: boolean }) {
-  const [games, setGames] = useState<GameRecord[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void gameRepo.list().then((g) => { if (alive) setGames(g); });
-    return () => { alive = false; };
-  }, []);
-  if (games === null) return null;
-
-  const estado = partidaLentaSemanal(games);
-  const completa = estado === 'completa';
-  const texto =
-    estado === 'sin-jugar' ? t.hoy.partidaLentaSinJugar
-      : estado === 'sin-analizar' ? t.hoy.partidaLentaSinAnalizar
-        : t.hoy.partidaLentaCompleta;
-
+/**
+ * Prescripciones que se hacen en otra pantalla (E11, principio 1).
+ *
+ * Los cuatro ejercicios más exigentes de la app —partida lenta con su análisis,
+ * finales contra Stockfish, Stoyko y línea comprometida— no entran en el
+ * formato de una jugada por posición de la sesión, así que vivían en pantallas
+ * sueltas que el Prescriptor nunca nombraba. Cálculo llegó a ser una de las
+ * cuatro pestañas de la navegación sin que ninguna prescripción la mencionara.
+ * Acá aparecen con el mismo contrato que un bloque: qué es, por qué hoy y
+ * cuánto dura, cada una con su enlace directo.
+ */
+function PrescripcionesExternasCard({ prescripciones }: { prescripciones: PrescripcionExterna[] }) {
+  if (prescripciones.length === 0) return null;
   return (
-    <section className={`flex flex-col gap-3 rounded-lg border p-4 ${completa ? 'border-success/35 bg-success-subtle' : 'border-info/40 bg-surface'}`}>
+    <section className="flex flex-col gap-2">
       <div>
-        <SectionHeading>{t.hoy.partidaLentaTitulo}</SectionHeading>
-        <p className="m-0 mt-1 text-sm text-secondary">{completa ? '✓ ' : ''}{texto}</p>
+        <SectionHeading>{t.hoy.tambienHoyTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-xs text-secondary">{t.hoy.tambienHoyAyuda}</p>
       </div>
-      {estado === 'sin-jugar' && (
-        <a href="#/jugar" className="btn-secondary text-center no-underline">{t.hoy.partidaLentaIrJugar}</a>
-      )}
-      {estado === 'sin-analizar' && (
-        <a href="#/panel/partidas" className="btn-secondary text-center no-underline">{t.hoy.partidaLentaIrAnalizar}</a>
-      )}
-      {fugaTactica && (
-        <p className="m-0 border-t border-subtle pt-3 text-sm text-secondary">
-          {t.hoy.partidaLentaCalculo}{' '}
-          <a href="#/calculo" className="font-semibold text-accent underline-offset-4 hover:underline">{t.hoy.partidaLentaIrCalculo}</a>
-        </p>
-      )}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {prescripciones.map((prescripcion) => (
+          <PrescripcionRow key={prescripcion.tipo} prescripcion={prescripcion} />
+        ))}
+      </ul>
     </section>
   );
 }
 
-// Finales teóricos (RF-6.2) en Hoy: dejan de estar "descolgados" en un toggle
-// de Jugar. Cuando hay técnicas de final pendientes (nuevas o no automatizadas),
-// una tarjeta secundaria las surge con enlace directo al modo finales. Se juegan
-// enteras contra el motor, por eso no entran en la sesión de un solo movimiento.
-function FinalesHoyCard() {
-  // El conteo lo calcula `loadSummary` con el catálogo y el progreso que ya
-  // carga: pedirlos de nuevo acá duplicaba el sembrado y la lectura del
-  // catálogo en cada visita a Hoy.
-  const pendientes = useSessionStore((s) => s.finalesPendientes);
-  if (pendientes === null || pendientes === 0) return null;
+function PrescripcionRow({ prescripcion }: { prescripcion: PrescripcionExterna }) {
+  const textos = t.hoy.prescripciones[prescripcion.tipo];
+  const cumplida = prescripcion.estado === 'cumplida';
+  const enEspera = prescripcion.estado === 'en-espera';
+  const motivo = (cumplida ? textos.cumplida : enEspera ? textos.enEspera : textos.pendiente)
+    .replace('{n}', String(prescripcion.cantidad ?? 0))
+    .replace('{fecha}', prescripcion.fecha ? new Date(prescripcion.fecha).toLocaleDateString('es-AR') : '');
 
+  const contenido = (
+    <>
+      <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-base leading-none">
+        {cumplida ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-success">
+            <path d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <>
+            <span className="font-mono text-base font-semibold text-primary">{prescripcion.minutos}</span>
+            <span className="mt-0.5 font-mono text-[0.5625rem] tracking-wider text-tertiary uppercase">{t.sesion.unidadMin}</span>
+          </>
+        )}
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-sm font-semibold text-primary">{textos.titulo}</span>
+        <span className="text-xs text-secondary">{motivo}</span>
+      </span>
+    </>
+  );
+
+  // En espera (el enfriamiento semanal de Stoyko) no es una acción: se muestra
+  // para que el usuario sepa que existe y cuándo vuelve, sin invitar a entrar.
+  if (enEspera) {
+    return (
+      <li className="flex items-center gap-3 rounded-md border border-subtle bg-surface p-3 opacity-70">{contenido}</li>
+    );
+  }
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-info/40 bg-surface p-4">
-      <div>
-        <SectionHeading>{t.hoy.finalesTitulo}</SectionHeading>
-        <p className="m-0 mt-1 text-sm text-secondary">{t.hoy.finalesTexto.replace('{n}', String(pendientes))}</p>
-      </div>
-      <a href="#/jugar/finales" className="btn-secondary text-center no-underline">{t.hoy.finalesIr}</a>
-    </section>
+    <li>
+      <a
+        href={prescripcion.ruta}
+        className={`flex items-center gap-3 rounded-md border p-3 no-underline transition-colors duration-[120ms] hover:border-strong hover:bg-elevated ${
+          cumplida ? 'border-success/35 bg-success-subtle' : 'border-info/40 bg-surface'
+        }`}
+      >
+        {contenido}
+      </a>
+    </li>
   );
 }
 

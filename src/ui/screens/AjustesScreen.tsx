@@ -11,6 +11,7 @@ import { useSessionStore } from '../state/sessionStore';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { ReminderCard } from '../components/ReminderCard';
 import { RatingExternoCard } from '../components/RatingExternoCard';
+import { EjerciciosCard } from '../components/EjerciciosCard';
 import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { DataBackupCard } from '../components/DataBackupCard';
 import { AppearanceCard } from '../components/AppearanceCard';
@@ -81,6 +82,7 @@ export function AjustesScreen() {
           <RatingExternoCard ratings={profile.ratingsExternos} onSave={saveRatingExterno} />
           <ReminderCard config={profile.recordatorio} onSave={saveReminder} />
           <AppearanceCard />
+          <EjerciciosCard />
           <BlindTrainingCard />
           <SensoryPreferencesCard preferences={profile.preferenciasSensoriales} onSave={saveSensoryPreferences} />
           <DataBackupCard onImported={() => void handleImported()} />

@@ -7,8 +7,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CalibrationRecord, Color, CompromisoAttempt, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, StoykoAttempt, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
-import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas } from '../../core/panel';
-import { brierScore, calibrationCurve, calibrationInsight } from '../../core/calibration';
+import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas, serieErroresGraves, tendenciaSerie } from '../../core/panel';
+import { admiteAnalisisExpres } from '../../core/analysis';
+import { brechaCalibracion, brierScore, calibrationCurve, calibrationInsight, serieBrechaCalibracion } from '../../core/calibration';
 import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
 import { transferAvailability, transferDelta, transferResults } from '../../core/transfer';
@@ -33,6 +34,7 @@ import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedDat
 import { useAnalysisStore } from '../state/analysisStore';
 import { Chip } from '../components/Chip';
 import { SegmentedControl } from '../components/SegmentedControl';
+import { Sparkline, type SparklinePoint } from '../components/Sparkline';
 import { SectionHeading } from '../components/SectionHeading';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { AnalizarScreen } from './AnalizarScreen';
@@ -478,6 +480,7 @@ function PartidasDatosView({ games, onImported }: { games: PanelResource<GameRec
         <GamesSection games={games.data!} />
       </PanelResourceSlot>
       <aside className="flex flex-col gap-4">
+        <AnalisisExpresSection games={games.data ?? []} />
         <ImportarPartidaSection onImported={onImported} />
       </aside>
     </div>
@@ -889,6 +892,10 @@ function PanelDeVerdad({
 
   const mediaErroresGraves = erroresGravesPorPartidaMediaMovil(games);
   const brier = brierScore(calibraciones);
+  const brecha = brechaCalibracion(calibraciones);
+  const serieErrores = serieErroresGraves(games);
+  const serieBrecha = serieBrechaCalibracion(calibraciones);
+  const tendenciaErrores = tendenciaSerie(serieErrores);
   const rating = ratingDePartidasLentas(profile, games);
   // El delta es la métrica estrella (PRD §3.1), no el número suelto: cuando hay
   // dos tomas o más, lo que se lee arriba es el cambio.
@@ -900,25 +907,50 @@ function PanelDeVerdad({
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
-      <SectionHeading>{t.panel.verdadTitulo}</SectionHeading>
+      <div>
+        <SectionHeading>{t.panel.verdadTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-xs text-secondary">{t.panel.verdadAyuda}</p>
+      </div>
       <div className="grid gap-2 sm:grid-cols-3">
         <TruthMetric
-          label={rating ? t.panel.verdadRating : t.panel.verdadBanda}
-          value={String(rating?.valor ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico))}
-          vacio={!rating && !profile.diagnosticoCompletadoEn}
-          detalle={ratingDetalle ?? (profile.diagnosticoCompletadoEn && !rating ? t.panel.verdadBandaAyuda : undefined)}
+          label={t.panel.verdadRating}
+          value={rating ? String(rating.valor) : t.panel.verdadSinRating}
+          vacio={!rating}
+          detalle={ratingDetalle ?? undefined}
         />
         <TruthMetric
           label={t.panel.verdadErroresGraves}
           value={mediaErroresGraves === null ? t.panel.verdadSinPartidas : formatDecimal(mediaErroresGraves, 1)}
           vacio={mediaErroresGraves === null}
+          detalle={
+            tendenciaErrores
+              ? (tendenciaErrores.delta < 0 ? t.panel.verdadErroresBajan : t.panel.verdadErroresSuben)
+                  .replace('{puntos}', formatDecimal(Math.abs(tendenciaErrores.delta), 1))
+              : mediaErroresGraves !== null
+                ? t.panel.verdadSinTendencia
+                : undefined
+          }
+          serie={serieErrores}
+          serieLabel={t.panel.verdadErroresSerieLabel}
         />
+        {/* La brecha es el titular y Brier el detalle: ver §brechaCalibracion. */}
         <TruthMetric
           label={t.panel.verdadCalibracion}
-          value={brier === null ? t.panel.verdadSinCalibracion : formatDecimal(brier, 2)}
-          vacio={brier === null}
+          value={brecha === null ? t.panel.verdadSinCalibracion : t.panel.verdadBrechaValor.replace('{puntos}', formatDecimal(brecha, 0))}
+          vacio={brecha === null}
+          detalle={brier === null ? undefined : t.panel.verdadBrierDetalle.replace('{brier}', formatDecimal(brier, 2))}
+          serie={serieBrecha}
+          serieLabel={t.panel.verdadCalibracionSerieLabel}
         />
       </div>
+      {/* La banda de Elo es un insumo del Prescriptor, no una medida de mejora:
+          ocupaba un tercio del panel de verdad sin cambiar nunca después del
+          diagnóstico. Baja a pie de tarjeta, con su rol dicho en una línea. */}
+      <p className="m-0 border-t border-subtle pt-3 text-xs text-tertiary">
+        {profile.diagnosticoCompletadoEn
+          ? t.panel.verdadBandaPie.replace('{banda}', t.diagnostico.bandas[profile.bandaElo])
+          : t.panel.verdadSinDiagnostico}
+      </p>
     </section>
   );
 }
@@ -927,10 +959,25 @@ function PanelDeVerdad({
  * explica NO toma la tipografía de la métrica: un estado vacío con el peso de
  * un número desalinea la fila (tres renglones contra una cifra) y se lee como
  * si fuera el valor medido. */
-function TruthMetric({ label, value, vacio = false, detalle }: { label: string; value: string; vacio?: boolean; detalle?: string }) {
+function TruthMetric({
+  label,
+  value,
+  vacio = false,
+  detalle,
+  serie,
+  serieLabel,
+}: {
+  label: string;
+  value: string;
+  vacio?: boolean;
+  detalle?: string;
+  serie?: SparklinePoint[];
+  serieLabel?: string;
+}) {
   return (
     <div className="flex min-h-24 flex-col justify-between gap-2 rounded-md bg-elevated p-3 sm:min-h-28">
       <span className="text-sm text-secondary">{label}</span>
+      {serie && serie.length >= 2 && serieLabel && <Sparkline puntos={serie} label={serieLabel} />}
       <div className="flex flex-col gap-0.5">
         {vacio ? (
           <span className="text-sm text-tertiary">{value}</span>
@@ -1049,6 +1096,32 @@ function errorMensaje(error: PgnParseError): string {
   if (error === 'vacio') return t.panel.importarPgnErrorVacio;
   if (error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
   return t.panel.importarPgnErrorInvalido;
+}
+
+/**
+ * Análisis exprés en lote (RF-3.5). Traer historial servía de poco si cada
+ * partida exigía el ritual completo de dos fases: en la práctica, las tarjetas
+ * de origen `partida` —de las que dependen la fuga táctica, el reciclaje de
+ * errores propios y la métrica de errores graves— solo llegaban de a una.
+ */
+function AnalisisExpresSection({ games }: { games: GameRecord[] }) {
+  const pendientes = games.filter((game) => !game.analizada && admiteAnalisisExpres(game) && plyCountFromPgn(game.pgn) > 0);
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
+      <SectionHeading className="mb-1">{t.analisis.expresAnalizandoTitulo}</SectionHeading>
+      <p className="m-0 text-sm text-secondary">{t.analisis.expresAyuda}</p>
+      {pendientes.length === 0 ? (
+        <p className="m-0 text-sm text-tertiary">{t.analisis.expresSinPendientes}</p>
+      ) : (
+        <button
+          onClick={() => void useAnalysisStore.getState().iniciarExpres(pendientes.map((game) => game.id))}
+          className="btn-secondary"
+        >
+          {t.analisis.expresBoton.replace('{n}', String(pendientes.length))}
+        </button>
+      )}
+    </section>
+  );
 }
 
 function ImportarPartidaSection({ onImported }: { onImported: () => void }) {

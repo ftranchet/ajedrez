@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { brierScore, brierScoreByContext, calibrationCurve, calibrationInsight, shouldSampleConfidence } from './calibration';
+import type { CalibrationRecord } from './types';
+import { brechaCalibracion, brierScore, brierScoreByContext, calibrationCurve, calibrationInsight, serieBrechaCalibracion, shouldSampleConfidence } from './calibration';
 
 describe('shouldSampleConfidence', () => {
   it('respeta la probabilidad ~1/4.5 (RF-10.1): con rng < umbral muestrea', () => {
@@ -115,5 +116,74 @@ describe('calibrationInsight', () => {
         { id: '2', contexto: 'radar', confianzaDeclarada: 90, acierto: false, fecha: '2026-07-19' },
       ]),
     ).toBeNull();
+  });
+});
+
+describe('brechaCalibracion (RF-10.3)', () => {
+  const r = (confianzaDeclarada: number, acierto: boolean) => ({ confianzaDeclarada, acierto });
+
+  it('sin registros no inventa un número', () => {
+    expect(brechaCalibracion([])).toBeNull();
+  });
+
+  it('quien declara lo que acierta tiene brecha cercana a cero', () => {
+    // Banda 60–79: declara ~70 y acierta 70%.
+    const records = [
+      ...Array.from({ length: 7 }, () => r(70, true)),
+      ...Array.from({ length: 3 }, () => r(70, false)),
+    ];
+    expect(brechaCalibracion(records)!).toBeLessThan(1);
+  });
+
+  it('la sobreconfianza se lee en puntos, que es lo que la hace legible', () => {
+    // Declara 90 y acierta la mitad: 40 puntos de brecha.
+    const records = [
+      ...Array.from({ length: 5 }, () => r(90, true)),
+      ...Array.from({ length: 5 }, () => r(90, false)),
+    ];
+    expect(brechaCalibracion(records)!).toBeCloseTo(40, 0);
+  });
+
+  it('a diferencia de Brier, no penaliza acertar poco si estaba bien anticipado', () => {
+    // Alguien calibrado en material difícil: declara 30 y acierta 30%.
+    const dificil = [
+      ...Array.from({ length: 3 }, () => r(30, true)),
+      ...Array.from({ length: 7 }, () => r(30, false)),
+    ];
+    // Alguien sobreconfiado en material fácil: declara 100 y acierta 80%.
+    const facil = [
+      ...Array.from({ length: 8 }, () => r(100, true)),
+      ...Array.from({ length: 2 }, () => r(100, false)),
+    ];
+    // Brier premia al segundo por acertar más; la brecha muestra que el
+    // primero está mejor calibrado, que es lo que la métrica quiere medir.
+    expect(brierScore(dificil)!).toBeGreaterThan(brierScore(facil)!);
+    expect(brechaCalibracion(dificil)!).toBeLessThan(brechaCalibracion(facil)!);
+  });
+});
+
+describe('serieBrechaCalibracion', () => {
+  const registro = (fecha: string, confianzaDeclarada: number, acierto: boolean): CalibrationRecord => ({
+    id: crypto.randomUUID(),
+    contexto: 'radar',
+    confianzaDeclarada,
+    acierto,
+    fecha,
+  });
+
+  it('no devuelve puntos hasta completar la primera ventana', () => {
+    const pocos = Array.from({ length: 5 }, (_, i) =>
+      registro(`2026-07-0${i + 1}T10:00:00.000Z`, 80, true),
+    );
+    expect(serieBrechaCalibracion(pocos, 12)).toEqual([]);
+  });
+
+  it('produce un punto por respuesta una vez que hay ventana completa', () => {
+    const registros = Array.from({ length: 15 }, (_, i) =>
+      registro(new Date(2026, 6, i + 1, 10).toISOString(), 80, i % 2 === 0),
+    );
+    const serie = serieBrechaCalibracion(registros, 12);
+    expect(serie).toHaveLength(4);
+    expect(serie.every((punto) => punto.valor >= 0)).toBe(true);
   });
 });

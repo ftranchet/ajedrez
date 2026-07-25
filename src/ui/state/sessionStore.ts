@@ -23,7 +23,10 @@ import {
   type RadarSelectionState,
 } from '../../core/radar';
 import { dueCurriculumItems, esDemostracionLimpia, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
-import { DEFAULT_PROFILE, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
+import { DEFAULT_PROFILE, detectarFugaCalculo, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
+import { prescripcionesExternas, type PrescripcionExterna } from '../../core/prescripcionesExternas';
+import { gameRepo } from '../../services/storage/gameRepo';
+import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
 import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
@@ -78,6 +81,12 @@ interface SessionState {
   curriculumDueCount: number | null;
   /** Finales teóricos pendientes (RF-6.2), para surgirlos desde Hoy. null = sin cargar todavía. */
   finalesPendientes: number | null;
+  /**
+   * Prescripciones que se hacen fuera de la sesión (partida lenta, finales,
+   * Stoyko, cálculo comprometido). Se calculan acá y no en la pantalla para
+   * que Hoy no vuelva a leer IndexedDB por su cuenta en cada visita.
+   */
+  prescripcionesExternas: PrescripcionExterna[] | null;
 
   // Prescriptor (E11): perfil y dieta de la sesión en curso (RF-11.2).
   profile: Profile;
@@ -427,6 +436,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     dueCount: null,
     curriculumDueCount: null,
     finalesPendientes: null,
+    prescripcionesExternas: null,
     profile: DEFAULT_PROFILE,
     dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
     soloBloque: null,
@@ -495,6 +505,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
               dueCount: 0,
               curriculumDueCount: 0,
               finalesPendientes: 0,
+              prescripcionesExternas: [],
               sessions: [],
               summaryStatus: 'ready',
             });
@@ -502,19 +513,32 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
 
           await curriculumItemRepo.ensureSeeded();
-          const [allCards, curriculumItems, curriculumProgressList, sessions] = await Promise.all([
-            errorCardRepo.list(),
-            curriculumItemRepo.list(),
-            curriculumProgressRepo.list(),
-            sessionRepo.list(),
-          ]);
+          const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts, compromisoAttempts] =
+            await Promise.all([
+              errorCardRepo.list(),
+              curriculumItemRepo.list(),
+              curriculumProgressRepo.list(),
+              sessionRepo.list(),
+              gameRepo.list(),
+              radarItemRepo.list(),
+              radarAttemptRepo.list(),
+              compromisoAttemptRepo.list(),
+            ]);
           if (generation !== summaryGeneration) return;
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
           const due = dueCurriculumItems(curriculumItems, progressById);
+          const finalesPendientes = due.filter((item) => item.tipo === 'final').length;
           set({
             dueCount: dueErrorCards(allCards).length,
             curriculumDueCount: due.filter((item) => item.tipo === 'patron').length,
-            finalesPendientes: due.filter((item) => item.tipo === 'final').length,
+            finalesPendientes,
+            prescripcionesExternas: prescripcionesExternas({
+              games,
+              finalesPendientes,
+              profile,
+              compromisoAttempts,
+              fugaCalculo: detectarFugaCalculo(radarAttempts, radarItems),
+            }),
             profile,
             dieta: dietaPorBanda(profile.bandaElo, allCards),
             sessions,
@@ -624,6 +648,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         dueCount: null,
         curriculumDueCount: null,
         finalesPendientes: null,
+        prescripcionesExternas: null,
         colaCards: [],
         colaIndex: 0,
         curriculumQueue: [],

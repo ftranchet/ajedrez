@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectarFugaTactica, dietaPorBanda, estimarBandaElo } from './prescriptor';
-import type { ErrorCard } from './types';
+import { detectarFugaCalculo, detectarFugaTactica, dietaPorBanda, estimarBandaElo } from './prescriptor';
+import type { ErrorCard, RadarAttempt, RadarItem } from './types';
 
 function cardTactica(creadaEn: string, origen: ErrorCard['origen'] = 'partida'): ErrorCard {
   return {
@@ -135,5 +135,75 @@ describe('estimarBandaElo', () => {
     // Empatar puntúa más que perder, así que la banda de tablas no puede ser más baja.
     const orden: Record<string, number> = { principiante: 0, elemental: 1, intermedio: 2, avanzado: 3, experto: 4 };
     expect(orden[conTablas]).toBeGreaterThanOrEqual(orden[conDerrotas]);
+  });
+});
+
+describe('detectarFugaCalculo (E7 → RF-7.1)', () => {
+  function item(id: string, plies: number): RadarItem {
+    return {
+      id,
+      fen: '8/8/8/8/8/8/8/K6k w - - 0 1',
+      tipo: 'ofensiva',
+      temas: [],
+      rating: 1500,
+      solucion: Array.from({ length: plies }, () => 'a1a2'),
+      fuente: 'lichess-cc0',
+    };
+  }
+  function attempt(itemId: string, acierto: boolean, overrides: Partial<RadarAttempt> = {}): RadarAttempt {
+    return {
+      id: crypto.randomUUID(),
+      itemId,
+      tipo: 'ofensiva',
+      rating: 1500,
+      acierto,
+      origenContenido: 'catalogo',
+      fecha: new Date('2026-07-20T10:00:00.000Z').toISOString(),
+      ...overrides,
+    };
+  }
+  const ahora = new Date('2026-07-25T10:00:00.000Z');
+  // Cuatro de línea forzada, una de jugada suelta.
+  const pool = [item('linea-1', 5), item('linea-2', 3), item('linea-3', 4), item('linea-4', 7), item('suelta', 1)];
+
+  it('sin intentos suficientes no afirma nada', () => {
+    const attempts = [attempt('linea-1', false), attempt('linea-2', false)];
+    expect(detectarFugaCalculo(attempts, pool, ahora).activa).toBe(false);
+  });
+
+  it('fallar seguido las líneas forzadas dispara la fuga', () => {
+    const attempts = [
+      ...Array.from({ length: 5 }, () => attempt('linea-1', false)),
+      ...Array.from({ length: 3 }, () => attempt('linea-2', true)),
+    ];
+    const fuga = detectarFugaCalculo(attempts, pool, ahora);
+    expect(fuga.activa).toBe(true);
+    expect(fuga.fallos).toBe(5);
+    expect(fuga.total).toBe(8);
+  });
+
+  it('acertarlas no la dispara', () => {
+    const attempts = Array.from({ length: 8 }, () => attempt('linea-3', true));
+    expect(detectarFugaCalculo(attempts, pool, ahora).activa).toBe(false);
+  });
+
+  it('las posiciones de una sola jugada no cuentan: no miden cálculo de línea', () => {
+    const attempts = Array.from({ length: 10 }, () => attempt('suelta', false));
+    expect(detectarFugaCalculo(attempts, pool, ahora)).toMatchObject({ activa: false, total: 0 });
+  });
+
+  it('excluye diagnóstico y errores propios: no tienen dificultad comparable', () => {
+    const attempts = [
+      ...Array.from({ length: 5 }, () => attempt('linea-1', false, { origenContenido: 'diagnostico' })),
+      ...Array.from({ length: 5 }, () => attempt('linea-2', false, { origenContenido: 'error-propio' })),
+    ];
+    expect(detectarFugaCalculo(attempts, pool, ahora)).toMatchObject({ activa: false, total: 0 });
+  });
+
+  it('una fuga vieja ya corregida deja de prescribir', () => {
+    const viejos = Array.from({ length: 10 }, () =>
+      attempt('linea-1', false, { fecha: new Date('2026-05-01T10:00:00.000Z').toISOString() }),
+    );
+    expect(detectarFugaCalculo(viejos, pool, ahora).activa).toBe(false);
   });
 });

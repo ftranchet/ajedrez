@@ -7,6 +7,7 @@ import type {
   ComparacionEvaluacion,
   EvalSymbol,
   GameAnalysis,
+  GameRecord,
   MoveAnalysisEntry,
   MoveClassification,
   PhaseOneData,
@@ -84,12 +85,28 @@ export interface EngineEvalAtPly {
 }
 
 /**
+ * ¿Esta partida admite análisis exprés (RF-3.5)?
+ *
+ * El análisis en dos fases es el corazón del producto y no se negocia para las
+ * partidas lentas: registrar el juicio propio **antes** de que hable el motor
+ * es lo que enseña. Pero exigir ese ritual completo para cada rápida importada
+ * volvía impracticable traer historial —y de las tarjetas de origen `partida`
+ * dependen la fuga táctica (RF-11.2), el reciclaje de errores propios (RF-5.9)
+ * y la métrica de errores graves (RF-12.1)—. El exprés existe para ese lote:
+ * solo fase 2, con revisión de las tarjetas candidatas.
+ */
+export function admiteAnalisisExpres(game: Pick<GameRecord, 'fuente' | 'ritmo'>): boolean {
+  return game.fuente !== 'local' && (game.ritmo === 'rapida' || game.ritmo === 'blitz' || game.ritmo === 'bullet');
+}
+
+/**
  * Arma el resultado completo de la fase 2 a partir de las evaluaciones del
  * motor por jugada (una por posición, incluida la posición final) y las
  * respuestas de la fase 1. `evals` debe tener longitud `jugadas.length + 1`
- * (una evaluación "antes" por jugada, más la posición final).
+ * (una evaluación "antes" por jugada, más la posición final). `fase1` es null
+ * en el análisis exprés (RF-3.5), que corre solo la fase 2.
  */
-export function buildGameAnalysis(evals: EngineEvalAtPly[], fase1: PhaseOneData, now: Date = new Date()): GameAnalysis {
+export function buildGameAnalysis(evals: EngineEvalAtPly[], fase1: PhaseOneData | null, now: Date = new Date()): GameAnalysis {
   const jugadas: MoveAnalysisEntry[] = [];
   for (let i = 0; i < evals.length - 1; i++) {
     const actual = evals[i];
@@ -109,8 +126,10 @@ export function buildGameAnalysis(evals: EngineEvalAtPly[], fase1: PhaseOneData,
     });
   }
 
+  // Sin fase 1 (análisis exprés, RF-3.5) no hay evaluaciones del usuario que
+  // comparar: la lista queda vacía en vez de inventar una comparación.
   const cpPorPly = new Map(evals.map((e) => [e.ply, e.cpAntes]));
-  const comparacionEvaluaciones: ComparacionEvaluacion[] = fase1.evaluaciones.map((ev) => {
+  const comparacionEvaluaciones: ComparacionEvaluacion[] = (fase1?.evaluaciones ?? []).map((ev) => {
     const cp = cpPorPly.get(ev.ply) ?? 0;
     const valorMotor = evalToSymbol(cp);
     return { ply: ev.ply, valorUsuario: ev.valorUsuario, valorMotor, coincide: ev.valorUsuario === valorMotor };

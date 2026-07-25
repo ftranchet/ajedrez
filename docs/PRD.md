@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.8 |
+| Versión | 0.2.9 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
 | Última actualización | 2026-07-25 |
@@ -97,7 +97,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-3.2 (P0)** Completada la fase 1, la fase 2 corre Stockfish local (ver ADR-0002), muestra la curva de evaluación, clasifica jugadas (error grave / error / imprecisión) y compara las evaluaciones del usuario con las del motor (alimenta calibración, E10).
 - **RF-3.3 (P0)** Cada error grave o error detectado genera una tarjeta candidata para la Cola Universal (E4); el usuario la confirma y categoriza en un toque: táctico / posicional / tiempo / psicológico.
 - **RF-3.4 (P1)** La fase 1 está diseñada para durar ≤5 minutos; el sistema mide y ajusta la cantidad de preguntas si el usuario abandona.
-- **RF-3.5 (P2)** Modo "análisis exprés" para partidas rápidas importadas en lote: solo fase 2 automática con revisión de tarjetas candidatas (el análisis en dos fases completo se reserva para partidas lentas).
+- **RF-3.5 (P1)** Modo "análisis exprés" para partidas rápidas importadas en lote: solo fase 2 automática con revisión de tarjetas candidatas (el análisis en dos fases completo se reserva para partidas lentas). **Sube de P2 a P1**: de las tarjetas con `origen: 'partida'` dependen la fuga táctica (RF-11.2), el reciclaje de errores propios (RF-5.9) y la métrica de errores graves (RF-12.1), así que sin un camino practicable a ellas media app queda apagada. Las partidas analizadas por exprés quedan con `analisis` y **sin** `fase1`: no se simula una fase 1 que no ocurrió.
 
 *Criterios de aceptación E3:* es imposible ver la evaluación del motor de una partida propia sin haber pasado la fase 1 (salvo modo exprés en importaciones masivas); el flujo completo toma <10 minutos en una partida de 40 jugadas en un celular de gama media.
 
@@ -144,7 +144,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 
 - **RF-8.1 (P1)** El sistema detecta en el historial del usuario posiciones ganadoras desperdiciadas (ventaja ≥ +3 que terminó en tablas o derrota) y las ofrece para rejugar **contra Maia** al nivel del usuario (defensa humano-realista, no Stockfish).
 - **RF-8.2 (P2)** Variante con reloj corto (conversión bajo presión).
-- **RF-8.3 (P2)** Fallback sin conexión/sin Lichess: motor local con fuerza limitada, señalando la limitación ("la resistencia del motor no es humana").
+- **RF-8.3 (P1)** Fallback sin conexión/sin Lichess: motor local con fuerza limitada, señalando la limitación ("la resistencia del motor no es humana"). **Sube de P2 a P1**: el material de esta épica sale del análisis de las partidas propias y nunca dependió de la red, así que tratarla como bloqueada por Maia dejaba sin construir un módulo tier-A que sí se puede entregar. La detección toma el **pico** de ventaja (≥ +3) en una posición donde movía el usuario, en partidas que terminaron en tablas o derrota.
 
 ### E9 — Criterio de cálculo ("¿Calcular o ya alcanza?")
 
@@ -158,13 +158,15 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 
 - **RF-10.1 (P0)** En ~1 de cada 4–5 respuestas (muestreo aleatorio, para no arruinar el flujo), el sistema pide confianza declarada (0–100) antes de revelar el resultado.
 - **RF-10.2 (P0)** El sistema computa y persiste la puntuación de Brier acumulada, global y por contexto (Radar, evaluaciones de análisis, Stoyko).
-- **RF-10.3 (P1)** Panel de calibración: curva de confianza declarada vs. tasa real de acierto, con lectura en lenguaje claro ("cuando decís 90%, acertás 70%: sobreconfianza en posiciones tácticas").
+- **RF-10.3 (P1)** Panel de calibración: curva de confianza declarada vs. tasa real de acierto, con lectura en lenguaje claro ("cuando decís 90%, acertás 70%: sobreconfianza en posiciones tácticas"). La métrica **titular** es la brecha (a cuántos puntos queda la confianza del acierto real), no Brier: Brier mezcla calibración con dificultad del material, y como el Radar sostiene el acierto en torno al 70% a propósito (RF-5.5), penaliza a quien está bien calibrado en material difícil. Brier se conserva como detalle porque es métrica de guardia (§3.2).
 
 ### E11 — Prescriptor y sesión diaria
 
 - **RF-11.1 (P0)** La pantalla principal es **"Tu sesión de hoy"**: una secuencia de bloques con duración total visible (por defecto 25 min; mínima viable 15; configurable).
 - **RF-11.2 (P0)** Composición de la sesión, en orden: (1) repasos vencidos de la Cola; (2) dieta base por banda de Elo (tabla versionada en configuración, no hardcodeada — ver §9); (3) ajuste por fugas del último mes. El ejemplo original de este RF era "si >35% de derrotas son por reloj, sube Triage"; al retirarse la métrica de reloj (ver E9), la fuga que se mide es la **táctica**: si >35% de los errores recientes de partidas propias son tácticos, se refuerza el Radar y se suma el bloque "¿Calcular o ya alcanza?".
 - **RF-11.3 (P0)** Cada bloque muestra su **porqué** en una línea ("Radar 12 min — tus errores graves en posiciones tranquilas duplican tu promedio").
+  - **RF-11.3a (P0)** Los ejercicios que **no caben en el formato de la sesión** (partida lenta y su análisis, finales jugados enteros, Stoyko, cálculo comprometido) también se prescriben, con el mismo contrato: qué es, por qué hoy y cuánto dura. Que vivan en otra pantalla no los convierte en un menú opcional — eso contradice el principio 1. Cada uno declara su propio cumplimiento con la señal que le es propia (la semana, el vencimiento, la fecha del último intento) y no aparece cuando no corresponde.
+  - **RF-11.3b (P1)** Existe un lugar donde el usuario puede ver **todos** los ejercicios y qué dispara cada uno. Buena parte del producto es invisible por diseño (muestreos aleatorios, subtipos que no se anuncian, modificadores que se activan solos), y sin esa lista el usuario no puede distinguir "no me apareció porque no me corresponde" de "no existe". Es la contracara del principio 8: la app decide, pero declara con qué criterio.
 - **RF-11.4 (P0)** Diagnóstico inicial: importación + análisis en lote (E2/E3 exprés) → banda de Elo y perfil de fugas → primera dieta. Sin historial: 2 partidas sin reloj contra Maia escalonada + 20 posiciones de Radar.
   - **RF-11.4a (P0)** El diagnóstico usa **el mismo instrumento** que la sesión: sus posiciones de Radar pasan por el paso de evaluación rápida (RF-5.2) y piden confianza declarada (RF-10.1) en un subconjunto **fijo** de posiciones —no muestreado al azar como en la sesión— para que la línea base de Brier tenga la misma cantidad de observaciones en todos los casos. Sin esto, los números del diagnóstico no son comparables con los de ninguna sesión posterior.
   - **RF-11.4b (P0)** El diagnóstico **no adapta** la dificultad mientras mide (si adaptara, la tasa de acierto convergería a la banda objetivo para cualquier nivel y dejaría de discriminar), pero **sí siembra** el centro adaptativo del Radar (RF-5.5) con la tasa observada, junto al historial de tipos e ids servidos. Sus respuestas se marcan con origen propio y quedan fuera de la lectura de la banda 60–80% y del detector de sobreajuste (RF-12.3).
@@ -179,6 +181,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 ### E12 — Panel de métricas y autoexperimento
 
 - **RF-12.1 (P0)** Panel de verdad (grande, al frente): rating de partidas lentas, errores graves por partida (media móvil), calibración. Panel de actividad (chico, atrás): sesiones, minutos, volumen.
+  - **RF-12.1b (P0)** Las métricas de verdad se muestran como **serie**, no como valor puntual: la pregunta del producto es si algo mejora, y un número solo no la responde. La lectura de tendencia solo aparece con puntos suficientes. La banda de Elo **no** es una métrica de verdad —es un insumo del Prescriptor que no cambia después del diagnóstico— y no ocupa lugar entre ellas.
   - **RF-12.1a (P0)** El **rating de partidas lentas** necesita una fuente real. Mientras la importación automática de historial siga bloqueada (RF-2.1), la única disponible es el rating que el usuario declara: se pide una vez en el diagnóstico (opcional, no bloqueante), se guarda como **serie** y se puede actualizar desde Ajustes. Lo que se muestra como métrica es el **cambio contra la primera toma**, no el número suelto. Sin esta fuente, la métrica estrella (§3.1) y el detector de sobreajuste (RF-12.3) no tienen instrumento para un usuario que solo juega dentro de la app: sus partidas se guardan sin reloj y sin rating.
 - **RF-12.2 (P1)** Batería de transferencia: set fijo de 30 posiciones nunca entrenadas, ofrecida cada 6–8 semanas, con resultados comparables entre tomas.
 - **RF-12.3 (P1)** Detector de sobreajuste: si el rating interno de ejercicios sube durante 8 semanas sin que el rating de partidas acompañe, alerta explícita + rebalanceo sugerido de dieta hacia partidas y análisis.

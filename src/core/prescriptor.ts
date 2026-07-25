@@ -7,7 +7,7 @@
 // posición pide detenerse a calcular. (Antes ese bloque se disparaba con un
 // "perfil de tiempo" medido con un cronómetro invisible; se quitó por
 // incoherente con el juego sin reloj.)
-import type { BandaElo, CategoriaError, ErrorCard, Profile } from './types';
+import type { BandaElo, CategoriaError, ErrorCard, Profile, RadarAttempt, RadarItem } from './types';
 import { DEFAULT_WEEKLY_PLAN } from './adherence';
 import { DEFAULT_SENSORY_PREFERENCES } from './sensory';
 import dietaConfig from '../config/prescriptor-dieta.json' with { type: 'json' };
@@ -66,6 +66,59 @@ export function detectarFugaTactica(cards: ErrorCard[], now: Date = new Date()):
   const tacticas = recientes.filter((c) => c.categoria === 'tactico').length;
   const proporcion = tacticas / recientes.length;
   return { categoria: proporcion > UMBRAL_FUGA_TACTICA ? 'tactico' : null, proporcion };
+}
+
+/** Plies mínimos de solución para que una posición exija calcular una línea, no ver una jugada. */
+const PLIES_LINEA_FORZADA = 3;
+const VENTANA_FUGA_CALCULO_DIAS = 30;
+const MIN_INTENTOS_FUGA_CALCULO = 6;
+const UMBRAL_FUGA_CALCULO = 0.4;
+
+export interface AjusteFugaCalculo {
+  /** Hay señal suficiente para prescribir Cálculo comprometido. */
+  activa: boolean;
+  fallos: number;
+  total: number;
+}
+
+/**
+ * Fuga de cálculo profundo (E7, RF-7.1): con qué frecuencia se falla en
+ * posiciones cuya solución **es una línea forzada** de 3 plies o más, y no una
+ * jugada suelta.
+ *
+ * Existe porque Cálculo comprometido vivía en una pestaña que el Prescriptor
+ * nunca mencionaba: el ejercicio de mayor exigencia de la app dependía de que
+ * el usuario lo descubriera solo, en un producto cuyo primer principio es
+ * "prescripción, no buffet". Ahora se dispara con la misma lógica que el resto
+ * de la dieta: una señal observable en los datos del usuario, explicable en una
+ * línea.
+ *
+ * Se miran solo respuestas de catálogo (no errores propios ni diagnóstico, que
+ * no tienen dificultad comparable) y solo la ventana reciente: una fuga vieja
+ * ya corregida no debe seguir prescribiendo.
+ */
+export function detectarFugaCalculo(
+  attempts: RadarAttempt[],
+  pool: RadarItem[],
+  now: Date = new Date(),
+): AjusteFugaCalculo {
+  const lineasForzadas = new Set(
+    pool.filter((item) => item.solucion.length >= PLIES_LINEA_FORZADA).map((item) => item.id),
+  );
+  const desde = now.getTime() - VENTANA_FUGA_CALCULO_DIAS * 24 * 60 * 60 * 1000;
+  const relevantes = attempts.filter((attempt) => {
+    if (attempt.origenContenido === 'error-propio' || attempt.origenContenido === 'diagnostico') return false;
+    if (!lineasForzadas.has(attempt.itemId)) return false;
+    const t = new Date(attempt.fecha).getTime();
+    return Number.isFinite(t) && t >= desde && t <= now.getTime();
+  });
+  const fallos = relevantes.filter((attempt) => !attempt.acierto).length;
+  const total = relevantes.length;
+  return {
+    activa: total >= MIN_INTENTOS_FUGA_CALCULO && fallos / total > UMBRAL_FUGA_CALCULO,
+    fallos,
+    total,
+  };
 }
 
 export interface DietaSesion {

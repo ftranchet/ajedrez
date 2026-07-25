@@ -117,6 +117,56 @@ export function mejoraErroresGraves(
   };
 }
 
+export interface PuntoSerie {
+  /** Fecha ISO del punto (la partida o el registro más reciente del tramo). */
+  fecha: string;
+  valor: number;
+}
+
+/**
+ * Serie de errores graves por partida, en orden cronológico, para mostrar
+ * **evolución** y no un valor puntual.
+ *
+ * El Panel de verdad mostraba las tres métricas como números sueltos: la media
+ * móvil de errores graves aparecía como "2,4" sin ninguna forma de ver si venía
+ * bajando o subiendo, y la única señal de cambio era una celebración binaria
+ * que exige tres partidas por ventana y una caída del 20%. Con eso, la pregunta
+ * que el producto dice querer responder —"¿esto me está haciendo mejor?"— no
+ * tenía respuesta visible el 90% del tiempo.
+ *
+ * Cada punto es la media móvil hasta esa partida, así que la serie se lee como
+ * la tendencia y no como el ruido partida a partida.
+ */
+export function serieErroresGraves(games: GameRecord[], ventana: number = VENTANA_PARTIDAS): PuntoSerie[] {
+  const atribuibles = games
+    .filter((game) => game.analisis && game.jugadorColor !== undefined)
+    .map((game) => ({ errores: erroresGravesUsuario(game) ?? 0, fecha: game.fecha, t: new Date(game.fecha).getTime() }))
+    .filter((entrada) => Number.isFinite(entrada.t))
+    .sort((a, b) => a.t - b.t);
+  return atribuibles.map((entrada, index) => {
+    const desde = Math.max(0, index + 1 - ventana);
+    const tramo = atribuibles.slice(desde, index + 1);
+    return {
+      fecha: entrada.fecha,
+      valor: tramo.reduce((sum, item) => sum + item.errores, 0) / tramo.length,
+    };
+  });
+}
+
+/**
+ * Tendencia de una serie: compara la media del último tercio contra la del
+ * primero. Devuelve null cuando no hay puntos suficientes para afirmar nada —
+ * un producto que promete honestidad no puede dibujar una flecha con dos datos.
+ */
+export function tendenciaSerie(serie: PuntoSerie[], minPuntos = 6): { delta: number; primero: number; ultimo: number } | null {
+  if (serie.length < minPuntos) return null;
+  const tercio = Math.max(2, Math.floor(serie.length / 3));
+  const media = (puntos: PuntoSerie[]) => puntos.reduce((sum, punto) => sum + punto.valor, 0) / puntos.length;
+  const primero = media(serie.slice(0, tercio));
+  const ultimo = media(serie.slice(-tercio));
+  return { delta: ultimo - primero, primero, ultimo };
+}
+
 /**
  * Media móvil de errores graves/error del usuario por partida, sobre las
  * últimas `ventana` partidas analizadas y atribuibles (más recientes primero

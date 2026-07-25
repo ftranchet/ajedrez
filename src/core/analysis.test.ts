@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  admiteAnalisisExpres,
   buildGameAnalysis,
   classifyMoveLoss,
   computeCpLoss,
@@ -239,5 +240,36 @@ describe('momento crítico: percibido vs. el del motor (RF-3.1a)', () => {
     const lectura = lecturaMomentoCritico(buildGameAnalysis(evals, fase1(0)), fase1(0))!;
     expect(lectura.coincide).toBe(false);
     expect(lectura.distanciaJugadas).toBe(2); // 4 medias jugadas = 2 completas
+  });
+});
+
+describe('admiteAnalisisExpres (RF-3.5)', () => {
+  it('las partidas lentas no se saltean la fase 1: ahí está todo el valor', () => {
+    expect(admiteAnalisisExpres({ fuente: 'manual', ritmo: 'clasica' })).toBe(false);
+    expect(admiteAnalisisExpres({ fuente: 'lichess', ritmo: 'sin-reloj' })).toBe(false);
+  });
+
+  it('las rápidas importadas sí, que son el lote que el exprés existe para resolver', () => {
+    expect(admiteAnalisisExpres({ fuente: 'manual', ritmo: 'rapida' })).toBe(true);
+    expect(admiteAnalisisExpres({ fuente: 'lichess', ritmo: 'blitz' })).toBe(true);
+    expect(admiteAnalisisExpres({ fuente: 'chesscom', ritmo: 'bullet' })).toBe(true);
+  });
+
+  it('las partidas jugadas en la app nunca van por exprés: se juegan para analizarlas', () => {
+    expect(admiteAnalisisExpres({ fuente: 'local', ritmo: 'rapida' })).toBe(false);
+  });
+});
+
+describe('buildGameAnalysis sin fase 1 (RF-3.5)', () => {
+  it('clasifica las jugadas igual pero no inventa comparación de evaluaciones', () => {
+    const evals = [
+      { ply: 0, fen: 'f0', san: 'e4', ladoQueMueve: 'w' as const, jugadaUsuario: 'e2e4', cpAntes: 0, jugadaMotor: 'e2e4' },
+      { ply: 1, fen: 'f1', san: 'e5', ladoQueMueve: 'b' as const, jugadaUsuario: 'e7e5', cpAntes: -400, jugadaMotor: 'e7e5' },
+      { ply: 2, fen: 'f2', san: 'Nf3', ladoQueMueve: 'w' as const, jugadaUsuario: 'g1f3', cpAntes: -400, jugadaMotor: 'g1f3' },
+    ];
+    const analisis = buildGameAnalysis(evals, null);
+    expect(analisis.comparacionEvaluaciones).toEqual([]);
+    expect(analisis.jugadas).toHaveLength(2);
+    expect(analisis.jugadas[0].clasificacion).toBe('grave');
   });
 });

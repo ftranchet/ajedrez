@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas } from './panel';
+import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas, serieErroresGraves, tendenciaSerie } from './panel';
 import type { Color, GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
 
 function jugada(clasificacion: MoveAnalysisEntry['clasificacion'], ladoQueMueve: Color = 'w'): MoveAnalysisEntry {
@@ -203,5 +203,45 @@ describe('ratingDePartidasLentas (PRD §3.1, RF-12.1)', () => {
     );
     expect(resultado?.origen).toBe('declarado');
     expect(resultado?.valor).toBe(1420);
+  });
+});
+
+describe('serieErroresGraves y tendenciaSerie (RF-12.1)', () => {
+  function partida(id: string, fecha: string, errores: number): GameRecord {
+    return game(id, fecha, analisisCon(Array.from({ length: errores }, () => 'grave' as const)));
+  }
+
+  it('la serie va en orden cronológico y suaviza con media móvil', () => {
+    const serie = serieErroresGraves(
+      [
+        partida('c', '2026-07-03T10:00:00.000Z', 4),
+        partida('a', '2026-07-01T10:00:00.000Z', 0),
+        partida('b', '2026-07-02T10:00:00.000Z', 2),
+      ],
+      10,
+    );
+    expect(serie.map((punto) => punto.fecha)).toEqual([
+      '2026-07-01T10:00:00.000Z',
+      '2026-07-02T10:00:00.000Z',
+      '2026-07-03T10:00:00.000Z',
+    ]);
+    expect(serie.map((punto) => punto.valor)).toEqual([0, 1, 2]);
+  });
+
+  it('sin partidas analizadas la serie está vacía, no en cero', () => {
+    expect(serieErroresGraves([game('sin', '2026-07-01T10:00:00.000Z')])).toEqual([]);
+  });
+
+  it('la tendencia exige puntos suficientes antes de afirmar una dirección', () => {
+    const pocos = Array.from({ length: 4 }, (_, i) => ({ fecha: `2026-07-0${i + 1}`, valor: 5 - i }));
+    expect(tendenciaSerie(pocos)).toBeNull();
+  });
+
+  it('una serie que baja da tendencia negativa; una que sube, positiva', () => {
+    const bajando = Array.from({ length: 9 }, (_, i) => ({ fecha: `d${i}`, valor: 9 - i }));
+    expect(tendenciaSerie(bajando)!.delta).toBeLessThan(0);
+
+    const subiendo = Array.from({ length: 9 }, (_, i) => ({ fecha: `d${i}`, valor: i }));
+    expect(tendenciaSerie(subiendo)!.delta).toBeGreaterThan(0);
   });
 });

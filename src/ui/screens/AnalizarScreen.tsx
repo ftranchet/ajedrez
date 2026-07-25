@@ -22,6 +22,8 @@ export function AnalizarScreen() {
   if (phase === 'fase2-analizando') return <Analizando />;
   if (phase === 'fase2-error') return <ErrorMotor />;
   if (phase === 'fase2-resultado') return <Resultado />;
+  if (phase === 'expres-analizando') return <ExpresAnalizando />;
+  if (phase === 'expres-error') return <ExpresError />;
   if (phase === 'confirmar-errores') return <ConfirmarErrores />;
   if (phase === 'fin') return <Fin />;
   return null;
@@ -172,6 +174,52 @@ function Analizando() {
           {t.analisis.analizandoProgreso.replace('{actual}', String(progreso.ply + 1)).replace('{total}', String(progreso.totalPlies + 1))}
         </p>
       )}
+    </div>
+  );
+}
+
+// Análisis exprés en lote (RF-3.5). A diferencia de la fase 2 de una partida
+// suelta, acá hay dos progresos anidados —qué partida y qué jugada de esa
+// partida— y una salida: analizar veinte rápidas puede llevar minutos, y
+// dejar al usuario sin forma de cortar sería atraparlo.
+function ExpresAnalizando() {
+  const progreso = useAnalysisStore((s) => s.progreso);
+  const lote = useAnalysisStore((s) => s.loteProgreso);
+  const cancelado = useAnalysisStore((s) => s.loteCancelado);
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
+      <Encabezado titulo={t.analisis.expresAnalizandoTitulo} />
+      {lote && (
+        <p className="m-0 font-mono text-sm text-primary">
+          {t.analisis.expresLoteProgreso.replace('{actual}', String(lote.actual)).replace('{total}', String(lote.total))}
+        </p>
+      )}
+      {progreso && (
+        <p className="m-0 font-mono text-xs text-secondary">
+          {t.analisis.analizandoProgreso.replace('{actual}', String(progreso.ply + 1)).replace('{total}', String(progreso.totalPlies + 1))}
+        </p>
+      )}
+      <p className="m-0 text-sm text-secondary">{t.analisis.expresAnalizandoTexto}</p>
+      {cancelado ? (
+        <p className="m-0 text-sm text-tertiary">{t.analisis.expresCancelando}</p>
+      ) : (
+        <button className="btn-secondary" onClick={() => useAnalysisStore.getState().cancelarLote()}>
+          {t.analisis.expresCancelar}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ExpresError() {
+  const s = useAnalysisStore();
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
+      <Encabezado titulo={t.analisis.errorMotorTitulo} />
+      <p className="m-0 text-secondary">{t.analisis.expresErrorTexto}</p>
+      <button className="btn-primary" onClick={() => s.volver()}>
+        {t.analisis.volver}
+      </button>
     </div>
   );
 }

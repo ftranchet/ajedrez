@@ -21,6 +21,9 @@ type Phase =
   | 'fase2-error'
   | 'fase2-resultado'
   | 'confirmar-errores'
+  // Análisis exprés (RF-3.5): solo fase 2, para el lote de rápidas importadas.
+  | 'expres-analizando'
+  | 'expres-error'
   | 'fin';
 
 interface MoveInfo {
@@ -53,7 +56,16 @@ interface AnalysisState {
   erroresConfirmados: number;
   errorActualCategoria: CategoriaError;
 
+  /** Progreso del lote exprés: qué partida se está analizando y cuántas van. */
+  loteProgreso: { actual: number; total: number } | null;
+  /** El usuario pidió cortar el lote; termina la partida en curso y para. */
+  loteCancelado: boolean;
+  /** Partidas del lote que el motor no pudo analizar; se informan al final. */
+  loteFallidas: number;
+
   iniciar(gameId: string): Promise<void>;
+  iniciarExpres(gameIds: string[]): Promise<void>;
+  cancelarLote(): void;
   marcarMomentoCritico(ply: number): void;
   confirmarPlan(texto: string): void;
   evaluarPosicion(valor: EvalSymbol): Promise<void>;
@@ -103,6 +115,9 @@ const initialState = {
   erroresPendientes: [] as MoveAnalysisEntry[],
   erroresConfirmados: 0,
   errorActualCategoria: 'tactico' as CategoriaError,
+  loteProgreso: null as { actual: number; total: number } | null,
+  loteCancelado: false,
+  loteFallidas: 0,
 };
 
 export const useAnalysisStore = create<AnalysisState>((set, get) => ({
@@ -118,6 +133,67 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     }
     const moves = movesFromPgn(game.pgn);
     set({ game, moves, phase: 'fase1-momento' });
+  },
+
+  /**
+   * Análisis exprés en lote (RF-3.5): corre solo la fase 2 sobre las partidas
+   * indicadas y junta todas las tarjetas candidatas para revisarlas de una.
+   *
+   * El análisis en dos fases sigue siendo obligatorio para las partidas lentas
+   * —el orden "primero tu juicio" es todo su valor—, pero pedirlo para cada
+   * rápida importada volvía impracticable traer historial. Y de ahí depende
+   * media app: sin tarjetas de origen `partida` no hay fuga táctica (RF-11.2),
+   * ni reciclaje de errores propios (RF-5.9), ni métrica de errores graves
+   * (RF-12.1). El exprés es el camino corto a ese material, no un atajo para
+   * saltearse la fase 1 donde sí importa.
+   *
+   * Una partida que el motor no puede analizar no corta el lote: se cuenta y
+   * se sigue con la siguiente.
+   */
+  async iniciarExpres(gameIds) {
+    if (gameIds.length === 0) return;
+    set({ ...initialState, phase: 'expres-analizando', loteProgreso: { actual: 0, total: gameIds.length } });
+    const games = await gameRepo.list();
+    const porId = new Map(games.map((game) => [game.id, game] as const));
+    const acumulados: MoveAnalysisEntry[] = [];
+    let fallidas = 0;
+
+    for (const [index, gameId] of gameIds.entries()) {
+      if (get().loteCancelado) break;
+      const game = porId.get(gameId);
+      if (!game) continue;
+      set({ loteProgreso: { actual: index + 1, total: gameIds.length }, game, progreso: null });
+      try {
+        const evals = await analyzeGameWithEngine(game.pgn, engine, {
+          onProgress: (p) => set({ progreso: p }),
+        });
+        // Sin fase 1: el exprés no la simula ni la deja a medias. La partida
+        // queda con `analisis` pero sin `fase1`, que es la verdad.
+        const analysis = buildGameAnalysis(evals, null);
+        await gameRepo.save({ ...game, analisis: analysis, analizada: true });
+        acumulados.push(...detectedErrorMoves(analysis, game.jugadorColor));
+      } catch {
+        fallidas += 1;
+      }
+    }
+
+    if (acumulados.length === 0) {
+      set({ phase: fallidas === gameIds.length ? 'expres-error' : 'fin', loteFallidas: fallidas, progreso: null });
+      return;
+    }
+    set({
+      erroresPendientes: acumulados,
+      erroresConfirmados: 0,
+      errorActualCategoria: 'tactico',
+      loteFallidas: fallidas,
+      progreso: null,
+      phase: 'confirmar-errores',
+    });
+  },
+
+  cancelarLote() {
+    if (get().phase !== 'expres-analizando') return;
+    set({ loteCancelado: true });
   },
 
   marcarMomentoCritico(ply) {

@@ -81,6 +81,7 @@ test('los números conservan ancho tabular sin cambiar la jerarquía tipográfic
   await expect(displayMetric).toBeVisible();
   expect(await displayMetric.evaluate((element) => getComputedStyle(element).getPropertyValue('font-variant-numeric'))).toContain('tabular-nums');
   expect(await displayMetric.evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Newsreader');
-  const truthSlot = page.getByRole('heading', { name: 'Panel de verdad' }).locator('..').locator('..');
+  // heading → contenedor del encabezado → <section> → PanelResourceSlot.
+  const truthSlot = page.getByRole('heading', { name: 'Panel de verdad' }).locator('..').locator('..').locator('..');
   expect(await truthSlot.evaluate((element) => getComputedStyle(element).minHeight)).toBe('368px');
 });

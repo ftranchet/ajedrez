@@ -72,6 +72,51 @@ export function calibrationCurve(
     }));
 }
 
+/**
+ * Brecha de calibración (error de calibración esperado): a cuántos puntos, en
+ * promedio, tu confianza declarada queda de tu acierto real. 0 es perfecto.
+ *
+ * Existe porque Brier, que es lo que el Panel mostraba como titular, mezcla dos
+ * cosas: qué tan calibrado estás y qué tan difícil es lo que respondés. Como el
+ * Radar mantiene el acierto en torno al 70% a propósito (RF-5.5), alguien
+ * perfectamente calibrado que declara 70% siempre saca 0,21 y *parece* peor que
+ * alguien que acierta 90% por estar en material fácil. Además "0,18" no le dice
+ * nada a un ajedrecista. La brecha se lee sola —"declarás 20 puntos por encima
+ * de lo que acertás"— y es la lectura que RF-10.3 pide en lenguaje claro. Brier
+ * se conserva como detalle: es la métrica de guardia del PRD §3.2.
+ */
+export function brechaCalibracion(records: Pick<CalibrationRecord, 'confianzaDeclarada' | 'acierto'>[]): number | null {
+  const curva = calibrationCurve(records);
+  if (curva.length === 0) return null;
+  const total = curva.reduce((sum, punto) => sum + punto.cantidad, 0);
+  if (total === 0) return null;
+  return curva.reduce(
+    (sum, punto) => sum + (punto.cantidad / total) * Math.abs(punto.confianzaMedia - punto.aciertoReal * 100),
+    0,
+  );
+}
+
+/**
+ * Serie de la brecha a lo largo del tiempo, en ventanas móviles de `ventana`
+ * respuestas. Para ver si la calibración mejora, que es lo que el PRD §3.2 pide
+ * ("debe bajar"), en vez de un número sin historia.
+ */
+export function serieBrechaCalibracion(
+  records: CalibrationRecord[],
+  ventana = 12,
+): Array<{ fecha: string; valor: number }> {
+  const ordenados = [...records]
+    .filter((record) => Number.isFinite(new Date(record.fecha).getTime()))
+    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  const serie: Array<{ fecha: string; valor: number }> = [];
+  for (let i = ventana - 1; i < ordenados.length; i++) {
+    const tramo = ordenados.slice(Math.max(0, i + 1 - ventana), i + 1);
+    const brecha = brechaCalibracion(tramo);
+    if (brecha !== null) serie.push({ fecha: ordenados[i].fecha, valor: brecha });
+  }
+  return serie;
+}
+
 export interface CalibrationInsight {
   direccion: 'sobreconfianza' | 'subconfianza' | 'calibrada';
   contexto: CalibrationRecord['contexto'] | 'global';

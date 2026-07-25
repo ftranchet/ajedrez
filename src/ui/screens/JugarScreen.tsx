@@ -7,38 +7,69 @@ import { SegmentedControl } from '../components/SegmentedControl';
 import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import { useFinalesStore } from '../state/finalesStore';
+import { useConversionStore } from '../state/conversionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
 import { isDue } from '../../core/scheduler';
+import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
 
 // La sub-ruta #/jugar/finales entra directo al modo finales (deep-link desde
 // Hoy), y elegir un modo actualiza el hash para que el botón "atrás" funcione.
-function modoDesdeHash(): 'partida' | 'finales' {
-  return window.location.hash.includes('/finales') ? 'finales' : 'partida';
+type ModoJugar = 'partida' | 'finales' | 'conversion';
+
+function modoDesdeHash(): ModoJugar {
+  if (window.location.hash.includes('/finales')) return 'finales';
+  if (window.location.hash.includes('/conversion')) return 'conversion';
+  return 'partida';
+}
+
+const RUTA_POR_MODO: Record<ModoJugar, string> = {
+  partida: '#/jugar',
+  finales: '#/jugar/finales',
+  conversion: '#/jugar/conversion',
+};
+
+function ModoPicker({ modo }: { modo: ModoJugar }) {
+  return (
+    <SegmentedControl
+      label={t.finales.modosLabel}
+      value={modo}
+      options={[
+        { value: 'partida', label: t.finales.modoPartida },
+        { value: 'finales', label: t.finales.modoFinales },
+        { value: 'conversion', label: t.conversion.modo },
+      ]}
+      onChange={(value) => {
+        const destino = RUTA_POR_MODO[value as ModoJugar];
+        if (window.location.hash !== destino) {
+          window.history.pushState(null, '', destino);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }}
+    />
+  );
 }
 
 export function JugarScreen() {
   const diagnosticoPhase = useDiagnosticoStore((state) => state.phase);
-  const [modo, setModo] = useState<'partida' | 'finales'>(modoDesdeHash);
+  const [modo, setModo] = useState<ModoJugar>(modoDesdeHash);
 
   useEffect(() => {
-    const onHash = () => setModo(modoDesdeHash());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const onNavigate = () => setModo(modoDesdeHash());
+    window.addEventListener('hashchange', onNavigate);
+    window.addEventListener('popstate', onNavigate);
+    return () => {
+      window.removeEventListener('hashchange', onNavigate);
+      window.removeEventListener('popstate', onNavigate);
+    };
   }, []);
 
-  function irA(next: 'partida' | 'finales') {
-    const target = next === 'finales' ? '#/jugar/finales' : '#/jugar';
-    if (window.location.hash !== target) window.history.pushState(null, '', target);
-    setModo(next);
-  }
-
   if (diagnosticoPhase !== 'inactivo' && diagnosticoPhase !== 'resultado') return <DiagnosticoEnCurso />;
-  return modo === 'finales'
-    ? <FinalesScreen onPartida={() => irA('partida')} />
-    : <PartidaScreen onFinales={() => irA('finales')} />;
+  if (modo === 'finales') return <FinalesScreen />;
+  if (modo === 'conversion') return <ConversionScreen />;
+  return <PartidaScreen />;
 }
 
 function DiagnosticoEnCurso() {
@@ -54,10 +85,10 @@ function DiagnosticoEnCurso() {
   );
 }
 
-function PartidaScreen({ onFinales }: { onFinales: () => void }) {
+function PartidaScreen() {
   const s = useGameStore();
 
-  if (s.phase === 'setup' || s.phase === 'loading') return <Setup onFinales={onFinales} />;
+  if (s.phase === 'setup' || s.phase === 'loading') return <Setup />;
 
   const statusText =
     s.phase === 'ended'
@@ -185,7 +216,7 @@ function ResignButton() {
   );
 }
 
-function Setup({ onFinales }: { onFinales: () => void }) {
+function Setup() {
   const s = useGameStore();
   const [levelId, setLevelId] = useState(ENGINE_LEVELS[0].id);
   const [color, setColor] = useState<Color | 'random'>('w');
@@ -200,15 +231,7 @@ function Setup({ onFinales }: { onFinales: () => void }) {
         <p className="mt-1 mb-0 text-secondary">{t.jugar.subtitulo}</p>
       </header>
 
-      <SegmentedControl
-        label={t.finales.modosLabel}
-        value="partida"
-        options={[
-          { value: 'partida', label: t.finales.modoPartida },
-          { value: 'finales', label: t.finales.modoFinales },
-        ]}
-        onChange={(value) => { if (value === 'finales') onFinales(); }}
-      />
+      <ModoPicker modo="partida" />
       <div>
         <section className="flex flex-col gap-4">
           <fieldset className="m-0 border-0 p-0">
@@ -297,7 +320,7 @@ function FinalRow({ item, progress }: { item: CurriculumItem; progress: Curricul
   );
 }
 
-function FinalesScreen({ onPartida }: { onPartida: () => void }) {
+function FinalesScreen() {
   const s = useFinalesStore();
   const itemCount = s.items.length;
   const load = s.load;
@@ -314,15 +337,7 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
           <p className="mt-1 mb-0 text-secondary">{t.finales.subtitulo}</p>
         </header>
 
-        <SegmentedControl
-          label={t.finales.modosLabel}
-          value="finales"
-          options={[
-            { value: 'partida', label: t.finales.modoPartida },
-            { value: 'finales', label: t.finales.modoFinales },
-          ]}
-          onChange={(value) => { if (value === 'partida') onPartida(); }}
-        />
+        <ModoPicker modo="finales" />
         {s.engineError && (
           <div className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
             <p className="m-0 text-sm">{t.finales.errorMotor}</p>
@@ -390,6 +405,130 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
                 : s.limpia ? t.finales.demostradoTexto : t.finales.perdidoTexto}
             </p>
             <button className="btn-primary" onClick={() => s.volver()}>{t.finales.volver}</button>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+/**
+ * Conversión de ventajas (E8, RF-8.1/8.3). El material sale del análisis de las
+ * partidas propias, que la app ya produce: no dependía de la red, y la épica
+ * figuraba bloqueada porque RF-8.1 pide Maia como defensor. RF-8.3 autoriza el
+ * motor local siempre que la limitación se diga, y acá se dice.
+ */
+function ConversionScreen() {
+  const s = useConversionStore();
+  const cargar = s.cargar;
+
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
+
+  if (s.phase === 'lista' || s.phase === 'error') {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <header>
+          <h1 className="m-0 font-display text-3xl font-medium">{t.conversion.titulo}</h1>
+          <p className="mt-1 mb-0 text-secondary">{t.conversion.subtitulo}</p>
+        </header>
+
+        <ModoPicker modo="conversion" />
+
+        <p className="m-0 rounded-lg border border-info/40 bg-surface p-3 text-sm text-secondary">{t.conversion.porQue}</p>
+        <p className="m-0 text-xs text-tertiary">{t.conversion.limitacion}</p>
+
+        {s.phase === 'error' && (
+          <div role="alert" className="rounded-md border border-error/35 bg-error-subtle p-3 text-sm">{t.conversion.errorMotor}</div>
+        )}
+
+        {s.ventajas.length === 0 ? (
+          <p className="m-0 rounded-lg border border-subtle bg-surface p-4 text-secondary">{t.conversion.sinVentajas}</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {s.ventajas.map((ventaja) => (
+              <li key={ventaja.gameId} className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
+                <div className="min-w-0">
+                  <p className="m-0 text-primary tabular-nums">
+                    {t.conversion.listaVentaja
+                      .replace('{ventaja}', formatDecimal(ventaja.ventajaCp / 100, 1))
+                      .replace('{jugada}', String(Math.floor(ventaja.ply / 2) + 1))}
+                  </p>
+                  <p className="m-0 mt-1 text-xs text-tertiary">
+                    {t.conversion.listaResultado.replace('{resultado}', ventaja.resultado)}
+                    {' · '}
+                    {new Date(ventaja.fecha).toLocaleDateString('es-AR')}
+                  </p>
+                </div>
+                <button className="btn-secondary shrink-0" onClick={() => void s.empezar(ventaja.gameId)}>
+                  {t.conversion.empezar}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  if (s.phase === 'cargando') return <p className="m-0 text-secondary">{t.conversion.cargando}</p>;
+
+  return (
+    <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
+        <Board
+          fen={s.fen}
+          orientation={s.playerColor}
+          turn={s.turn}
+          lastMove={s.lastMove}
+          check={s.check}
+          dests={s.dests}
+          movableColor={s.phase === 'jugando' && !s.thinking && s.turn === s.playerColor ? s.playerColor : null}
+          onMove={(from, to) => void s.userMove(from as Square, to as Square)}
+        />
+        {s.pendingPromotion && (
+          <PromotionDialog
+            color={s.playerColor}
+            onPick={(piece) => void s.userMove(s.pendingPromotion!.from, s.pendingPromotion!.to, piece)}
+            onCancel={() => s.cancelPromotion()}
+          />
+        )}
+      </div>
+      <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
+        <div className="rounded-lg border border-subtle bg-surface p-4">
+          <p className="m-0 font-display text-xl">{t.conversion.titulo}</p>
+          {s.ventaja && (
+            <p className="m-0 mt-2 text-sm text-secondary tabular-nums">
+              {t.conversion.listaVentaja
+                .replace('{ventaja}', formatDecimal(s.ventaja.ventajaCp / 100, 1))
+                .replace('{jugada}', String(Math.floor(s.ventaja.ply / 2) + 1))}
+            </p>
+          )}
+        </div>
+        {s.engineError && (
+          <div role="alert" className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
+            <p className="m-0 text-sm">{t.conversion.errorMotor}</p>
+            <button className="btn-secondary" onClick={() => s.volver()}>{t.conversion.volver}</button>
+          </div>
+        )}
+        {s.phase === 'jugando' && !s.engineError && (
+          <p className="m-0 text-secondary">{s.thinking ? t.conversion.pensando : t.conversion.teToca}</p>
+        )}
+        {s.phase === 'feedback' && (
+          <div
+            className={`flex flex-col gap-3 rounded-lg border p-4 ${
+              s.resultado === 'convertida' ? 'border-success/35 bg-success-subtle' : 'border-error/35 bg-error-subtle'
+            }`}
+          >
+            <h2 className="m-0 font-display text-2xl">
+              {s.resultado === 'convertida' ? t.conversion.convertida : t.conversion.perdida}
+            </h2>
+            <p className="m-0 text-secondary">
+              {s.resultado === 'convertida' ? t.conversion.convertidaTexto : t.conversion.perdidaTexto}
+            </p>
+            <p className="m-0 text-xs text-tertiary">{t.conversion.limitacion}</p>
+            <button className="btn-primary" onClick={() => s.volver()}>{t.conversion.volver}</button>
           </div>
         )}
       </aside>
