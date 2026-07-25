@@ -1,13 +1,33 @@
 // Adaptador del motor (ADR-0002): Stockfish WASM single-thread en un Web
 // Worker. El archivo .js real lo publica scripts/copy-engine.mjs en
 // public/engine/ junto con un manifest.json con su nombre.
+import { clampUciElo, elegirJugadaConImprecision, multiPvParaNivel } from '../../core/engineLevels';
 import type { EngineEvaluation, EngineLevel, EnginePort } from '../../core/ports';
 
 interface AnalyzeOptions {
-  skill: number;
+  /**
+   * Elo objetivo cuando el motor juega contra el usuario, o `null` para
+   * analizar a fuerza plena.
+   *
+   * Es obligatorio y explícito porque el worker es un **singleton compartido**
+   * entre la partida y el análisis: si jugar dejara `UCI_LimitStrength`
+   * encendido, la fase 2 del análisis (E3) correría en silencio a 1320 Elo y
+   * clasificaría errores contra un motor capado, sin que nada lo delatara.
+   * Cada búsqueda fija las dos opciones, siempre.
+   */
+  limitElo: number | null;
   /** Uno de los dos: presupuesto por tiempo (juego contra el usuario) o por profundidad (análisis, RNF-3). */
   movetimeMs?: number;
   depth?: number;
+  /** Líneas a pedir; >1 solo cuando el nivel juega con imprecisión. */
+  multiPv?: number;
+}
+
+/** Una línea devuelta por el motor, indexada por `multipv`. */
+interface LineaMotor {
+  move: string;
+  cp: number | null;
+  mateIn: number | null;
 }
 
 export class StockfishEngine implements EnginePort {
@@ -46,53 +66,87 @@ export class StockfishEngine implements EnginePort {
     await this.waitFor(/^readyok$/m);
   }
 
+  /**
+   * Jugada del motor al nivel pedido (RF-1.3). Los niveles con imprecisión
+   * piden varias líneas y a veces juegan una alternativa: es la única forma de
+   * bajar del piso de 1320 Elo que impone `UCI_Elo` sin caer en jugadas
+   * absurdas (ver core/engineLevels.ts).
+   */
   async bestMove(fen: string, level: EngineLevel): Promise<string> {
-    const result = await this.analyze(fen, { skill: level.skill, movetimeMs: level.movetimeMs });
-    return result.move;
+    const lineas = await this.search(fen, {
+      limitElo: level.uciElo,
+      movetimeMs: level.movetimeMs,
+      multiPv: multiPvParaNivel(level),
+    });
+    const elegida = elegirJugadaConImprecision(
+      lineas.map((linea) => linea.move),
+      level.imprecision ?? 0,
+    );
+    if (!elegida) throw new Error('El motor no devolvió jugada');
+    return elegida;
   }
 
-  /** Fuerza máxima (Skill Level 20), profundidad fija — para el análisis de partidas, no para jugar contra el usuario. */
+  /** Fuerza plena por profundidad — para el análisis de partidas, nunca para jugar contra el usuario. */
   async evaluate(fen: string, depth: number): Promise<EngineEvaluation> {
-    return this.analyze(fen, { skill: 20, depth });
+    const [mejor] = await this.search(fen, { limitElo: null, depth, multiPv: 1 });
+    if (!mejor) throw new Error('El motor no devolvió evaluación');
+    return mejor;
   }
 
-  private analyze(fen: string, opts: AnalyzeOptions): Promise<EngineEvaluation> {
-    const run = () => this.analyzeNow(fen, opts);
+  private search(fen: string, opts: AnalyzeOptions): Promise<LineaMotor[]> {
+    const run = () => this.searchNow(fen, opts);
     const result = this.pending.then(run, run);
     this.pending = result.catch(() => {}); // un análisis fallido no bloquea los siguientes
     return result;
   }
 
-  private async analyzeNow(fen: string, opts: AnalyzeOptions): Promise<EngineEvaluation> {
+  private async searchNow(fen: string, opts: AnalyzeOptions): Promise<LineaMotor[]> {
     await this.init();
     const worker = this.worker;
     if (!worker) throw new Error('Motor no inicializado');
 
-    let cp: number | null = null;
-    let mateIn: number | null = null;
+    // Índice `multipv` → última línea vista a la mayor profundidad. Stockfish
+    // reemite cada línea a cada profundidad; quedarse con la última es quedarse
+    // con la más profunda.
+    const lineas = new Map<number, LineaMotor>();
     const onInfo = (e: MessageEvent) => {
       const text = typeof e.data === 'string' ? e.data : '';
-      const mateMatch = /score mate (-?\d+)/.exec(text);
-      const cpMatch = /score cp (-?\d+)/.exec(text);
-      if (mateMatch) {
-        mateIn = Number(mateMatch[1]);
-        cp = null;
-      } else if (cpMatch) {
-        cp = Number(cpMatch[1]);
-        mateIn = null;
-      }
+      const scoreMatch = /score (cp|mate) (-?\d+)/.exec(text);
+      const pvMatch = /\bpv\s+(\S+)/.exec(text);
+      if (!scoreMatch || !pvMatch) return;
+      const indice = Number(/\bmultipv\s+(\d+)/.exec(text)?.[1] ?? 1);
+      const valor = Number(scoreMatch[2]);
+      lineas.set(indice, {
+        move: pvMatch[1],
+        cp: scoreMatch[1] === 'cp' ? valor : null,
+        mateIn: scoreMatch[1] === 'mate' ? valor : null,
+      });
     };
     worker.addEventListener('message', onInfo);
 
     try {
-      this.send(`setoption name Skill Level value ${opts.skill}`);
+      const multiPv = Math.max(1, opts.multiPv ?? 1);
+      // Las dos opciones se fijan siempre, en los dos sentidos: ver AnalyzeOptions.
+      if (opts.limitElo === null) {
+        this.send('setoption name UCI_LimitStrength value false');
+        this.send('setoption name Skill Level value 20');
+      } else {
+        this.send('setoption name Skill Level value 20');
+        this.send('setoption name UCI_LimitStrength value true');
+        this.send(`setoption name UCI_Elo value ${clampUciElo(opts.limitElo)}`);
+      }
+      this.send(`setoption name MultiPV value ${multiPv}`);
       this.send('ucinewgame');
       this.send(`position fen ${fen}`);
       this.send(opts.depth !== undefined ? `go depth ${opts.depth}` : `go movetime ${opts.movetimeMs}`);
       const line = await this.waitFor(/^bestmove\s+(\S+)/m, 30_000);
       const match = /^bestmove\s+(\S+)/m.exec(line);
       if (!match || match[1] === '(none)') throw new Error(`El motor no devolvió jugada: ${line}`);
-      return { move: match[1], cp, mateIn };
+
+      const ordenadas = [...lineas.entries()].sort(([a], [b]) => a - b).map(([, linea]) => linea);
+      // Si no llegó ninguna línea `info` utilizable (posiciones de mate en 1,
+      // búsquedas muy cortas), el `bestmove` sigue siendo una respuesta válida.
+      return ordenadas.length > 0 ? ordenadas : [{ move: match[1], cp: null, mateIn: null }];
     } finally {
       worker.removeEventListener('message', onInfo);
     }

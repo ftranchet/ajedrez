@@ -22,7 +22,7 @@ const CONVERSION_EVAL_DEPTH = 12;
  * motor no es humana; bajar la fuerza acerca el ejercicio a una defensa
  * realista en vez de convertirlo en un final de estudio.
  */
-const CONVERSION_LEVEL: EngineLevel = { id: 'conversion', skill: 8, movetimeMs: 600 };
+const CONVERSION_LEVEL: EngineLevel = { id: 'conversion', uciElo: 1700, movetimeMs: 600 };
 
 type Phase = 'lista' | 'cargando' | 'jugando' | 'feedback' | 'error';
 

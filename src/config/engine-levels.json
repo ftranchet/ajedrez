@@ -1,9 +1,10 @@
 {
+  "version": "engine-levels-v2",
   "levels": [
-    { "id": "nivel-1", "skill": 0, "movetimeMs": 250 },
-    { "id": "nivel-2", "skill": 3, "movetimeMs": 350 },
-    { "id": "nivel-3", "skill": 6, "movetimeMs": 500 },
-    { "id": "nivel-4", "skill": 10, "movetimeMs": 700 },
-    { "id": "nivel-5", "skill": 16, "movetimeMs": 1000 }
+    { "id": "nivel-1", "uciElo": 1320, "movetimeMs": 400, "imprecision": 0.55 },
+    { "id": "nivel-2", "uciElo": 1320, "movetimeMs": 400, "imprecision": 0.25 },
+    { "id": "nivel-3", "uciElo": 1450, "movetimeMs": 500 },
+    { "id": "nivel-4", "uciElo": 1950, "movetimeMs": 900 },
+    { "id": "nivel-5", "uciElo": 2600, "movetimeMs": 1400 }
   ]
 }

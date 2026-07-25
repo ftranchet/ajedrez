@@ -4,10 +4,20 @@ import type { GameRecord } from './types';
 
 export interface EngineLevel {
   id: string;
-  /** Skill Level de Stockfish (0–20). */
-  skill: number;
+  /**
+   * Elo objetivo que se le pide al motor vía `UCI_LimitStrength` + `UCI_Elo`
+   * (piso duro de Stockfish: 1320). Reemplaza al viejo `Skill Level`, que no
+   * era una curva de dificultad sino fuerza casi plena con errores aleatorios
+   * — ver `core/engineLevels.ts`.
+   */
+  uciElo: number;
   /** Presupuesto de tiempo por jugada del motor. */
   movetimeMs: number;
+  /**
+   * Probabilidad (0–1) de jugar una alternativa en vez de la mejor línea, para
+   * bajar del piso de 1320 que impone `UCI_Elo`. Ausente o 0 = siempre la mejor.
+   */
+  imprecision?: number;
 }
 
 /** Resultado de evaluar una posición a máxima fuerza (E3, análisis en dos fases). */

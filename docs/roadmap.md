@@ -62,5 +62,32 @@ Revisión completa del recorrido del usuario contra la visión del PRD. No agreg
 
 **Sigue pendiente,** por bloqueo de red real: bots Maia (RF-1.4), importación automática de historial (RF-2.1/2.3), Maia como defensor en conversión (RF-8.1) y el sello de tablebase (RF-6.4).
 
+## Auditoría 2026-07-25 (tercera tanda) — el instrumento
+
+Reordenamiento pedido por el dueño de producto, con un argumento que corrige la
+prioridad anterior: **medir con un instrumento que miente no es medir**. Ocho
+semanas de datos sobre una app que hace las cosas mal producen una conclusión
+falsa con mucha precisión. Antes de validar hay que arreglar.
+
+**Los niveles del motor no diferenciaban nada** (RF-1.3). Reportado por uso real
+—"el nivel 1 me resulta tan difícil como el 5, de hecho a veces más"— y
+confirmado: `Skill Level` no es una curva de dificultad. Se reemplazó por
+`UCI_LimitStrength` + `UCI_Elo` con imprecisión declarada por debajo del piso de
+1320, y se agregó `npm run measure:niveles`, que juega los niveles entre sí y
+falla si alguno no supera al inferior. Detalle y limitaciones de la medición en
+`docs/niveles-motor.md`.
+
+**Entrar a Jugar era un callejón sin salida** (RF-1.6). Ni partida libre, ni
+finales, ni conversión tenían salida mientras se jugaba; la única forma de dejar
+una partida era rendirse, que guarda una derrota real y además daba por cumplido
+el compromiso semanal de partida lenta.
+
+**Sigue pendiente de esta línea de trabajo:** Maia (RF-1.4) —construible: el
+bloqueo de red es del entorno de desarrollo, no del navegador del usuario, así
+que la verificación de punta a punta la hace el dueño de producto—, la amplitud
+de los catálogos (116 posiciones de Radar repiten a los ~12 días) y las
+explicaciones del Radar, que hoy son una frase fija por tipo y no dicen nada de
+la posición concreta (RF-5.3).
+
 ## Fase 6+ — Extensiones (cada una con su ADR previo)
 Candidatas: sincronización opcional en la nube, Maia self-hosted con niveles finos, inglés, cuentas para entrenadores con alumnos, cohortes agregadas con consentimiento para evidencia de eficacia.

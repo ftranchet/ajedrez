@@ -12,6 +12,7 @@ import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
 import { isDue } from '../../core/scheduler';
+import { eloAproximado } from '../../core/engineLevels';
 import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
 
@@ -142,7 +143,17 @@ function PartidaScreen() {
 
         <MoveList moves={s.sanMoves} />
 
-        {s.phase === 'playing' && !s.engineError && <ResignButton />}
+        {s.phase === 'playing' && !s.engineError && (
+          <>
+            <ResignButton />
+            {/* Rendirse guarda una derrota real, así que no puede ser la única
+                forma de salir: entrar a probar el motor y arrepentirse dejaba
+                una derrota en el historial y —al ser una partida sin reloj—
+                daba por cumplido el compromiso semanal de partida lenta.
+                Abandonar descarta la partida sin guardarla. */}
+            <AbandonButton />
+          </>
+        )}
         {s.phase === 'ended' && (
           <button onClick={() => s.reset()} className="btn-primary">
             {t.jugar.nuevaPartida}
@@ -216,6 +227,30 @@ function ResignButton() {
   );
 }
 
+function AbandonButton() {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button onClick={() => setConfirming(true)} className="btn-secondary">
+        {t.jugar.abandonar}
+      </button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-3">
+      <p className="m-0 text-sm">{t.jugar.confirmarAbandonar}</p>
+      <div className="flex gap-2">
+        <button onClick={() => useGameStore.getState().reset()} className="btn-danger flex-1">
+          {t.jugar.confirmarSi}
+        </button>
+        <button onClick={() => setConfirming(false)} className="btn-secondary flex-1">
+          {t.jugar.confirmarNo}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Setup() {
   const s = useGameStore();
   const [levelId, setLevelId] = useState(ENGINE_LEVELS[0].id);
@@ -240,9 +275,13 @@ function Setup() {
               {ENGINE_LEVELS.map((l) => (
                 <Chip key={l.id} selected={levelId === l.id} onClick={() => setLevelId(l.id)}>
                   {t.jugar.niveles[l.id] ?? l.id}
+                  <span className="ml-2 font-mono text-xs text-tertiary">
+                    {t.jugar.nivelElo.replace('{elo}', String(eloAproximado(l)))}
+                  </span>
                 </Chip>
               ))}
             </div>
+            <p className="m-0 mt-2 text-xs text-tertiary">{t.jugar.nivelesAyuda}</p>
           </fieldset>
 
           <fieldset className="m-0 border-0 p-0">
@@ -395,7 +434,16 @@ function FinalesScreen() {
             <button className="btn-secondary" onClick={() => s.volver()}>{t.finales.volver}</button>
           </div>
         )}
-        {s.phase === 'jugando' && <p className="m-0 text-secondary">{s.thinking ? t.finales.pensando : t.finales.teToca}</p>}
+        {s.phase === 'jugando' && (
+          <>
+            <p className="m-0 text-secondary">{s.thinking ? t.finales.pensando : t.finales.teToca}</p>
+            {/* Antes no había ninguna salida hasta terminar la técnica: entrar
+                a un final era quedar atrapado. Dejarlo a mitad no cuenta como
+                demostración fallida —no se llama a finish()—, así que no
+                rompe la racha hacia la automatización (RF-6.3). */}
+            <button className="btn-secondary" onClick={() => s.volver()}>{t.finales.dejar}</button>
+          </>
+        )}
         {s.phase === 'feedback' && (
           <div className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
             <h2 className="m-0 font-display text-2xl">{s.limpia ? t.finales.demostrado : t.finales.perdido}</h2>
@@ -513,7 +561,10 @@ function ConversionScreen() {
           </div>
         )}
         {s.phase === 'jugando' && !s.engineError && (
-          <p className="m-0 text-secondary">{s.thinking ? t.conversion.pensando : t.conversion.teToca}</p>
+          <>
+            <p className="m-0 text-secondary">{s.thinking ? t.conversion.pensando : t.conversion.teToca}</p>
+            <button className="btn-secondary" onClick={() => s.volver()}>{t.conversion.dejar}</button>
+          </>
         )}
         {s.phase === 'feedback' && (
           <div

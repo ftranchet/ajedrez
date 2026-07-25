@@ -3,6 +3,7 @@
 // compromiso semanal visible en Hoy —no una sugerencia suelta—. Estado de la
 // semana calendario local (lunes a domingo, igual que el plan de adherencia).
 import type { GameRecord, Ritmo } from './types';
+import { plyCountFromPgn } from './game';
 
 export type SlowGameWeekStatus = 'sin-jugar' | 'sin-analizar' | 'completa';
 
@@ -20,8 +21,20 @@ const RITMOS_LENTOS: Ritmo[] = ['rapida', 'clasica', 'sin-reloj'];
  * cuentan para las métricas de verdad; lo que no hacen es cumplir el
  * compromiso en su lugar.
  */
+/**
+ * Jugadas mínimas para que una partida cuente como "partida lenta". Rendirse en
+ * la jugada 4 produce una partida real —y se guarda como derrota, con razón—,
+ * pero no es el ejercicio que el compromiso semanal pide. Diez jugadas por lado
+ * es un piso bajo: cualquier partida que valga la pena analizar lo supera.
+ */
+const JUGADAS_MINIMAS_COMPROMISO = 20;
+
 function cuentaParaElCompromiso(game: GameRecord): boolean {
-  return game.contexto === undefined && RITMOS_LENTOS.includes(game.ritmo);
+  return (
+    game.contexto === undefined &&
+    RITMOS_LENTOS.includes(game.ritmo) &&
+    plyCountFromPgn(game.pgn) >= JUGADAS_MINIMAS_COMPROMISO
+  );
 }
 
 function startOfLocalWeek(now: Date): Date {

@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { partidaLentaSemanal } from './slowGame';
 import type { GameRecord } from './types';
 
+// El compromiso semanal exige una partida de largo realista (ver
+// JUGADAS_MINIMAS_COMPROMISO): rendirse en la jugada 4 produce una partida
+// real, pero no es el ejercicio que el compromiso pide.
+const PGN_COMPLETA = '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 *';
+
 function game(overrides: Partial<GameRecord>): GameRecord {
   return {
     id: crypto.randomUUID(),
-    pgn: '1. e4 e5 *',
+    pgn: PGN_COMPLETA,
     fuente: 'local',
     ritmo: 'clasica',
     resultado: '*',
@@ -79,5 +84,22 @@ describe('partidaLentaSemanal (RF-11.7)', () => {
       expect(partidaLentaSemanal([delDiagnostico(), propia], ahora)).toBe('sin-analizar');
       expect(partidaLentaSemanal([delDiagnostico(), { ...propia, analizada: true }], ahora)).toBe('completa');
     });
+  });
+});
+
+// Rendirse en la jugada 4 guarda una derrota real —y con razón—, pero no es
+// "tu partida lenta de la semana". Sin este piso, entrar a probar el motor y
+// arrepentirse daba el compromiso por cumplido.
+describe('una partida demasiado corta no cumple el compromiso', () => {
+  const ahora = new Date(2026, 6, 22, 20);
+
+  it('una rendición temprana no cuenta', () => {
+    const abandonada = game({ pgn: '1. e4 e5 2. Nf3 Nc6 0-1', fecha: new Date(2026, 6, 21, 10).toISOString() });
+    expect(partidaLentaSemanal([abandonada], ahora)).toBe('sin-jugar');
+  });
+
+  it('pero una partida de largo normal sí', () => {
+    const completa = game({ fecha: new Date(2026, 6, 21, 10).toISOString() });
+    expect(partidaLentaSemanal([completa], ahora)).toBe('sin-analizar');
   });
 });

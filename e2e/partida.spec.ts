@@ -79,3 +79,47 @@ test.describe('partida contra el motor', () => {
     await expect(page.locator('ol li').first()).toContainText('d4');
   });
 });
+
+// Entrar a Jugar y no poder volver era un callejón sin salida: los únicos
+// botones durante la partida eran "Rendirse" —que guarda una derrota real y,
+// al ser sin reloj, daba por cumplido el compromiso semanal— y nada más.
+test('partida libre: se puede abandonar sin que quede registrada', async ({ page }) => {
+  await page.goto('./#/jugar');
+  await page.getByRole('heading', { name: 'Jugar' }).waitFor();
+  await page.getByRole('button', { name: /Nivel 1/ }).click();
+  await page.getByRole('button', { name: 'Blancas' }).click();
+  await page.getByRole('button', { name: 'Empezar partida' }).click();
+
+  await page.locator('cg-board').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Abandonar sin guardar' }).click();
+  await page.getByRole('button', { name: 'Sí' }).click();
+
+  // Vuelve a la configuración, no a un tablero muerto.
+  await expect(page.getByRole('button', { name: 'Empezar partida' })).toBeVisible();
+
+  // Y no quedó ninguna partida guardada. Se consulta con poll porque el service
+  // worker de la PWA puede recargar la página y destruir el contexto justo acá.
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () =>
+          new Promise<number>((resolve, reject) => {
+            const request = indexedDB.open('elomax');
+            request.onsuccess = () => {
+              const db = request.result;
+              // Si nunca se guardó una partida, la tabla puede no existir aún:
+              // eso también significa cero.
+              if (!db.objectStoreNames.contains('games')) {
+                resolve(0);
+                return;
+              }
+              const count = db.transaction('games').objectStore('games').count();
+              count.onsuccess = () => resolve(count.result);
+              count.onerror = () => reject(count.error);
+            };
+            request.onerror = () => reject(request.error);
+          }),
+      ),
+    )
+    .toBe(0);
+});

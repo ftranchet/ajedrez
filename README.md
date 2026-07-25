@@ -35,6 +35,7 @@ Todo el contenido es local y verificado programáticamente: 116 posiciones de Ra
 | **`docs/adr/`** | Decisiones de arquitectura: qué se decidió, por qué y qué se descartó. |
 | **`docs/evidence/`** | La investigación que justifica cada módulo del producto. |
 | **`docs/radar-dataset.md`** | Origen, generación y validación del catálogo del Radar. |
+| **`docs/niveles-motor.md`** | Cómo se piden los niveles del oponente local y cómo se midieron. |
 | **`docs/prototipos/`** | Referencia visual del design system (se abre en el navegador). |
 | **`CHANGELOG.md`** | Historia de cambios. |
 
@@ -55,6 +56,7 @@ npm run dev    # servidor de desarrollo
 | `npm run lint` | ESLint |
 | `npm run verify:patrones` | Revalida las posiciones del currículo con chess.js |
 | `npm run verify:finales` | Revalida los finales con Stockfish |
+| `npm run measure:niveles` | Mide los niveles del motor jugándolos entre sí (RF-1.3b) |
 | `npm run build` | Build de producción |
 
 La arquitectura separa `core/` (dominio puro, sin React ni base de datos), `services/` (adaptadores: almacenamiento, motor, análisis) y `ui/`. Los detalles y las reglas de contribución están en `CONTRIBUTING.md`.

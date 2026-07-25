@@ -144,6 +144,7 @@ export const es = {
     convertidaTexto: 'Ganaste la posición que en su momento se te escapó. Eso es técnica de conversión.',
     perdida: 'Se escapó otra vez',
     perdidaTexto: 'La ventaja bajó de la mitad de lo que tenías. Podés volver a intentarlo: la posición no se gasta.',
+    dejar: 'Dejar esta posición',
     volver: 'Volver a la lista',
     errorMotor: 'El motor no pudo cargar o responder. Podés volver a intentarlo.',
   },
@@ -276,6 +277,7 @@ export const es = {
     perdidoPractica: 'Fue práctica libre: no descuenta de tu racha, pero el punto crítico igual queda para repasar.',
     perdido: 'La técnica se perdió',
     perdidoTexto: 'El punto crítico quedó registrado para repasarlo, si el motor pudo verificar una alternativa.',
+    dejar: 'Dejar este final',
     volver: 'Volver a finales',
     errorMotor: 'Stockfish no pudo cargar o completar la evaluación. Podés volver a intentarlo.',
   },
@@ -498,6 +500,8 @@ export const es = {
     pensando: 'El motor piensa…',
     jaque: 'Jaque',
     rendirse: 'Rendirse',
+    abandonar: 'Abandonar sin guardar',
+    confirmarAbandonar: '¿Descartar esta partida? No queda registrada: no cuenta como derrota ni como tu partida lenta de la semana.',
     confirmarRendirse: '¿Abandonar la partida?',
     confirmarSi: 'Sí, abandonar',
     confirmarNo: 'Seguir jugando',
@@ -514,13 +518,19 @@ export const es = {
       porAhogado: 'por ahogado',
       porRegla: 'por regla de tablas',
     },
+    // El nombre dice el Elo aproximado en vez de un adjetivo: los adjetivos
+    // anteriores ("da sus primeros pasos") prometían una curva que el motor no
+    // entregaba, y no había forma de que el usuario notara la diferencia.
     niveles: {
-      'nivel-1': 'Nivel 1 — da sus primeros pasos',
-      'nivel-2': 'Nivel 2 — comete errores gruesos',
-      'nivel-3': 'Nivel 3 — juega razonable',
+      'nivel-1': 'Nivel 1 — deja piezas, juega sin plan',
+      'nivel-2': 'Nivel 2 — falla táctica simple',
+      'nivel-3': 'Nivel 3 — sólido, castiga descuidos',
       'nivel-4': 'Nivel 4 — exige precisión',
       'nivel-5': 'Nivel 5 — muy fuerte',
     } as Record<string, string>,
+    nivelElo: '≈ {elo} Elo',
+    nivelesAyuda:
+      'Los Elo son aproximados: se los pide al motor, que los calibra contra su propia escala. Están medidos entre sí (los niveles altos le ganan a los bajos), no contra una federación.',
   },
   analisis: {
     analizar: 'Analizar',
