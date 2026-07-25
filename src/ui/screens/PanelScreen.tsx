@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CalibrationRecord, Color, CompromisoAttempt, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, StoykoAttempt, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
-import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from '../../core/panel';
+import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas } from '../../core/panel';
 import { brierScore, calibrationCurve, calibrationInsight } from '../../core/calibration';
 import { activitySummary } from '../../core/session';
 import { tasaConformismo } from '../../core/dobleSolucion';
@@ -501,6 +501,9 @@ function GamesSection({ games }: { games: GameRecord[] }) {
                   <span className="text-sm text-tertiary">{formatJugadas(Math.ceil(jugadas / 2))}</span>
                   <span className="font-mono text-sm text-primary">{game.resultado}</span>
                 </div>
+                {game.contexto === 'diagnostico' && (
+                  <span className="text-xs text-tertiary">{t.panel.partidaDelDiagnostico}</span>
+                )}
                 {game.ratingUsuario === undefined ? null : (
                   <span className="font-mono text-xs text-tertiary">{t.panel.partidaRating.replace('{rating}', String(game.ratingUsuario))}</span>
                 )}
@@ -886,18 +889,24 @@ function PanelDeVerdad({
 
   const mediaErroresGraves = erroresGravesPorPartidaMediaMovil(games);
   const brier = brierScore(calibraciones);
-  const latestRatedGame = games
-    .filter((game) => (game.ritmo === 'rapida' || game.ritmo === 'clasica') && game.ratingUsuario !== undefined)
-    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+  const rating = ratingDePartidasLentas(profile, games);
+  // El delta es la métrica estrella (PRD §3.1), no el número suelto: cuando hay
+  // dos tomas o más, lo que se lee arriba es el cambio.
+  const ratingDetalle = rating?.delta !== null && rating !== null
+    ? t.panel.verdadRatingDelta.replace('{signo}', rating.delta > 0 ? '+' : '').replace('{puntos}', String(rating.delta))
+    : rating
+      ? t.panel.verdadRatingSinDelta
+      : null;
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
       <SectionHeading>{t.panel.verdadTitulo}</SectionHeading>
       <div className="grid gap-2 sm:grid-cols-3">
         <TruthMetric
-          label={latestRatedGame ? t.panel.verdadRating : t.panel.verdadBanda}
-          value={String(latestRatedGame?.ratingUsuario ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico))}
-          vacio={!latestRatedGame && !profile.diagnosticoCompletadoEn}
+          label={rating ? t.panel.verdadRating : t.panel.verdadBanda}
+          value={String(rating?.valor ?? (profile.diagnosticoCompletadoEn ? t.diagnostico.bandas[profile.bandaElo] : t.panel.verdadSinDiagnostico))}
+          vacio={!rating && !profile.diagnosticoCompletadoEn}
+          detalle={ratingDetalle ?? (profile.diagnosticoCompletadoEn && !rating ? t.panel.verdadBandaAyuda : undefined)}
         />
         <TruthMetric
           label={t.panel.verdadErroresGraves}
@@ -918,15 +927,18 @@ function PanelDeVerdad({
  * explica NO toma la tipografía de la métrica: un estado vacío con el peso de
  * un número desalinea la fila (tres renglones contra una cifra) y se lee como
  * si fuera el valor medido. */
-function TruthMetric({ label, value, vacio = false }: { label: string; value: string; vacio?: boolean }) {
+function TruthMetric({ label, value, vacio = false, detalle }: { label: string; value: string; vacio?: boolean; detalle?: string }) {
   return (
     <div className="flex min-h-24 flex-col justify-between gap-2 rounded-md bg-elevated p-3 sm:min-h-28">
       <span className="text-sm text-secondary">{label}</span>
-      {vacio ? (
-        <span className="text-sm text-tertiary">{value}</span>
-      ) : (
-        <strong className="font-display text-2xl font-medium leading-tight text-primary tabular-nums">{value}</strong>
-      )}
+      <div className="flex flex-col gap-0.5">
+        {vacio ? (
+          <span className="text-sm text-tertiary">{value}</span>
+        ) : (
+          <strong className="font-display text-2xl font-medium leading-tight text-primary tabular-nums">{value}</strong>
+        )}
+        {detalle && <span className="text-xs text-secondary">{detalle}</span>}
+      </div>
     </div>
   );
 }
@@ -941,9 +953,15 @@ function RadarSummary({ attempts }: { attempts: RadarAttempt[] | null }) {
       </section>
     );
   }
-  // Los intentos históricos sin origen son catálogo. Los errores propios no
-  // entran en la meta 60–80% porque no tienen dificultad calibrada (RF-5.9).
-  const recent = attempts.filter((attempt) => attempt.origenContenido !== 'error-propio').slice(0, 50);
+  // Los intentos históricos sin origen son catálogo. Quedan afuera de la meta
+  // 60–80% los errores propios (no tienen dificultad calibrada, RF-5.9) y las
+  // respuestas del diagnóstico (RF-11.4), que se sirven sin adaptar la
+  // dificultad porque miden en vez de entrenar: mezclarlas hacía que las 20
+  // posiciones del diagnóstico dominaran esta lectura durante toda la primera
+  // semana, comparadas contra una banda objetivo que no les corresponde.
+  const esDeLaBandaAdaptativa = (attempt: RadarAttempt) =>
+    attempt.origenContenido !== 'error-propio' && attempt.origenContenido !== 'diagnostico';
+  const recent = attempts.filter(esDeLaBandaAdaptativa).slice(0, 50);
   const ownErrors = attempts.filter((attempt) => attempt.origenContenido === 'error-propio').slice(0, 50);
   const porcentaje = recent.length > 0
     ? Math.round((recent.filter((attempt) => attempt.acierto).length / recent.length) * 100)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RADAR_INITIAL_STATE, OWN_ERROR_RADAR_MAX_SHARE, adjustDifficulty, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, isOwnErrorRadarItem, ownErrorRadarItems, recordServed, scheduleOwnErrorRadarSlots, selectNextRadarItem, type RadarSelectionState } from './radar';
+import { RADAR_INITIAL_STATE, OWN_ERROR_RADAR_MAX_SHARE, adjustDifficulty, centroInicialDesdeDiagnostico, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, isOwnErrorRadarItem, ownErrorRadarItems, recordServed, scheduleOwnErrorRadarSlots, selectNextRadarItem, type RadarSelectionState } from './radar';
 import type { RadarItem, TipoRadar } from './types';
 import { buildErrorCard } from './errorCard';
 
@@ -260,5 +260,40 @@ describe('esRespuestaCorrectaRadar', () => {
     expect(esRespuestaCorrectaRadar(conAlt, 'g1f3')).toBe(true);
     // Una que no está listada sigue siendo fallo.
     expect(esRespuestaCorrectaRadar(conAlt, 'a2a3')).toBe(false);
+  });
+});
+
+describe('centroInicialDesdeDiagnostico (RF-11.4 → RF-5.5)', () => {
+  it('acertar en la banda objetivo deja el centro neutral', () => {
+    expect(centroInicialDesdeDiagnostico(0.7)).toBe(RADAR_INITIAL_STATE.dificultadCentro);
+  });
+
+  it('acertar de más arranca en posiciones más difíciles, y al revés', () => {
+    expect(centroInicialDesdeDiagnostico(0.9)).toBeGreaterThan(RADAR_INITIAL_STATE.dificultadCentro);
+    expect(centroInicialDesdeDiagnostico(0.4)).toBeLessThan(RADAR_INITIAL_STATE.dificultadCentro);
+  });
+
+  it('queda siempre dentro de 0–100, incluso en los extremos', () => {
+    expect(centroInicialDesdeDiagnostico(1)).toBeLessThanOrEqual(100);
+    expect(centroInicialDesdeDiagnostico(0)).toBeGreaterThanOrEqual(0);
+    // Valores fuera de rango (no deberían llegar) se acotan en vez de romper.
+    expect(centroInicialDesdeDiagnostico(5)).toBeLessThanOrEqual(100);
+    expect(centroInicialDesdeDiagnostico(-3)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('el centro sembrado sirve para seleccionar: un usuario fuerte no arranca en posiciones fáciles', () => {
+    const pool: RadarItem[] = Array.from({ length: 20 }, (_, index) => ({
+      id: `item-${index}`,
+      fen: '8/8/8/8/8/8/8/K6k w - - 0 1',
+      tipo: 'ofensiva',
+      temas: [],
+      rating: 1000 + index * 100,
+      solucion: ['a1a2'],
+      fuente: 'lichess-cc0',
+    }));
+    const state = { ...RADAR_INITIAL_STATE, dificultadCentro: centroInicialDesdeDiagnostico(0.95) };
+    const elegido = selectNextRadarItem(pool, state, () => 0.5);
+    expect(elegido).not.toBeNull();
+    expect(elegido!.rating).toBeGreaterThan(1000 + 9 * 100);
   });
 });

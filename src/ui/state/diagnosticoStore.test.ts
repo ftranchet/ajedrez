@@ -43,9 +43,16 @@ beforeEach(async () => {
     resultSaveStatus: 'inactivo',
     radarSelState: RADAR_INITIAL_STATE,
     radarItem: null,
-    radarSubPhase: 'jugando',
+    radarSubPhase: 'evaluando',
     radarServidos: 0,
     radarAciertos: 0,
+    radarRespuestas: [],
+    radarCalibraciones: [],
+    radarEvalGuess: null,
+    radarJugadaUsuario: null,
+    partidaIds: [],
+    lineaBase: null,
+    ratingExternoGuardado: null,
   });
 });
 
@@ -161,7 +168,10 @@ describe('diagnosticoStore — pausa y recuperación', () => {
     await useDiagnosticoStore.getState().reintentarJuego();
 
     expect(start).toHaveBeenCalledOnce();
-    expect(start).toHaveBeenCalledWith(DIAGNOSTICO_JUEGO1_NIVEL, 'b');
+    // El contexto viaja también en el reintento: sin él, la partida rehecha se
+    // guardaría como una partida propia y volvería a ocupar el compromiso
+    // semanal de partida lenta (core/slowGame.ts).
+    expect(start).toHaveBeenCalledWith(DIAGNOSTICO_JUEGO1_NIVEL, 'b', 'diagnostico');
   });
 
   it('muestra error si preparar Radar falla y permite reintentar sin perder resultados', async () => {
@@ -248,5 +258,149 @@ describe('diagnosticoStore — pausa y recuperación', () => {
     await useDiagnosticoStore.getState().radarContinuar();
     expect(useDiagnosticoStore.getState()).toMatchObject({ phase: 'resultado', resultSaveStatus: 'inactivo' });
     expect((await profileRepo.get()).diagnosticoCompletadoEn).not.toBeNull();
+  });
+});
+
+describe('diagnosticoStore — el diagnóstico deja línea base (RF-11.4)', () => {
+  // La base falsa es compartida entre tests del archivo y el beforeEach de
+  // arriba solo limpia el perfil: sin esto, los intentos y calibraciones de un
+  // test se cuentan en el siguiente.
+  beforeEach(async () => {
+    await Promise.all([
+      db.radarAttempts.clear(),
+      db.calibrationRecords.clear(),
+      db.radarProgress.clear(),
+    ]);
+  });
+
+  async function responderRadar() {
+    // El fixture es una posición de tipo 'envenenada' donde la solución es
+    // d5h5; jugarla acierta, cualquier otra falla.
+    await useDiagnosticoStore.getState().radarUserMove('d5' as never, 'h5' as never);
+  }
+
+  /**
+   * Carga la posición por el camino real del store. Importa hacerlo así y no
+   * con setState: el tablero de chess.js vive a nivel de módulo y solo lo
+   * posiciona `loadRadarItem`, de modo que inyectar el ítem a mano dejaría el
+   * tablero en la posición inicial y toda jugada sería ilegal.
+   */
+  async function cargarPosicion(posicionesYaServidas: number) {
+    vi.spyOn(radarItemRepo, 'ensureSeeded').mockResolvedValue(undefined);
+    vi.spyOn(radarItemRepo, 'list').mockResolvedValue([radarFixture]);
+    useDiagnosticoStore.setState({ phase: 'radar', radarLoadStatus: 'listo' });
+    await useDiagnosticoStore.getState().reintentarRadar();
+    useDiagnosticoStore.setState({
+      radarServidos: posicionesYaServidas,
+      radarAciertos: 0,
+      radarRespuestas: [],
+      radarCalibraciones: [],
+    });
+  }
+
+  it('el Radar del diagnóstico usa el mismo recorrido que la sesión: evaluar y después jugar (RF-5.2)', async () => {
+    await cargarPosicion(0);
+    expect(useDiagnosticoStore.getState().radarSubPhase).toBe('evaluando');
+
+    // Mientras no se declare la evaluación, la jugada no resuelve nada.
+    await responderRadar();
+    expect(useDiagnosticoStore.getState().radarSubPhase).toBe('evaluando');
+
+    useDiagnosticoStore.getState().radarEval('negras');
+    expect(useDiagnosticoStore.getState().radarSubPhase).toBe('jugando');
+    expect(useDiagnosticoStore.getState().radarEvalGuess).toBe('negras');
+  });
+
+  it('pide confianza en posiciones fijas y no revela el resultado antes de declararla', async () => {
+    // La tercera posición está en DIAGNOSTICO_POSICIONES_CONFIANZA.
+    await cargarPosicion(2);
+    useDiagnosticoStore.getState().radarEval('igual');
+    await responderRadar();
+
+    expect(useDiagnosticoStore.getState().radarSubPhase).toBe('confianza');
+    expect(useDiagnosticoStore.getState().radarServidos).toBe(3);
+
+    await useDiagnosticoStore.getState().radarConfirmarConfianza(80);
+
+    const state = useDiagnosticoStore.getState();
+    expect(state.radarSubPhase).toBe('feedback');
+    expect(state.radarCalibraciones).toEqual([{ confianzaDeclarada: 80, acierto: true }]);
+    // El registro también queda persistido para el Brier del Panel (RF-10.2).
+    expect(await db.calibrationRecords.count()).toBe(1);
+  });
+
+  it('una posición fuera del muestreo va directo al feedback', async () => {
+    await cargarPosicion(0);
+    useDiagnosticoStore.getState().radarEval('igual');
+    await responderRadar();
+
+    expect(useDiagnosticoStore.getState().radarSubPhase).toBe('feedback');
+    expect(useDiagnosticoStore.getState().radarCalibraciones).toEqual([]);
+  });
+
+  it('marca sus respuestas del Radar como del diagnóstico, para no contaminar la banda 60–80%', async () => {
+    await cargarPosicion(0);
+    useDiagnosticoStore.getState().radarEval('igual');
+    await responderRadar();
+
+    const intentos = await db.radarAttempts.toArray();
+    expect(intentos).toHaveLength(1);
+    expect(intentos[0].origenContenido).toBe('diagnostico');
+    // Sin dificultad normalizada: el diagnóstico no adapta, así que no aporta
+    // un percentil comparable al detector de sobreajuste (RF-12.3).
+    expect(intentos[0].dificultadNormalizada).toBeUndefined();
+  });
+
+  it('al cerrar guarda perfil de fugas y siembra el centro adaptativo del Radar', async () => {
+    useDiagnosticoStore.setState({
+      phase: 'radar',
+      radarLoadStatus: 'listo',
+      radarPool: [radarFixture],
+      radarItem: radarFixture,
+      radarSubPhase: 'feedback',
+      radarServidos: 20,
+      radarAciertos: 18,
+      resultadoJuego1: 'gano',
+      resultadoJuego2: 'gano',
+      partidaIds: ['partida-1', 'partida-2'],
+      radarRespuestas: [
+        ...Array.from({ length: 8 }, () => ({ tipo: 'ofensiva' as const, acierto: true })),
+        ...Array.from({ length: 8 }, () => ({ tipo: 'tranquila' as const, acierto: true })),
+        ...Array.from({ length: 4 }, (_, index) => ({ tipo: 'defensa' as const, acierto: index < 2 })),
+      ],
+      radarCalibraciones: [{ confianzaDeclarada: 100, acierto: true }],
+    });
+
+    await useDiagnosticoStore.getState().radarContinuar();
+
+    const state = useDiagnosticoStore.getState();
+    expect(state.phase).toBe('resultado');
+    expect(state.lineaBase).not.toBeNull();
+    expect(state.lineaBase!.radarAciertos).toBe(18);
+    expect(state.lineaBase!.brier).toBe(0);
+    expect(state.lineaBase!.partidaIds).toEqual(['partida-1', 'partida-2']);
+
+    // El perfil de fugas queda en el perfil, no solo en memoria (RF-11.4).
+    const profile = await profileRepo.get();
+    expect(profile.diagnosticoCompletadoEn).not.toBeNull();
+    expect(profile.perfilDeFugas?.porTipo).toEqual(
+      expect.arrayContaining([{ tipo: 'defensa', aciertos: 2, total: 4 }]),
+    );
+
+    // Y el Radar de la sesión arranca calibrado, no en el percentil neutral:
+    // 90% de acierto ⇒ centro por encima del inicial.
+    const progreso = await db.radarProgress.get('principal');
+    expect(progreso).toBeDefined();
+    expect(progreso!.dificultadCentro).toBeGreaterThan(RADAR_INITIAL_STATE.dificultadCentro);
+    expect(progreso!.aciertosRecientes).toHaveLength(8);
+  });
+
+  it('guarda el rating declarado como serie y rechaza valores fuera de rango', async () => {
+    await useDiagnosticoStore.getState().guardarRatingExterno(1450, 'lichess');
+    expect(useDiagnosticoStore.getState().ratingExternoGuardado?.valor).toBe(1450);
+    expect((await profileRepo.get()).ratingsExternos).toHaveLength(1);
+
+    await useDiagnosticoStore.getState().guardarRatingExterno(42, 'lichess');
+    expect((await profileRepo.get()).ratingsExternos).toHaveLength(1);
   });
 });

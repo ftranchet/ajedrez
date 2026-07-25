@@ -3,10 +3,10 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.2.7 |
+| Versión | 0.2.8 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
-| Última actualización | 2026-07-22 |
+| Última actualización | 2026-07-25 |
 | Documentos hermanos | `CONTRIBUTING.md`, `roadmap.md`, `design-system.md`, `adr/`, `evidence/` |
 
 > **Cómo usar este documento.** Es la fuente de verdad de producto. Cada épica tiene requisitos numerados (RF = requisito funcional, RNF = no funcional) con criterios de aceptación. Al construirlo —sea una persona o un agente de IA—: implementar de a una épica, citando los números de requisito en los commits; las reglas de trabajo completas están en `CONTRIBUTING.md`. Si una decisión técnica contradice o excede lo escrito acá, se documenta en un ADR antes de codear. Este documento cambia por pull request y cada cambio se refleja en el changelog.
@@ -130,7 +130,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 
 - **RF-6.1 (P0)** Biblioteca de mates típicos y motivos tácticos organizada por patrón, servida con recuperación activa (resolver en el tablero) y **motivos intercalados** — el sistema nunca sirve bloques monotemáticos.
 - **RF-6.2 (P0)** Biblioteca de finales teóricos elementales (rey y peón, torre básicos: Lucena, Philidor, oposición, regla del cuadrado) que se **juegan contra Stockfish** hasta demostrar la técnica (aquí la defensa perfecta del motor es deseable).
-- **RF-6.3 (P0)** Cada patrón y final tiene estado en el planificador espaciado: reaparece con intervalos crecientes hasta automatización (3 demostraciones espaciadas sin error).
+- **RF-6.3 (P0)** Cada patrón y final tiene estado en el planificador espaciado: reaparece con intervalos crecientes hasta automatización (3 demostraciones espaciadas sin error). El **espaciado es parte del requisito, no un detalle**: una interfaz que permita encadenar las tres demostraciones seguidas produce automatización por práctica masiva, que es el mecanismo contrario al que sostiene el currículo. Repetir un elemento antes de que venza está permitido como práctica libre, pero no acumula racha ni mueve el calendario (mismo criterio que RF-7.2).
 - **RF-6.4 (P1)** Verificación de finales contra tablebases vía interfaz de Lichess cuando hay conexión (sello de "jugada perfecta").
 - **RF-6.5 (P2)** Modificador a ciegas progresivo (piezas fantasma → solo coordenadas) que se activa automáticamente sobre patrones con acierto >80% para mantener la dificultad deseable.
 
@@ -166,6 +166,11 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-11.2 (P0)** Composición de la sesión, en orden: (1) repasos vencidos de la Cola; (2) dieta base por banda de Elo (tabla versionada en configuración, no hardcodeada — ver §9); (3) ajuste por fugas del último mes. El ejemplo original de este RF era "si >35% de derrotas son por reloj, sube Triage"; al retirarse la métrica de reloj (ver E9), la fuga que se mide es la **táctica**: si >35% de los errores recientes de partidas propias son tácticos, se refuerza el Radar y se suma el bloque "¿Calcular o ya alcanza?".
 - **RF-11.3 (P0)** Cada bloque muestra su **porqué** en una línea ("Radar 12 min — tus errores graves en posiciones tranquilas duplican tu promedio").
 - **RF-11.4 (P0)** Diagnóstico inicial: importación + análisis en lote (E2/E3 exprés) → banda de Elo y perfil de fugas → primera dieta. Sin historial: 2 partidas sin reloj contra Maia escalonada + 20 posiciones de Radar.
+  - **RF-11.4a (P0)** El diagnóstico usa **el mismo instrumento** que la sesión: sus posiciones de Radar pasan por el paso de evaluación rápida (RF-5.2) y piden confianza declarada (RF-10.1) en un subconjunto **fijo** de posiciones —no muestreado al azar como en la sesión— para que la línea base de Brier tenga la misma cantidad de observaciones en todos los casos. Sin esto, los números del diagnóstico no son comparables con los de ninguna sesión posterior.
+  - **RF-11.4b (P0)** El diagnóstico **no adapta** la dificultad mientras mide (si adaptara, la tasa de acierto convergería a la banda objetivo para cualquier nivel y dejaría de discriminar), pero **sí siembra** el centro adaptativo del Radar (RF-5.5) con la tasa observada, junto al historial de tipos e ids servidos. Sus respuestas se marcan con origen propio y quedan fuera de la lectura de la banda 60–80% y del detector de sobreajuste (RF-12.3).
+  - **RF-11.4c (P0)** El diagnóstico produce y persiste un **perfil de fugas** por tipo de posición del Radar (los cinco de RF-5.1). Se guardan los conteos crudos, no una conclusión. Con ~4 observaciones por tipo, señalar una fuga exige observaciones mínimas, acierto bajo en absoluto **y** separación clara del promedio del propio usuario; cuando nada califica, la interfaz dice que todavía no hay señal en vez de nombrar la menos buena.
+  - **RF-11.4d (P0)** Las partidas del diagnóstico se registran con su contexto y **no cumplen** el compromiso semanal de partida lenta (RF-11.7): ese compromiso es una partida que el usuario decide jugar. Siguen contando para las métricas de verdad si se analizan.
+  - **RF-11.4e (P0)** El diagnóstico cierra con un **informe**, no con una etiqueta: banda con su significado, valor de arranque de cada métrica de verdad con qué mide y para qué sirve, perfil de fugas, recomendaciones derivadas de esos datos, y cuándo se vuelve a medir. Su acción primaria es analizar una de las partidas recién jugadas —el único camino a la línea base de errores graves y a las tarjetas de origen `partida`, de las que dependen RF-11.2 y RF-5.9—. El análisis nunca se dispara solo: la fase 1 es del usuario (RF-3.1).
 - **RF-11.5 (P1)** El usuario puede saltear un bloque (se registra) pero no reordenar la prioridad de la Cola.
 - **RF-11.6 (P1)** Las reglas del Prescriptor viven en un archivo de configuración versionado (JSON) con su propio changelog: iterar la dieta no toca código.
 - **RF-11.7 (P2)** Modo "partida lenta programada": el Prescriptor reserva bloques semanales para partidas completas + análisis (no todo es ejercicio).
@@ -174,6 +179,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 ### E12 — Panel de métricas y autoexperimento
 
 - **RF-12.1 (P0)** Panel de verdad (grande, al frente): rating de partidas lentas, errores graves por partida (media móvil), calibración. Panel de actividad (chico, atrás): sesiones, minutos, volumen.
+  - **RF-12.1a (P0)** El **rating de partidas lentas** necesita una fuente real. Mientras la importación automática de historial siga bloqueada (RF-2.1), la única disponible es el rating que el usuario declara: se pide una vez en el diagnóstico (opcional, no bloqueante), se guarda como **serie** y se puede actualizar desde Ajustes. Lo que se muestra como métrica es el **cambio contra la primera toma**, no el número suelto. Sin esta fuente, la métrica estrella (§3.1) y el detector de sobreajuste (RF-12.3) no tienen instrumento para un usuario que solo juega dentro de la app: sus partidas se guardan sin reloj y sin rating.
 - **RF-12.2 (P1)** Batería de transferencia: set fijo de 30 posiciones nunca entrenadas, ofrecida cada 6–8 semanas, con resultados comparables entre tomas.
 - **RF-12.3 (P1)** Detector de sobreajuste: si el rating interno de ejercicios sube durante 8 semanas sin que el rating de partidas acompañe, alerta explícita + rebalanceo sugerido de dieta hacia partidas y análisis.
 - **RF-12.4 (P2)** Modo experimento n=1: registro de línea base, dosis por modalidad, y comparación entre bloques de énfasis distinto (diseño ABAB simple), con las advertencias metodológicas escritas en pantalla.
@@ -256,13 +262,13 @@ Regla de dependencias: `ui → core → (interfaces de) services`. `core` no imp
 
 | Entidad | Campos clave |
 |---|---|
-| `Game` | id, pgn, fuente (local/lichess/chesscom/manual), ritmo, resultado, tiemposPorJugada, analizada (bool), fase1 (respuestas del usuario), fecha |
+| `Game` | id, pgn, fuente (local/lichess/chesscom/manual), ritmo, resultado, tiemposPorJugada, analizada (bool), fase1 (respuestas del usuario), fecha, contexto (diagnóstico) |
 | `ErrorCard` | id, fen, ladoAMover, jugadaUsuario, jugadaCorrecta, categoría, origen, fsrs {due, stability, difficulty, reps, lapses}, historialRepasos |
 | `RadarItem` | id, fen, tipo (ofensiva/defensa/tranquila/genuina/envenenada/dobleSolución), temas[], rating, fuente |
 | `CurriculumItem` | id, tipo (patrón/final), contenido, fsrs, demostracionesLimpias |
 | `CalibrationRecord` | id, contexto, confianzaDeclarada, acierto, fecha |
 | `Session` | id, fecha, bloquesPrescritos[], bloquesCompletados[], duración |
-| `Profile` | bandaElo, ratingsExternos, perfilDeFugas, config, versiónEsquema |
+| `Profile` | bandaElo, ratingsExternos (serie declarada), perfilDeFugas (por tipo del Radar), config, versiónEsquema |
 | `TransferBattery` | setId, tomas[{fecha, resultados[]}] |
 
 **Dependencias externas y sus riesgos:** interfaz de Lichess (generosa pero con límites de tasa; mitigación: adaptador con reintentos + import manual de PGN como camino alternativo permanente); interfaz pública de Chess.com (solo lectura; mismo adaptador); bots Maia (solo 3 niveles hoy — 1100/1500/1900; suficiente para v1, self-hosting como evolución en ADR-0004); dataset de puzzles (descarga única, se procesa en pipeline propio, sin dependencia en runtime).

@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import type { Color, GameRecord, Resultado } from './types';
+import type { Color, ContextoPartida, GameRecord, Resultado } from './types';
 
 export interface ResultInput {
   isCheckmate: boolean;
@@ -30,6 +30,8 @@ export interface BuildGameArgs {
   jugadorColor?: Color;
   /** Elo del usuario en esta partida, cuando existe una fuente real. */
   ratingUsuario?: number;
+  /** Contexto de la partida cuando no la eligió el usuario (hoy: el diagnóstico). */
+  contexto?: ContextoPartida;
 }
 
 export function buildGameRecord(args: BuildGameArgs): GameRecord {
@@ -44,6 +46,7 @@ export function buildGameRecord(args: BuildGameArgs): GameRecord {
     fecha: args.fecha ?? new Date().toISOString(),
     ...(args.jugadorColor ? { jugadorColor: args.jugadorColor } : {}),
     ...(args.ratingUsuario !== undefined ? { ratingUsuario: args.ratingUsuario } : {}),
+    ...(args.contexto ? { contexto: args.contexto } : {}),
   };
 }
 

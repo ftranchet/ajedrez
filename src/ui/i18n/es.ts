@@ -21,6 +21,15 @@ export const es = {
     temaSistema: 'Sistema',
     temaClaro: 'Claro',
     temaOscuro: 'Oscuro',
+    ratingTitulo: 'Tu rating de partidas lentas',
+    ratingTexto:
+      'La pregunta que la app intenta responder es si tu Elo real sube por hora entrenada. Ese número no lo puede medir sola: anotá acá el rating de tus partidas rápidas o clásicas y actualizalo cada cuatro o seis semanas.',
+    ratingSinDatos: 'Todavía no cargaste ninguno. Sin él, el Panel muestra tu banda de arranque en vez de tu progreso real.',
+    ratingActual: 'Último: {valor} ({fuente}, {fecha}).',
+    ratingDelta: '{signo}{puntos} en {tomas} tomas.',
+    ratingNuevo: 'Rating de hoy',
+    ratingGuardar: 'Guardar rating',
+    ratingAyuda: 'Se guarda la serie completa: lo que se mide es el cambio entre tomas, no el número suelto.',
     aCiegasTitulo: 'Modo a ciegas',
     aCiegasTexto: 'Cuando dominás un patrón, las piezas se van atenuando (y después se ocultan) para que recordar la posición cueste un poco más y se fije mejor. Si preferís ver siempre el tablero completo, apagalo.',
     aCiegasLabel: 'Piezas que se desvanecen al dominar un patrón',
@@ -121,12 +130,18 @@ export const es = {
     objetivoGana: 'Objetivo: convertir la ventaja y promocionar o ganar.',
     objetivoTablas: 'Objetivo: sostener la defensa de Philidor durante 12 jugadas propias o alcanzar tablas.',
     progreso: '{n} de 3 demostraciones limpias',
+    programado: '{n} de 3 demostraciones limpias · vuelve el {fecha}',
     automatizado: 'Técnica automatizada',
+    espaciadoAyuda:
+      'Cada técnica se automatiza con tres demostraciones limpias separadas en el tiempo, no seguidas: repetir hoy lo que ya te salió no te lo fija. Podés practicar igual las que están programadas, pero esas repeticiones no cuentan para la racha.',
     empezar: 'Jugar este final',
+    practicar: 'Practicar sin que cuente',
     pensando: 'Stockfish busca la defensa más fuerte…',
     teToca: 'Te toca',
     demostrado: 'Técnica demostrada',
     demostradoTexto: 'La demostración quedó registrada y la próxima aparición se espaciará.',
+    demostradoPractica: 'Salió bien. Fue práctica libre, así que no suma a la racha ni cambia la fecha de la próxima.',
+    perdidoPractica: 'Fue práctica libre: no descuenta de tu racha, pero el punto crítico igual queda para repasar.',
     perdido: 'La técnica se perdió',
     perdidoTexto: 'El punto crítico quedó registrado para repasarlo, si el motor pudo verificar una alternativa.',
     volver: 'Volver a finales',
@@ -180,6 +195,66 @@ export const es = {
     resultadoBanda: 'Banda de arranque: {banda}',
     resultadoTexto: 'Tu dieta de hoy ya está armada con esta banda. Se va a ajustar sola con cada partida que analices.',
     continuar: 'Empezar a entrenar',
+
+    // --- Informe de cierre (RF-11.4) ---
+    informeTitulo: 'Tu punto de partida',
+    informeIntro:
+      'Esto es lo que quedó medido hoy. No es una nota: es la línea base contra la que vas a comparar dentro de unas semanas para saber si el entrenamiento está funcionando.',
+    informeBandaLabel: 'Banda de arranque',
+    informeBandaAyuda:
+      'Define cuántos patrones y cuántas posiciones trae tu sesión diaria. Es un punto de partida para dosificar, no una medida de tu fuerza: tu Elo real se mide jugando.',
+    informeLineaBaseTitulo: 'Tus valores de arranque',
+    informeRadarLabel: 'Radar del diagnóstico',
+    informeRadarValor: '{aciertos} de {total} ({porcentaje}%)',
+    informeRadarAyuda:
+      'Estas 20 posiciones se sirvieron sin adaptar la dificultad, para medir. A partir de ahora el Radar ajusta para dejarte entre 60% y 80% de acierto, así que este número no se compara con el de tus sesiones.',
+    informeBrierLabel: 'Calibración del juicio (Brier)',
+    informeBrierAyuda:
+      'Compara la confianza que declaraste con lo que realmente acertaste. Más cerca de 0 es mejor. Sirve para saber si sabés cuándo sabés: un juicio calibrado decide mejor cuando la posición se complica.',
+    informeBrierSinDatos: 'Sin datos todavía',
+    informeErroresLabel: 'Errores graves por partida',
+    informeErroresPendiente: 'Falta analizar una partida',
+    informeErroresAyuda:
+      'Es la métrica de mejora más importante que la app puede medir sola: por debajo de 1800, los errores graves deciden la mayoría de las partidas. Se llena en cuanto analices tu primera partida.',
+    informeFugasTitulo: 'Dónde se te escapan las posiciones',
+    informeFugasSinSenal:
+      'Con 20 posiciones no aparece todavía una fuga clara. Vas a verla acá cuando el Radar acumule más respuestas: preferimos no señalar una debilidad que no podemos sostener.',
+    informeFugaLinea: '{tipo}: {aciertos} de {total}',
+    informeFugaDestacada: 'Tu punto flojo de hoy: {tipo}.',
+    informeFugasAyuda: 'Acierto por tipo de posición en el diagnóstico. Con ~4 posiciones por tipo, esto marca una tendencia, no una conclusión.',
+    informeRecomendacionesTitulo: 'Qué conviene hacer primero',
+    informeRecomendacionAnalisis:
+      'Analizá una de las dos partidas que acabás de jugar. Es lo único que llena la métrica de errores graves y lo que convierte tus errores reales en repasos.',
+    informeRecomendacionPartida:
+      'Jugá y analizá una partida lenta por semana. Es el ejercicio con más respaldo de todos los que hay acá.',
+    informeRecomendacionFuga:
+      'Tu sesión diaria ya va a insistir con {tipo}, que es donde hoy fallás más.',
+    informeMedicionTitulo: 'Cómo vas a saber si sirve',
+    informeMedicionTexto:
+      'Dentro de unas siete semanas vas a resolver una batería de 30 posiciones que nunca se entrenan ni se muestran resueltas. Comparar esa toma con la siguiente es la prueba más honesta de que lo entrenado se traslada a posiciones nuevas, y no de que te aprendiste el catálogo.',
+    informeRatingTitulo: 'Tu rating de partidas lentas (opcional)',
+    informeRatingTexto:
+      'La medida que más importa es cuánto sube tu Elo real por hora entrenada. Si jugás en Lichess, Chess.com o un club, anotá tu rating de partidas rápidas o clásicas para tener contra qué comparar. Podés cargarlo o cambiarlo después desde Ajustes.',
+    informeRatingLabel: 'Rating',
+    informeRatingFuente: '¿Dónde jugás?',
+    informeRatingGuardar: 'Guardar rating',
+    informeRatingGuardado: 'Rating guardado: {valor}. Vas a poder ver su evolución en el Panel.',
+    informeRatingInvalido: 'Poné un número entre 100 y 4000.',
+    fuentesRating: {
+      lichess: 'Lichess',
+      chesscom: 'Chess.com',
+      otro: 'Otro',
+    } as Record<string, string>,
+    informeAnalizarCta: 'Analizar mi partida del diagnóstico',
+    informeEmpezar: 'Ir a mi sesión de hoy',
+    /** Nombres de los cinco tipos del Radar (RF-5.1) para el perfil de fugas. */
+    tiposRadar: {
+      ofensiva: 'Táctica ofensiva',
+      defensa: 'Defensa obligada',
+      tranquila: 'Posición tranquila',
+      genuina: 'Oferta de material genuina',
+      envenenada: 'Oferta envenenada',
+    } as Record<string, string>,
     bandas: {
       principiante: 'Principiante',
       elemental: 'Elemental',
@@ -403,7 +478,10 @@ export const es = {
     medicionComoLeer: 'Transferencia, sobreajuste y experimentos necesitan semanas y partidas comparables. Un estado “sin datos” es una limitación honesta, no una tarea atrasada.',
     verdadTitulo: 'Panel de verdad',
     verdadBanda: 'Banda de Elo',
-    verdadRating: 'Rating de partidas rápidas y clásicas',
+    verdadBandaAyuda: 'Es tu punto de partida para dosificar, no una medida de mejora. Cargá tu rating real en Ajustes para medirla.',
+    verdadRating: 'Rating de partidas lentas',
+    verdadRatingDelta: '{signo}{puntos} desde tu primera medición.',
+    verdadRatingSinDelta: 'Primera medición. El progreso se ve cuando lo actualices.',
     verdadSinDiagnostico: 'Sin diagnosticar todavía',
     verdadErroresGraves: 'Errores graves por partida (últimas 10)',
     verdadSinPartidas: 'Analizá una partida para ver esto',
@@ -439,6 +517,7 @@ export const es = {
     partidas: 'Partidas guardadas',
     sinPartidas: 'Todavía no jugaste ninguna partida. Cuando termines una, queda guardada acá, en tu dispositivo.',
     partidaRating: 'Tu rating: {rating}',
+    partidaDelDiagnostico: 'Del diagnóstico inicial. Cuenta para tus métricas si la analizás, pero no ocupa tu partida lenta de la semana.',
     jugadaCorta: 'jugada',
     jugadasCortas: 'jugadas',
     radar: 'Radar',

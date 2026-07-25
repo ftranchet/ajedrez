@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves } from './panel';
+import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas } from './panel';
 import type { Color, GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
 
 function jugada(clasificacion: MoveAnalysisEntry['clasificacion'], ladoQueMueve: Color = 'w'): MoveAnalysisEntry {
@@ -138,5 +138,70 @@ describe('mejoraErroresGraves (RF-13.2)', () => {
     ];
     const unattributable = game('sin-color', '2026-07-10T12:00:00.000Z', analisisCon([]), null);
     expect(mejoraErroresGraves([...previous, ...current, unattributable], now)).toBeNull();
+  });
+});
+
+describe('ratingDePartidasLentas (PRD §3.1, RF-12.1)', () => {
+  function partidaRateada(fecha: string, rating: number): GameRecord {
+    return { ...game('rateada', fecha), ritmo: 'rapida', ratingUsuario: rating };
+  }
+
+  it('sin rating declarado ni partida rateada no inventa un número', () => {
+    expect(ratingDePartidasLentas({}, [])).toBeNull();
+    // Las partidas jugadas dentro de la app son 'sin-reloj' y no llevan rating:
+    // ese es justamente el caso que dejaba la métrica estrella sin instrumento.
+    expect(ratingDePartidasLentas({}, [game('local', '2026-07-20T10:00:00.000Z')])).toBeNull();
+  });
+
+  it('una sola toma declarada no tiene delta todavía', () => {
+    const resultado = ratingDePartidasLentas(
+      { ratingsExternos: [{ valor: 1420, fuente: 'lichess', fecha: '2026-06-01T10:00:00.000Z' }] },
+      [],
+    );
+    expect(resultado).toEqual({ valor: 1420, delta: null, origen: 'declarado' });
+  });
+
+  it('con varias tomas el delta se mide contra la primera, no contra la anterior', () => {
+    const resultado = ratingDePartidasLentas(
+      {
+        ratingsExternos: [
+          { valor: 1420, fuente: 'lichess', fecha: '2026-06-01T10:00:00.000Z' },
+          { valor: 1500, fuente: 'lichess', fecha: '2026-07-01T10:00:00.000Z' },
+          { valor: 1465, fuente: 'lichess', fecha: '2026-08-01T10:00:00.000Z' },
+        ],
+      },
+      [],
+    );
+    expect(resultado).toEqual({ valor: 1465, delta: 45, origen: 'declarado' });
+  });
+
+  it('la serie desordenada se ordena por fecha antes de leerla', () => {
+    const resultado = ratingDePartidasLentas(
+      {
+        ratingsExternos: [
+          { valor: 1500, fuente: 'otro', fecha: '2026-07-01T10:00:00.000Z' },
+          { valor: 1420, fuente: 'otro', fecha: '2026-06-01T10:00:00.000Z' },
+        ],
+      },
+      [],
+    );
+    expect(resultado).toEqual({ valor: 1500, delta: 80, origen: 'declarado' });
+  });
+
+  it('sin serie declarada cae a la partida rateada más reciente', () => {
+    const resultado = ratingDePartidasLentas({}, [
+      partidaRateada('2026-06-01T10:00:00.000Z', 1300),
+      partidaRateada('2026-07-01T10:00:00.000Z', 1380),
+    ]);
+    expect(resultado).toEqual({ valor: 1380, delta: null, origen: 'partida' });
+  });
+
+  it('la serie declarada tiene prioridad: no se mezclan dos poblaciones en un delta', () => {
+    const resultado = ratingDePartidasLentas(
+      { ratingsExternos: [{ valor: 1420, fuente: 'chesscom', fecha: '2026-06-01T10:00:00.000Z' }] },
+      [partidaRateada('2026-07-01T10:00:00.000Z', 1900)],
+    );
+    expect(resultado?.origen).toBe('declarado');
+    expect(resultado?.valor).toBe(1420);
   });
 });

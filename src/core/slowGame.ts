@@ -9,6 +9,21 @@ export type SlowGameWeekStatus = 'sin-jugar' | 'sin-analizar' | 'completa';
 /** Ritmos que cuentan como "partida lenta" para el compromiso (se excluye bullet/blitz). */
 const RITMOS_LENTOS: Ritmo[] = ['rapida', 'clasica', 'sin-reloj'];
 
+/**
+ * El compromiso semanal es una partida que el usuario **decide** jugar. Las dos
+ * partidas del diagnóstico inicial (RF-11.4) se juegan sin reloj y con el mismo
+ * motor de partidas que la pantalla Jugar, así que entraban acá y daban el
+ * compromiso por cumplido apenas terminaba el diagnóstico: Hoy anunciaba "tu
+ * partida lenta de la semana ya está jugada" (o directamente "jugada y
+ * analizada", si el usuario analizaba una de ellas desde el Panel) sin que el
+ * usuario hubiera jugado ninguna partida propia. Siguen siendo partidas suyas y
+ * cuentan para las métricas de verdad; lo que no hacen es cumplir el
+ * compromiso en su lugar.
+ */
+function cuentaParaElCompromiso(game: GameRecord): boolean {
+  return game.contexto === undefined && RITMOS_LENTOS.includes(game.ritmo);
+}
+
 function startOfLocalWeek(now: Date): Date {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const daysSinceMonday = (start.getDay() + 6) % 7;
@@ -25,7 +40,7 @@ export function partidaLentaSemanal(games: GameRecord[], now: Date = new Date())
   const hasta = now.getTime();
   const lentasDeLaSemana = games.filter((game) => {
     const t = new Date(game.fecha).getTime();
-    return Number.isFinite(t) && t >= inicio && t <= hasta && RITMOS_LENTOS.includes(game.ritmo);
+    return Number.isFinite(t) && t >= inicio && t <= hasta && cuentaParaElCompromiso(game);
   });
   if (lentasDeLaSemana.length === 0) return 'sin-jugar';
   if (lentasDeLaSemana.some((game) => game.analizada)) return 'completa';

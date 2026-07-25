@@ -55,4 +55,29 @@ describe('partidaLentaSemanal (RF-11.7)', () => {
     const madrugada = game({ fecha: new Date(2026, 6, 20, 0, 5).toISOString() });
     expect(partidaLentaSemanal([madrugada], lunes)).toBe('sin-analizar');
   });
+
+  // El diagnóstico (RF-11.4) juega dos partidas sin reloj con el mismo motor
+  // de partidas que la pantalla Jugar. Sin marcarlas, el compromiso semanal se
+  // daba por cumplido apenas terminaba el diagnóstico: Hoy anunciaba la
+  // partida lenta de la semana como jugada —o como jugada y analizada, si el
+  // usuario analizaba una desde el Panel— sin que hubiera jugado ninguna.
+  describe('las partidas del diagnóstico no ocupan el compromiso', () => {
+    const delDiagnostico = () =>
+      game({ contexto: 'diagnostico', ritmo: 'sin-reloj', fecha: new Date(2026, 6, 21, 10).toISOString() });
+
+    it('terminar el diagnóstico deja la semana sin jugar', () => {
+      expect(partidaLentaSemanal([delDiagnostico(), delDiagnostico()], ahora)).toBe('sin-jugar');
+    });
+
+    it('analizar una partida del diagnóstico tampoco la da por cumplida', () => {
+      const analizada = { ...delDiagnostico(), analizada: true };
+      expect(partidaLentaSemanal([analizada, delDiagnostico()], ahora)).toBe('sin-jugar');
+    });
+
+    it('una partida propia de la misma semana sí cuenta, con el diagnóstico presente', () => {
+      const propia = game({ fecha: new Date(2026, 6, 22, 9).toISOString() });
+      expect(partidaLentaSemanal([delDiagnostico(), propia], ahora)).toBe('sin-analizar');
+      expect(partidaLentaSemanal([delDiagnostico(), { ...propia, analizada: true }], ahora)).toBe('completa');
+    });
+  });
 });

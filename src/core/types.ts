@@ -7,6 +7,19 @@ export type Ritmo = 'bullet' | 'blitz' | 'rapida' | 'clasica' | 'sin-reloj';
 export type Resultado = '1-0' | '0-1' | '1/2-1/2' | '*';
 export type Color = 'w' | 'b';
 
+/**
+ * Para qué se jugó una partida, cuando no fue por decisión libre del usuario.
+ * Ausente = partida normal (la que el usuario eligió jugar).
+ *
+ * Existe porque el diagnóstico (RF-11.4) reutiliza el motor de partidas de la
+ * pantalla Jugar y sus dos partidas quedaban indistinguibles de una partida
+ * elegida por el usuario. Eso hacía que el compromiso semanal de partida lenta
+ * (RF-11.7) se diera por cumplido con las partidas del diagnóstico: el usuario
+ * terminaba el diagnóstico y Hoy le decía que su partida lenta de la semana ya
+ * estaba jugada, sin que hubiera jugado ninguna a propósito.
+ */
+export type ContextoPartida = 'diagnostico';
+
 export interface GameRecord {
   id: string;
   pgn: string;
@@ -32,6 +45,13 @@ export interface GameRecord {
   jugadorColor?: Color;
   /** Elo del usuario al jugar esta partida, si el PGN o el usuario lo aporta. */
   ratingUsuario?: number;
+  /**
+   * Contexto en el que se jugó, cuando no fue una partida elegida libremente
+   * (hoy: el diagnóstico inicial). Sigue siendo una partida propia y cuenta
+   * para las métricas de verdad si se analiza; lo que no hace es ocupar el
+   * compromiso semanal de partida lenta (ver `ContextoPartida`).
+   */
+  contexto?: ContextoPartida;
 }
 
 /**
@@ -191,8 +211,15 @@ export interface RadarAttempt {
   rating: number;
   /** Percentil 0–100 usado al servir el ítem (ADR-0007). Ausente en intentos históricos. */
   dificultadNormalizada?: number;
-  /** Separa el catálogo calibrado de los errores propios reciclados (RF-5.9). */
-  origenContenido?: 'catalogo' | 'error-propio';
+  /**
+   * Separa el catálogo calibrado de los errores propios reciclados (RF-5.9) y
+   * del diagnóstico inicial (RF-11.4). El diagnóstico sirve posiciones sin
+   * adaptar la dificultad —a propósito: mide, no entrena—, así que sus
+   * respuestas no pertenecen a la lectura de la banda 60–80% (RF-5.5) ni al
+   * detector de sobreajuste (RF-12.3). Ausente en intentos históricos, que
+   * son todos de catálogo.
+   */
+  origenContenido?: 'catalogo' | 'error-propio' | 'diagnostico';
   /** Tarjeta fuente cuando `origenContenido` es `error-propio`. */
   errorCardId?: string;
   acierto: boolean;
@@ -408,10 +435,46 @@ export interface SensoryPreferences {
  * que la produjo. `diagnosticoCompletadoEn` en null significa que la banda
  * es el valor por defecto, todavía sin diagnóstico real (RF-11.4).
  */
+/** De dónde sale un rating declarado por el usuario (RF-12.1, PRD §3.1). */
+export type FuenteRating = 'lichess' | 'chesscom' | 'otro';
+
+/**
+ * Rating de partidas lentas que el usuario declara a mano. La métrica estrella
+ * del PRD (§3.1) es ΔElo por hora contra línea base, medido con el rating de
+ * partidas lentas — nunca con el rating interno de ejercicios. Sin importación
+ * automática de historial (RF-2.1, bloqueada por red) el único rating real
+ * disponible es el que el usuario aporta, así que se le pide una vez en el
+ * diagnóstico y se puede actualizar desde Ajustes. Es una serie, no un valor:
+ * la métrica es el cambio, no el número.
+ */
+export interface RatingExterno {
+  valor: number;
+  fuente: FuenteRating;
+  fecha: string; // ISO 8601
+}
+
+/**
+ * Perfil de fugas por tipo de posición del Radar (RF-11.4: el diagnóstico
+ * produce "banda de Elo y perfil de fugas"). Se guardan los conteos crudos y
+ * no una conclusión: qué tipo es la fuga se deriva en `core/leakProfile.ts`,
+ * que puede cambiar de criterio sin migrar datos del usuario.
+ */
+export interface PerfilDeFugas {
+  porTipo: Array<{ tipo: TipoRadar; aciertos: number; total: number }>;
+  registradoEn: string; // ISO 8601
+}
+
 export interface Profile {
   id: 'principal';
   bandaElo: BandaElo;
-  diagnosticoCompletadoEn: string | null; // ISO 8601, o null si no se hizo
+  diagnosticoCompletadoEn: string | null; // ISO 8601
+  /**
+   * Fugas por tipo de posición medidas en el último diagnóstico (RF-11.4).
+   * `undefined` en perfiles anteriores a esta medición.
+   */
+  perfilDeFugas?: PerfilDeFugas;
+  /** Ratings de partidas lentas declarados por el usuario, más reciente al final. */
+  ratingsExternos?: RatingExterno[];
   /**
    * Fecha de la última vez que se completó el ejercicio de Stoyko (E7,
    * RF-7.2), para el enfriamiento semanal. `undefined`/`null` = nunca hecho,

@@ -123,6 +123,32 @@ export function adjustDifficulty(state: RadarSelectionState, acierto: boolean, t
   return { ...state, dificultadCentro };
 }
 
+/** Tasa de acierto que el selector adaptativo persigue: centro de la banda 60–80% (RF-5.5). */
+const TASA_OBJETIVO = 0.7;
+
+/**
+ * Centro de dificultad con el que arranca el Radar después del diagnóstico
+ * (RF-11.4), a partir de la tasa de acierto observada en sus 20 posiciones.
+ *
+ * El diagnóstico sirve posiciones **sin** adaptar la dificultad, a propósito:
+ * si adaptara, la tasa convergería a ~70% para cualquier nivel y dejaría de
+ * discriminar, que es justo lo que ahí se necesita medir. Pero eso hacía que
+ * las 20 respuestas no dejaran ninguna huella y la sesión arrancara en el
+ * percentil neutral 50, obligando al selector a redescubrir el nivel del
+ * usuario desde cero (el criterio de salida de E5 pide converger en ≤50
+ * posiciones; 20 recién medidas se estaban tirando).
+ *
+ * La traducción es una heurística explícita y suave: acertar por encima del
+ * objetivo mueve el centro hacia arriba en la misma proporción, y viceversa.
+ * Es un punto de partida informado, no una medición de dificultad; el ajuste
+ * fino sigue siendo trabajo de `adjustDifficulty` durante las sesiones.
+ */
+export function centroInicialDesdeDiagnostico(tasaAcierto: number): number {
+  const acotada = Math.min(1, Math.max(0, tasaAcierto));
+  const centro = RADAR_INITIAL_STATE.dificultadCentro + (acotada - TASA_OBJETIVO) * 100;
+  return Math.min(DIFICULTAD_MAX, Math.max(DIFICULTAD_MIN, Math.round(centro)));
+}
+
 function pesoPorTipo(tipo: TipoRadar, historialTipos: TipoRadar[]): number {
   const recientes = historialTipos.slice(-VENTANA_TIPOS);
   const apariciones = recientes.filter((t) => t === tipo).length;

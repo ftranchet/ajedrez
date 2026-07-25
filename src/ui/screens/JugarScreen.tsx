@@ -8,8 +8,9 @@ import { PromotionDialog } from '../components/PromotionDialog';
 import { ENGINE_LEVELS, useGameStore } from '../state/gameStore';
 import { useFinalesStore } from '../state/finalesStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
-import type { Color } from '../../core/types';
+import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
+import { isDue } from '../../core/scheduler';
 import { t } from '../i18n/es';
 
 // La sub-ruta #/jugar/finales entra directo al modo finales (deep-link desde
@@ -254,6 +255,48 @@ function Setup({ onFinales }: { onFinales: () => void }) {
   );
 }
 
+/**
+ * Una técnica de final en la lista. Los tres estados posibles son distintos y
+ * conviene que se vean distintos: vencida (la que toca hoy y suma a la racha),
+ * programada (ya demostrada; se puede repetir, pero como práctica que no
+ * acumula) y automatizada (RF-6.3: tres demostraciones limpias espaciadas, deja
+ * de aparecer).
+ */
+function FinalRow({ item, progress }: { item: CurriculumItem; progress: CurriculumProgress | undefined }) {
+  const automatizado = progress !== undefined && isAutomatizado(progress);
+  const vencido = !automatizado && (progress === undefined || isDue(progress.fsrs));
+  const proxima = progress ? new Date(progress.fsrs.due) : null;
+
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
+      <div className="min-w-0">
+        <p className="m-0 text-primary">{item.nombre}</p>
+        <p className="m-0 mt-1 text-xs text-tertiary">
+          {automatizado
+            ? t.finales.automatizado
+            : vencido
+              ? t.finales.progreso.replace('{n}', String(progress?.demostracionesLimpias ?? 0))
+              : t.finales.programado
+                  .replace('{n}', String(progress?.demostracionesLimpias ?? 0))
+                  .replace('{fecha}', proxima ? proxima.toLocaleDateString('es-AR') : '')}
+        </p>
+      </div>
+      {vencido ? (
+        <button className="btn-secondary shrink-0" onClick={() => void useFinalesStore.getState().start(item.id)}>
+          {t.finales.empezar}
+        </button>
+      ) : (
+        <button
+          className="min-h-11 shrink-0 px-2 text-sm font-semibold text-secondary underline-offset-4 hover:text-primary hover:underline"
+          onClick={() => void useFinalesStore.getState().start(item.id, true)}
+        >
+          {t.finales.practicar}
+        </button>
+      )}
+    </li>
+  );
+}
+
 function FinalesScreen({ onPartida }: { onPartida: () => void }) {
   const s = useFinalesStore();
   const itemCount = s.items.length;
@@ -289,24 +332,14 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
         {s.phase === 'cargando' ? (
           <p className="m-0 text-secondary">{t.finales.cargando}</p>
         ) : (
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {s.items.map((item) => {
-              const progress = s.progressById.get(item.id);
-              return (
-                <li key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
-                  <div>
-                    <p className="m-0 text-primary">{item.nombre}</p>
-                    <p className="m-0 mt-1 text-xs text-tertiary">
-                      {progress && isAutomatizado(progress)
-                        ? t.finales.automatizado
-                        : t.finales.progreso.replace('{n}', String(progress?.demostracionesLimpias ?? 0))}
-                    </p>
-                  </div>
-                  <button className="btn-secondary shrink-0" onClick={() => void s.start(item.id)}>{t.finales.empezar}</button>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <p className="m-0 text-sm text-secondary">{t.finales.espaciadoAyuda}</p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {s.items.map((item) => (
+                <FinalRow key={item.id} item={item} progress={s.progressById.get(item.id)} />
+              ))}
+            </ul>
+          </>
         )}
       </div>
     );
@@ -351,7 +384,11 @@ function FinalesScreen({ onPartida }: { onPartida: () => void }) {
         {s.phase === 'feedback' && (
           <div className="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4">
             <h2 className="m-0 font-display text-2xl">{s.limpia ? t.finales.demostrado : t.finales.perdido}</h2>
-            <p className="m-0 text-secondary">{s.limpia ? t.finales.demostradoTexto : t.finales.perdidoTexto}</p>
+            <p className="m-0 text-secondary">
+              {s.practica
+                ? s.limpia ? t.finales.demostradoPractica : t.finales.perdidoPractica
+                : s.limpia ? t.finales.demostradoTexto : t.finales.perdidoTexto}
+            </p>
             <button className="btn-primary" onClick={() => s.volver()}>{t.finales.volver}</button>
           </div>
         )}

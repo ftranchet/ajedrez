@@ -28,7 +28,15 @@ import type {
 
 export const DB_NAME = 'elomax';
 /** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
+
+/**
+ * Ventana hacia atrás desde `diagnosticoCompletadoEn` dentro de la cual una
+ * partida local sin reloj se atribuye al diagnóstico en la migración v16. El
+ * diagnóstico es una sola sentada (su pausa solo sobrevive mientras la pestaña
+ * siga abierta), así que 12 horas es holgado y a la vez acotado.
+ */
+const VENTANA_ATRIBUCION_DIAGNOSTICO_MS = 12 * 60 * 60 * 1000;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -367,6 +375,93 @@ export class ElomaxDB extends Dexie {
               sonido: typeof preferences?.sonido === 'boolean' ? preferences.sonido : false,
               vibracion: typeof preferences?.vibracion === 'boolean' ? preferences.vibracion : false,
             };
+          });
+      });
+
+    // v16 — el diagnóstico inicial deja de confundirse con el entrenamiento
+    // elegido por el usuario. Sus partidas (`games.contexto`) ya no ocupan el
+    // compromiso semanal de partida lenta (RF-11.7) y sus respuestas del Radar
+    // (`radarAttempts.origenContenido = 'diagnostico'`) ya no entran en la
+    // lectura de la banda 60–80% (RF-5.5). Además el perfil suma el perfil de
+    // fugas y los ratings declarados que RF-11.4 y RF-12.1 piden.
+    //
+    // No alcanza con escribir bien de acá en adelante: quien ya hizo el
+    // diagnóstico tiene esos registros indistinguibles de los propios, y el
+    // compromiso semanal seguiría dándose por cumplido esta semana. La
+    // atribución retroactiva es deliberadamente conservadora — solo registros
+    // anteriores a `diagnosticoCompletadoEn`, dentro de una ventana acotada, y
+    // como máximo las dos partidas que el diagnóstico juega.
+    this.version(16)
+      .stores({
+        games: 'id, fecha, fuente, contexto',
+        errorCards: 'id, fsrs.due, origen, categoria',
+        radarItems: 'id, tipo, rating',
+        calibrationRecords: 'id, contexto, fecha',
+        radarProgress: 'id, updatedAt',
+        radarDatasetMeta: 'id',
+        radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada, origenContenido',
+        curriculumItems: 'id, tipo, patternKey',
+        curriculumDatasetMeta: 'id',
+        curriculumProgress: 'id, fsrs.due, updatedAt',
+        profile: 'id',
+        candidataAttempts: 'id, itemId, fecha',
+        compromisoAttempts: 'id, itemId, fecha',
+        dobleSolucionAttempts: 'id, itemId, fecha',
+        stoykoItems: 'id',
+        stoykoDatasetMeta: 'id',
+        stoykoAttempts: 'id, itemId, fecha',
+        triageAttempts: 'id, itemId, fecha',
+        sessions: 'id, fechaInicio, estado',
+        transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+        n1Experiments: 'id, creadoEn, estado',
+      })
+      .upgrade(async (tx) => {
+        const profile: Partial<Profile> | undefined = await tx.table('profile').get('principal');
+        const completadoEn = profile?.diagnosticoCompletadoEn
+          ? new Date(profile.diagnosticoCompletadoEn).getTime()
+          : Number.NaN;
+        if (!Number.isFinite(completadoEn)) return;
+        const desde = completadoEn - VENTANA_ATRIBUCION_DIAGNOSTICO_MS;
+
+        const enVentana = (iso: unknown): boolean => {
+          const t = typeof iso === 'string' ? new Date(iso).getTime() : Number.NaN;
+          return Number.isFinite(t) && t >= desde && t <= completadoEn;
+        };
+
+        // Las dos partidas del diagnóstico: locales, sin reloj y terminadas
+        // antes de que se guardara la banda. Si hubiera más candidatas (el
+        // usuario puede saltear el diagnóstico y jugar suelto antes de
+        // volver), se atribuyen las dos más cercanas al cierre y las demás
+        // quedan como partidas propias.
+        const partidas: Array<Partial<GameRecord> & { id: string }> = await tx.table('games').toArray();
+        const delDiagnostico = partidas
+          .filter(
+            (game) =>
+              game.contexto === undefined &&
+              game.fuente === 'local' &&
+              game.ritmo === 'sin-reloj' &&
+              enVentana(game.fecha),
+          )
+          .sort((a, b) => new Date(String(b.fecha)).getTime() - new Date(String(a.fecha)).getTime())
+          .slice(0, 2);
+        for (const game of delDiagnostico) {
+          await tx.table('games').update(game.id, { contexto: 'diagnostico' });
+        }
+
+        // Las respuestas del Radar del diagnóstico son las únicas anteriores
+        // al cierre que no llevan dificultad normalizada: la sesión siempre la
+        // registra, salvo en errores propios, que van marcados aparte.
+        await tx
+          .table('radarAttempts')
+          .toCollection()
+          .modify((attempt: Partial<RadarAttempt>) => {
+            if (
+              attempt.origenContenido === undefined &&
+              attempt.dificultadNormalizada === undefined &&
+              enVentana(attempt.fecha)
+            ) {
+              attempt.origenContenido = 'diagnostico';
+            }
           });
       });
   }

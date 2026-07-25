@@ -90,20 +90,50 @@ test('diagnóstico inicial: dos partidas y 20 posiciones del Radar arman la prim
   await expect(page.getByText('Tu avance sigue disponible mientras mantengas abierta esta pestaña.')).toBeVisible();
   await page.getByRole('button', { name: 'Continuar diagnóstico' }).click();
   await expect(page.getByText('Posición 1 de 20')).toBeVisible();
-  for (let i = 0; i < 20; i++) {
+  // Posiciones (1-based) donde el diagnóstico pide confianza declarada
+  // (DIAGNOSTICO_POSICIONES_CONFIANZA): fijas a propósito, para que la línea
+  // base de Brier tenga la misma cantidad de observaciones en todos los casos.
+  const conConfianza = new Set([3, 7, 11, 15, 19]);
+  for (let i = 1; i <= 20; i++) {
     const board = page.locator('cg-board');
     await board.waitFor();
+    // Paso 1 (RF-5.2): declarar la evaluación antes de poder jugar.
+    await page.getByRole('button', { name: 'Mejor negras' }).click();
     await clickSquare(page, board, 'd', 5);
     await clickSquare(page, board, 'h', 5);
+    if (conConfianza.has(i)) {
+      // El resultado no se revela hasta declarar la confianza.
+      await expect(page.getByText('¿Cuánta confianza tenés en tu jugada?')).toBeVisible();
+      await expect(page.getByText('Acertaste')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Confirmar' }).click();
+    }
     await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Siguiente' }).click();
   }
 
-  // Resultado: banda estimada y perfil guardado.
-  await page.getByText('Diagnóstico completo').waitFor({ timeout: 10_000 });
-  await expect(page.getByText(/Banda de arranque:/)).toBeVisible();
-  await page.getByRole('button', { name: 'Empezar a entrenar' }).click();
+  // Informe de cierre: banda, línea base medida y perfil de fugas.
+  await expect(page.getByRole('heading', { name: 'Tu punto de partida' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Banda de arranque')).toBeVisible();
+  await expect(page.getByText('Radar del diagnóstico')).toBeVisible();
+  await expect(page.getByText('20 de 20 (100%)')).toBeVisible();
+  // Cinco confianzas al 50% con 100% de acierto: Brier 0,25.
+  await expect(page.getByText('Calibración del juicio (Brier)')).toBeVisible();
+  await expect(page.getByText('Dónde se te escapan las posiciones')).toBeVisible();
+  // Errores graves todavía sin dato: es lo que la CTA de análisis va a llenar.
+  await expect(page.getByText('Falta analizar una partida')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Analizar mi partida del diagnóstico' })).toBeVisible();
+
+  // El rating declarado es opcional y se puede cargar acá mismo.
+  await page.getByRole('spinbutton', { name: 'Rating' }).fill('1450');
+  await page.getByRole('button', { name: 'Guardar rating' }).click();
+  await expect(page.getByText(/Rating guardado: 1450/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ir a mi sesión de hoy' }).click();
 
   // De vuelta en Hoy, ya no vuelve a pedir el diagnóstico.
   await page.getByRole('button', { name: 'Empezar sesión' }).waitFor({ timeout: 10_000 });
+
+  // Y las partidas del diagnóstico no ocupan el compromiso semanal (RF-11.7):
+  // el usuario no jugó todavía ninguna partida lenta propia.
+  await expect(page.getByText('Todavía no jugaste una partida lenta esta semana.', { exact: false })).toBeVisible();
 });

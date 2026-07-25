@@ -771,4 +771,62 @@ describe('migración de esquema Dexie', () => {
     });
     current.close();
   });
+  // La corrección que motivó v16 no alcanzaba con escribir bien de acá en
+  // adelante: quien ya había hecho el diagnóstico tenía sus dos partidas y sus
+  // 20 respuestas del Radar indistinguibles de las propias, y el compromiso
+  // semanal de partida lenta seguía dándose por cumplido con ellas.
+  it('migra de v15 a v16 atribuyendo al diagnóstico las partidas y respuestas ya guardadas', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v15 = new Dexie(name);
+    v15.version(15).stores({
+      games: 'id, fecha, fuente',
+      profile: 'id',
+      radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada',
+    });
+    await v15.open();
+    await v15.table('profile').add({
+      id: 'principal',
+      bandaElo: 'intermedio',
+      diagnosticoCompletadoEn: '2026-07-19T12:00:00.000Z',
+    });
+    // Las dos partidas del diagnóstico, terminadas justo antes del cierre.
+    await v15.table('games').bulkAdd([
+      { id: 'diag-1', pgn: '1. e4 *', fuente: 'local', ritmo: 'sin-reloj', resultado: '0-1', tiemposPorJugadaMs: [], analizada: false, fecha: '2026-07-19T11:20:00.000Z' },
+      { id: 'diag-2', pgn: '1. d4 *', fuente: 'local', ritmo: 'sin-reloj', resultado: '0-1', tiemposPorJugadaMs: [], analizada: false, fecha: '2026-07-19T11:50:00.000Z' },
+      // Una partida propia posterior al diagnóstico: no se toca.
+      { id: 'propia', pgn: '1. c4 *', fuente: 'local', ritmo: 'sin-reloj', resultado: '1-0', tiemposPorJugadaMs: [], analizada: false, fecha: '2026-07-20T09:00:00.000Z' },
+      // Y una vieja, fuera de la ventana de atribución: tampoco.
+      { id: 'vieja', pgn: '1. f4 *', fuente: 'local', ritmo: 'sin-reloj', resultado: '1-0', tiemposPorJugadaMs: [], analizada: false, fecha: '2026-07-01T09:00:00.000Z' },
+    ]);
+    await v15.table('radarAttempts').bulkAdd([
+      // Sin dificultad normalizada y anterior al cierre: es del diagnóstico.
+      { id: 'a-diag', itemId: 'i1', tipo: 'ofensiva', rating: 1500, acierto: true, fecha: '2026-07-19T11:55:00.000Z' },
+      // De una sesión posterior: conserva su percentil y no se toca.
+      { id: 'a-sesion', itemId: 'i2', tipo: 'defensa', rating: 1600, dificultadNormalizada: 62, acierto: false, fecha: '2026-07-20T10:00:00.000Z' },
+    ]);
+    v15.close();
+
+    const current = new ElomaxDB(name);
+    expect(await current.games.get('diag-1')).toMatchObject({ contexto: 'diagnostico' });
+    expect(await current.games.get('diag-2')).toMatchObject({ contexto: 'diagnostico' });
+    expect((await current.games.get('propia'))!.contexto).toBeUndefined();
+    expect((await current.games.get('vieja'))!.contexto).toBeUndefined();
+    expect(await current.radarAttempts.get('a-diag')).toMatchObject({ origenContenido: 'diagnostico' });
+    expect((await current.radarAttempts.get('a-sesion'))!.origenContenido).toBeUndefined();
+    current.close();
+  });
+
+  it('sin diagnóstico completado, v16 no atribuye nada', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v15 = new Dexie(name);
+    v15.version(15).stores({ games: 'id, fecha, fuente', profile: 'id', radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada' });
+    await v15.open();
+    await v15.table('profile').add({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: null });
+    await v15.table('games').add({ id: 'g', pgn: '1. e4 *', fuente: 'local', ritmo: 'sin-reloj', resultado: '*', tiemposPorJugadaMs: [], analizada: false, fecha: '2026-07-19T11:20:00.000Z' });
+    v15.close();
+
+    const current = new ElomaxDB(name);
+    expect((await current.games.get('g'))!.contexto).toBeUndefined();
+    current.close();
+  });
 });

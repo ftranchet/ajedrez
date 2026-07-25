@@ -52,9 +52,13 @@ export function detectOverfitting(
   const baselineEnd = start + EDGE_WINDOW_DAYS * DAY_MS;
   const recentStart = end - EDGE_WINDOW_DAYS * DAY_MS;
 
+  // Solo catálogo servido por el selector adaptativo: los errores propios no
+  // tienen dificultad calibrada (RF-5.9) y el diagnóstico (RF-11.4) sirve sin
+  // adaptar. Ambos quedan fuera de la comparación de percentiles.
   const catalogAttempts = attempts.filter(
     (attempt) =>
       attempt.origenContenido !== 'error-propio' &&
+      attempt.origenContenido !== 'diagnostico' &&
       attempt.dificultadNormalizada !== undefined,
   );
   const radarBaseline = catalogAttempts

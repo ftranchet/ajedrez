@@ -4,7 +4,7 @@
 // Chess.com, bloqueado por red en este entorno — ver docs/roadmap.md) para
 // calibrarse con sentido; mientras tanto se muestra la banda de Elo del
 // diagnóstico (E11), categórica, en vez de inventar un número sin base.
-import type { GameRecord } from './types';
+import type { GameRecord, Profile } from './types';
 
 const VENTANA_PARTIDAS = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -24,6 +24,51 @@ export function erroresGravesUsuario(game: GameRecord): number | null {
   return game.analisis.jugadas.filter(
     (j) => j.ladoQueMueve === game.jugadorColor && (j.clasificacion === 'grave' || j.clasificacion === 'error'),
   ).length;
+}
+
+export interface RatingDeVerdad {
+  valor: number;
+  /** Cambio contra el primer valor de la serie declarada; null si todavía no hay contra qué comparar. */
+  delta: number | null;
+  origen: 'declarado' | 'partida';
+}
+
+/**
+ * El rating de partidas lentas del Panel de verdad (RF-12.1), que es el
+ * instrumento de la métrica estrella del PRD (§3.1: ΔElo contra línea base).
+ *
+ * Hasta ahora esto solo podía salir de una partida importada por PGN con
+ * rating: las partidas jugadas dentro de la app se guardan como `sin-reloj` y
+ * sin `ratingUsuario`, así que un usuario que solo juega acá adentro no veía
+ * nunca un número —y el detector de sobreajuste (RF-12.3), que exige lo mismo,
+ * no podía activarse jamás—. Por eso el diagnóstico ahora pide el rating real
+ * al usuario y lo guarda como serie: es la única fuente disponible mientras la
+ * importación automática de historial siga bloqueada.
+ *
+ * Las dos fuentes no se mezclan en un mismo delta —son poblaciones distintas—:
+ * la serie declarada tiene prioridad porque es la que el usuario mantiene a
+ * propósito, y la partida rateada queda como respaldo.
+ */
+export function ratingDePartidasLentas(
+  profile: Pick<Profile, 'ratingsExternos'>,
+  games: GameRecord[],
+): RatingDeVerdad | null {
+  const serie = [...(profile.ratingsExternos ?? [])].sort(
+    (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
+  );
+  const ultimo = serie.at(-1);
+  if (ultimo) {
+    return {
+      valor: ultimo.valor,
+      delta: serie.length > 1 ? ultimo.valor - serie[0].valor : null,
+      origen: 'declarado',
+    };
+  }
+  const partidaRateada = games
+    .filter((game) => (game.ritmo === 'rapida' || game.ritmo === 'clasica') && game.ratingUsuario !== undefined)
+    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+  if (!partidaRateada) return null;
+  return { valor: partidaRateada.ratingUsuario as number, delta: null, origen: 'partida' };
 }
 
 export interface TruthImprovement {

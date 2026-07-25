@@ -4,12 +4,13 @@
 // enfocados en su intención. Carga y persiste el perfil por su cuenta (puede
 // abrirse sin pasar por Hoy) y mantiene sincronizado el store de sesión.
 import { useEffect, useState } from 'react';
-import type { PlanSemanal, Profile, ReminderConfig, SensoryPreferences, SessionRecord } from '../../core/types';
+import type { PlanSemanal, Profile, RatingExterno, ReminderConfig, SensoryPreferences, SessionRecord } from '../../core/types';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { useSessionStore } from '../state/sessionStore';
 import { WeeklyPlanCard } from '../components/WeeklyPlanCard';
 import { ReminderCard } from '../components/ReminderCard';
+import { RatingExternoCard } from '../components/RatingExternoCard';
 import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { DataBackupCard } from '../components/DataBackupCard';
 import { AppearanceCard } from '../components/AppearanceCard';
@@ -47,6 +48,10 @@ export function AjustesScreen() {
   const saveWeeklyPlan = (planSemanal: PlanSemanal) => persist({ planSemanal });
   const saveReminder = (recordatorio: ReminderConfig) => persist({ recordatorio });
   const saveSensoryPreferences = (preferenciasSensoriales: SensoryPreferences) => persist({ preferenciasSensoriales });
+  // Se acumula la serie entera: la métrica es el cambio entre tomas, así que
+  // pisar el valor anterior con el nuevo borraría justamente lo que se mide.
+  const saveRatingExterno = (registro: RatingExterno) =>
+    persist({ ratingsExternos: [...(profile?.ratingsExternos ?? []), registro] });
 
   // Restaurar reemplaza toda la base: recargo perfil y sesiones acá y fuerzo el
   // resumen de la sesión para que Hoy no quede mostrando datos previos.
@@ -73,6 +78,7 @@ export function AjustesScreen() {
       ) : (
         <>
           <WeeklyPlanCard records={sessions} profile={profile} editable onSave={saveWeeklyPlan} />
+          <RatingExternoCard ratings={profile.ratingsExternos} onSave={saveRatingExterno} />
           <ReminderCard config={profile.recordatorio} onSave={saveReminder} />
           <AppearanceCard />
           <BlindTrainingCard />

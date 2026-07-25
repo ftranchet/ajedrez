@@ -34,9 +34,20 @@ export interface FinalesState {
   userMoves: number;
   limpia: boolean | null;
   engineError: boolean;
+  /**
+   * La demostración en curso es práctica libre: no toca el progreso espaciado.
+   * RF-6.3 pide "3 demostraciones **espaciadas** sin error" y la lista dejaba
+   * repetir el mismo final tres veces seguidas, con lo cual se automatizaba
+   * —y dejaba de aparecer para siempre— con práctica masiva, exactamente lo
+   * contrario del mecanismo en el que se apoya el currículo. Ahora el intento
+   * que cuenta es el del final vencido; querer practicar de nuevo antes de
+   * tiempo sigue estando permitido, pero no acumula racha (mismo criterio que
+   * el enfriamiento de Stoyko, RF-7.2).
+   */
+  practica: boolean;
 
   load(): Promise<void>;
-  start(itemId: string): Promise<void>;
+  start(itemId: string, practica?: boolean): Promise<void>;
   userMove(from: Square, to: Square, promotion?: string): Promise<void>;
   cancelPromotion(): void;
   volver(): void;
@@ -79,11 +90,17 @@ export function createFinalesStore(deps: FinalesDeps) {
     async function finish(limpia: boolean) {
       const item = get().item;
       if (!item) return;
-      const previous = get().progressById.get(item.id) ?? newCurriculumProgress(item.id);
-      const next = reviewCurriculumProgress(previous, limpia);
-      await deps.progress.save(next);
       const progressById = new Map(get().progressById);
-      progressById.set(item.id, next);
+      // En práctica libre el resultado no mueve el planificador: ni suma a la
+      // racha de automatización ni adelanta la reaparición. La tarjeta de error
+      // por perder la técnica sí se crea igual — un error propio es material de
+      // repaso venga de donde venga (RF-4.1).
+      if (!get().practica) {
+        const previous = progressById.get(item.id) ?? newCurriculumProgress(item.id);
+        const next = reviewCurriculumProgress(previous, limpia);
+        await deps.progress.save(next);
+        progressById.set(item.id, next);
+      }
 
       if (!limpia && lastUserFen && lastUserMove) {
         try {
@@ -143,6 +160,7 @@ export function createFinalesStore(deps: FinalesDeps) {
       userMoves: 0,
       limpia: null,
       engineError: false,
+      practica: false,
 
       async load() {
         await deps.items.ensureSeeded();
@@ -154,7 +172,7 @@ export function createFinalesStore(deps: FinalesDeps) {
         });
       },
 
-      async start(itemId) {
+      async start(itemId, practica = false) {
         const item = get().items.find((candidate) => candidate.id === itemId);
         if (!item || !item.ladoUsuario || !item.resultadoEsperado) return;
         chess = new Chess(item.fen);
@@ -162,7 +180,7 @@ export function createFinalesStore(deps: FinalesDeps) {
         lastUserMove = '';
         set({
           phase: 'cargando', item, playerColor: item.ladoUsuario, userMoves: 0,
-          limpia: null, engineError: false, pendingPromotion: null, lastMove: null,
+          limpia: null, engineError: false, pendingPromotion: null, lastMove: null, practica,
         });
         try {
           await deps.enginePort.init();
@@ -228,7 +246,7 @@ export function createFinalesStore(deps: FinalesDeps) {
 
       volver() {
         chess = new Chess();
-        set({ phase: 'lista', item: null, limpia: null, thinking: false, pendingPromotion: null });
+        set({ phase: 'lista', item: null, limpia: null, thinking: false, pendingPromotion: null, practica: false });
       },
     };
   });

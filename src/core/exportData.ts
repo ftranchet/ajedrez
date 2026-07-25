@@ -22,6 +22,7 @@ import { SCHEMA_VERSION } from '../services/storage/db';
 import { DEFAULT_PROFILE } from './prescriptor';
 import { isValidWeeklyPlan } from './adherence';
 import { isValidReminder } from './reminder';
+import { TIPOS_RADAR } from './leakProfile';
 
 export interface ExportManifest {
   esquema: number;
@@ -111,7 +112,8 @@ function esGameRecordValido(x: unknown): boolean {
     typeof x.ritmo === 'string' &&
     typeof x.resultado === 'string' &&
     typeof x.analizada === 'boolean' &&
-    Array.isArray(x.tiemposPorJugadaMs)
+    Array.isArray(x.tiemposPorJugadaMs) &&
+    (x.contexto === undefined || x.contexto === 'diagnostico')
   );
 }
 
@@ -165,6 +167,33 @@ function esSessionRecordValido(x: unknown): boolean {
   );
 }
 
+function esPerfilDeFugasValido(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  return (
+    typeof x.registradoEn === 'string' &&
+    Array.isArray(x.porTipo) &&
+    x.porTipo.every(
+      (entry) =>
+        isObj(entry) &&
+        (TIPOS_RADAR as string[]).includes(String(entry.tipo)) &&
+        Number.isInteger(entry.aciertos) && Number(entry.aciertos) >= 0 &&
+        Number.isInteger(entry.total) && Number(entry.total) >= Number(entry.aciertos),
+    )
+  );
+}
+
+function esRatingsExternosValido(x: unknown): boolean {
+  if (!Array.isArray(x)) return false;
+  const fuentes = ['lichess', 'chesscom', 'otro'];
+  return x.every(
+    (entry) =>
+      isObj(entry) &&
+      typeof entry.valor === 'number' && Number.isFinite(entry.valor) &&
+      fuentes.includes(String(entry.fuente)) &&
+      typeof entry.fecha === 'string',
+  );
+}
+
 function esProfileValido(x: unknown): boolean {
   if (!isObj(x)) return false;
   const bands = ['principiante', 'elemental', 'intermedio', 'avanzado', 'experto'];
@@ -172,6 +201,8 @@ function esProfileValido(x: unknown): boolean {
     (x.diagnosticoCompletadoEn === null || typeof x.diagnosticoCompletadoEn === 'string') &&
     (x.planSemanal === undefined || isValidWeeklyPlan(x.planSemanal)) &&
     (x.recordatorio === undefined || isValidReminder(x.recordatorio)) &&
+    (x.perfilDeFugas === undefined || esPerfilDeFugasValido(x.perfilDeFugas)) &&
+    (x.ratingsExternos === undefined || esRatingsExternosValido(x.ratingsExternos)) &&
     (x.preferenciasSensoriales === undefined || (
       isObj(x.preferenciasSensoriales) &&
       typeof x.preferenciasSensoriales.sonido === 'boolean' &&

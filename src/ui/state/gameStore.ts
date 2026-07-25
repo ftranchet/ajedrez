@@ -2,7 +2,7 @@
 // EnginePort) y persistencia (puerto GameRepo). RF-1.1, RF-1.3, RF-1.5.
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { Color, Resultado } from '../../core/types';
+import type { Color, ContextoPartida, Resultado } from '../../core/types';
 import type { EngineLevel } from '../../core/ports';
 import { buildGameRecord, deriveResult } from '../../core/game';
 import { engine } from '../../services/engine/stockfishEngine';
@@ -26,6 +26,8 @@ interface GameState {
   turn: Color;
   playerColor: Color;
   levelId: string;
+  /** Contexto con el que se guardará la partida; el diagnóstico lo fija (ver ContextoPartida). */
+  contexto: ContextoPartida | null;
   sanMoves: string[];
   lastMove: [Square, Square] | null;
   check: boolean;
@@ -35,9 +37,11 @@ interface GameState {
   resultado: Resultado | null;
   endReason: EndReason | null;
   saved: boolean;
+  /** Id de la partida recién guardada, para poder enlazarla (p. ej. a su análisis). */
+  savedGameId: string | null;
   engineError: boolean;
 
-  start(levelId: string, color: Color | 'random'): Promise<void>;
+  start(levelId: string, color: Color | 'random', contexto?: ContextoPartida): Promise<void>;
   userMove(from: Square, to: Square, promotion?: string): Promise<void>;
   cancelPromotion(): void;
   resign(): Promise<void>;
@@ -82,8 +86,8 @@ export const useGameStore = create<GameState>((set, get) => {
           ? 'ahogado'
           : 'regla';
 
-    const { playerColor, levelId } = get();
-    chess.header('Event', 'Partida local ELOmax');
+    const { playerColor, levelId, contexto } = get();
+    chess.header('Event', contexto === 'diagnostico' ? 'Diagnóstico inicial ELOmax' : 'Partida local ELOmax');
     chess.header('Site', 'ELOmax');
     chess.header('Date', new Date().toISOString().slice(0, 10).replaceAll('-', '.'));
     chess.header('White', playerColor === 'w' ? 'Usuario' : `Motor local (${levelId})`);
@@ -97,9 +101,10 @@ export const useGameStore = create<GameState>((set, get) => {
       fuente: 'local',
       ritmo: 'sin-reloj',
       jugadorColor: playerColor,
+      ...(contexto ? { contexto } : {}),
     });
     await gameRepo.save(record);
-    snapshot({ phase: 'ended', resultado, endReason, saved: true, thinking: false });
+    snapshot({ phase: 'ended', resultado, endReason, saved: true, savedGameId: record.id, thinking: false });
   }
 
   async function engineTurn() {
@@ -130,6 +135,7 @@ export const useGameStore = create<GameState>((set, get) => {
     turn: 'w',
     playerColor: 'w',
     levelId: ENGINE_LEVELS[0].id,
+    contexto: null,
     sanMoves: [],
     lastMove: null,
     check: false,
@@ -139,12 +145,13 @@ export const useGameStore = create<GameState>((set, get) => {
     resultado: null,
     endReason: null,
     saved: false,
+    savedGameId: null,
     engineError: false,
 
-    async start(levelId, color) {
+    async start(levelId, color, contexto) {
       const playerColor: Color = color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
       chess.reset();
-      set({ phase: 'loading', levelId, playerColor, engineError: false, resultado: null, endReason: null, saved: false, lastMove: null, pendingPromotion: null });
+      set({ phase: 'loading', levelId, playerColor, contexto: contexto ?? null, engineError: false, resultado: null, endReason: null, saved: false, savedGameId: null, lastMove: null, pendingPromotion: null });
       try {
         await engine.init();
       } catch {
@@ -194,6 +201,7 @@ export const useGameStore = create<GameState>((set, get) => {
         phase: 'setup',
         fen: chess.fen(),
         turn: 'w',
+        contexto: null,
         sanMoves: [],
         lastMove: null,
         check: false,
@@ -203,6 +211,7 @@ export const useGameStore = create<GameState>((set, get) => {
         resultado: null,
         endReason: null,
         saved: false,
+        savedGameId: null,
         engineError: false,
       });
     },
