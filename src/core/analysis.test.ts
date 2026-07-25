@@ -6,6 +6,8 @@ import {
   detectedErrorMoves,
   esMomentoCriticoValido,
   evalToSymbol,
+  lecturaMomentoCritico,
+  momentoCriticoDelMotor,
   pickPhaseOnePositions,
   type EngineEvalAtPly,
 } from './analysis';
@@ -179,5 +181,63 @@ describe('detectedErrorMoves', () => {
     expect(detectedErrorMoves(analysis, 'w').map((e) => e.ply)).toEqual([0, 2]);
     // Usuario jugó negras: ninguno de esos dos errores es suyo.
     expect(detectedErrorMoves(analysis, 'b').map((e) => e.ply)).toEqual([]);
+  });
+});
+
+describe('momento crítico: percibido vs. el del motor (RF-3.1a)', () => {
+  const fase1 = (ply: number): PhaseOneData => ({
+    momentoCriticoPly: ply,
+    plan: 'un plan',
+    evaluaciones: [],
+    completadaEn: '2026-07-17T00:00:00.000Z',
+  });
+
+  // 4 jugadas: el vuelco real está en el ply 4 (blancas pierden 300cp).
+  const evals: EngineEvalAtPly[] = [
+    { ply: 0, fen: 'f0', san: 'e4', ladoQueMueve: 'w', jugadaUsuario: 'e2e4', cpAntes: 20, jugadaMotor: 'e2e4' },
+    { ply: 1, fen: 'f1', san: 'e5', ladoQueMueve: 'b', jugadaUsuario: 'e7e5', cpAntes: 25, jugadaMotor: 'e7e5' },
+    { ply: 2, fen: 'f2', san: 'Nf3', ladoQueMueve: 'w', jugadaUsuario: 'g1f3', cpAntes: 30, jugadaMotor: 'g1f3' },
+    { ply: 3, fen: 'f3', san: 'Nc6', ladoQueMueve: 'b', jugadaUsuario: 'b8c6', cpAntes: 10, jugadaMotor: 'b8c6' },
+    { ply: 4, fen: 'f4', san: 'Bxf7??', ladoQueMueve: 'w', jugadaUsuario: 'c4f7', cpAntes: 20, jugadaMotor: 'd2d4' },
+    { ply: 5, fen: 'f5', san: 'Kxf7', ladoQueMueve: 'b', jugadaUsuario: 'e8f7', cpAntes: -280, jugadaMotor: 'e8f7' },
+  ];
+
+  it('el motor ubica el vuelco en la jugada de mayor pérdida', () => {
+    const analysis = buildGameAnalysis(evals, fase1(0));
+    const motor = momentoCriticoDelMotor(analysis);
+    expect(motor?.ply).toBe(4);
+    expect(motor?.san).toBe('Bxf7??');
+    expect(motor?.cpPerdidos).toBe(300);
+  });
+
+  it('sin jugadas que muevan la evaluación, no inventa un momento', () => {
+    const planas: EngineEvalAtPly[] = [
+      { ply: 0, fen: 'f0', san: 'e4', ladoQueMueve: 'w', jugadaUsuario: 'e2e4', cpAntes: 0, jugadaMotor: 'e2e4' },
+      { ply: 1, fen: 'f1', san: 'e5', ladoQueMueve: 'b', jugadaUsuario: 'e7e5', cpAntes: 0, jugadaMotor: 'e7e5' },
+    ];
+    expect(momentoCriticoDelMotor(buildGameAnalysis(planas, fase1(0)))).toBeNull();
+    expect(lecturaMomentoCritico(buildGameAnalysis(planas, fase1(0)), fase1(0))).toBeNull();
+  });
+
+  it('acierta si marcó la jugada del vuelco', () => {
+    const analysis = buildGameAnalysis(evals, fase1(4));
+    const lectura = lecturaMomentoCritico(analysis, fase1(4))!;
+    expect(lectura.coincide).toBe(true);
+    expect(lectura.distanciaJugadas).toBe(0);
+    expect(lectura.plyMotor).toBe(4);
+    expect(lectura.cpPerdidos).toBe(300);
+  });
+
+  it('acierta dentro de una jugada completa de tolerancia', () => {
+    // ply 2 está a 2 medias jugadas del 4: sigue contando como percibido.
+    expect(lecturaMomentoCritico(buildGameAnalysis(evals, fase1(2)), fase1(2))!.coincide).toBe(true);
+    // ply 5 está a 1 media jugada: también.
+    expect(lecturaMomentoCritico(buildGameAnalysis(evals, fase1(5)), fase1(5))!.coincide).toBe(true);
+  });
+
+  it('no acierta si lo ubicó lejos, y reporta a cuántas jugadas', () => {
+    const lectura = lecturaMomentoCritico(buildGameAnalysis(evals, fase1(0)), fase1(0))!;
+    expect(lectura.coincide).toBe(false);
+    expect(lectura.distanciaJugadas).toBe(2); // 4 medias jugadas = 2 completas
   });
 });

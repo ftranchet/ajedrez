@@ -96,6 +96,12 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   await expect(page.getByRole('button', { name: 'Revisar errores' })).toBeVisible();
   await expect(page.locator('span.text-error-text', { hasText: 'Ba6' })).toBeVisible();
 
+  // El momento crítico que se marcó a ciegas en la fase 1 recibe devolución
+  // (RF-3.1a): acá se marcó Ba6, que es justo donde el motor ubica el vuelco.
+  await expect(page.getByText('Tu lectura de la partida')).toBeVisible();
+  await expect(page.getByText(/Le acertaste/)).toBeVisible();
+  await expect(page.getByText(/peones de evaluación/)).toBeVisible();
+
   await page.getByRole('button', { name: /Revisar errores/ }).click();
   await page.getByText('Confirmá y categorizá').waitFor();
 

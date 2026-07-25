@@ -7,8 +7,9 @@ import { EvalGraph } from '../components/EvalGraph';
 import { MoveListPicker } from '../components/MoveListPicker';
 import { Chip } from '../components/Chip';
 import { useAnalysisStore } from '../state/analysisStore';
-import { detectedErrorMoves } from '../../core/analysis';
+import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
 import type { CategoriaError } from '../../core/types';
+import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
 
 export function AnalizarScreen() {
@@ -203,6 +204,8 @@ function Resultado() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
       <Encabezado titulo={t.analisis.fase2Titulo} />
 
+      <LecturaDelMomento />
+
       <section className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface p-4">
         <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.analisis.curvaTitulo}</h2>
         <EvalGraph jugadas={analysis.jugadas} />
@@ -238,6 +241,40 @@ function Resultado() {
         {errores.length > 0 ? t.analisis.verErrores.replace('{n}', String(errores.length)) : t.analisis.terminarSinErrores}
       </button>
     </div>
+  );
+}
+
+// Cierra el círculo de la fase 1 (RF-3.1a): el momento crítico que marcaste a
+// ciegas se contrasta con el punto donde el motor dice que la partida se dio
+// vuelta. Mide percepción —si reconocés dónde se juega una partida—, no
+// cálculo. Sin esto, marcar el momento era un dato que se producía y nunca
+// volvía a verse.
+function LecturaDelMomento() {
+  const { analysis, game } = useAnalysisStore();
+  if (!analysis || !game?.fase1) return null;
+  const lectura = lecturaMomentoCritico(analysis, game.fase1);
+  if (!lectura) return null;
+
+  const jugadaDe = (ply: number) => Math.floor(ply / 2) + 1;
+  const texto = lectura.coincide
+    ? t.analisis.momentoLecturaCoincide.replace('{jugada}', String(jugadaDe(lectura.plyMotor)))
+    : t.analisis.momentoLecturaDifiere
+        .replace('{tuya}', String(jugadaDe(lectura.plyUsuario)))
+        .replace('{motor}', String(jugadaDe(lectura.plyMotor)))
+        .replace('{san}', lectura.sanMotor);
+
+  return (
+    <section
+      className={`flex flex-col gap-1 rounded-lg border p-4 ${
+        lectura.coincide ? 'border-success/35 bg-success-subtle' : 'border-subtle bg-surface'
+      }`}
+    >
+      <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.analisis.momentoLecturaTitulo}</h2>
+      <p className="m-0 text-primary">{texto}</p>
+      <p className="m-0 text-sm text-secondary">
+        {t.analisis.momentoLecturaCosto.replace('{cp}', formatDecimal(lectura.cpPerdidos / 100, 1))}
+      </p>
+    </section>
   );
 }
 

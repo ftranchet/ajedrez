@@ -132,3 +132,55 @@ export function detectedErrorMoves(analysis: GameAnalysis, jugadorColor?: Color)
     (m) => (m.clasificacion === 'grave' || m.clasificacion === 'error') && (jugadorColor === undefined || m.ladoQueMueve === jugadorColor),
   );
 }
+
+/**
+ * Dónde se dio vuelta la partida según el motor: la jugada con mayor pérdida
+ * de centipeones. No filtra por lado —una partida también se define cuando el
+ * rival regala— y sirve para contrastar con el momento crítico que el usuario
+ * marcó a ciegas en la fase 1 (RF-3.1a). Null si el análisis está vacío o si
+ * ninguna jugada movió la evaluación.
+ */
+export function momentoCriticoDelMotor(analysis: GameAnalysis): MoveAnalysisEntry | null {
+  let mayor: MoveAnalysisEntry | null = null;
+  for (const jugada of analysis.jugadas) {
+    if (jugada.cpPerdidos <= 0) continue;
+    if (!mayor || jugada.cpPerdidos > mayor.cpPerdidos) mayor = jugada;
+  }
+  return mayor;
+}
+
+/** Tolerancia para dar por acertada la percepción: una jugada completa. */
+const TOLERANCIA_PLIES = 2;
+
+export interface LecturaMomentoCritico {
+  /** Media jugada que marcó el usuario en la fase 1. */
+  plyUsuario: number;
+  /** Media jugada donde el motor ubica el vuelco, y cuánto costó. */
+  plyMotor: number;
+  cpPerdidos: number;
+  sanMotor: string;
+  /** ¿Le acertó, dentro de una jugada completa de tolerancia? */
+  coincide: boolean;
+  /** Distancia en jugadas completas entre lo que sintió y lo que pasó. */
+  distanciaJugadas: number;
+}
+
+/**
+ * Contrasta el momento crítico percibido (fase 1) con el del motor (fase 2).
+ * Mide **percepción**, no cálculo: si reconocés en qué momento se juega una
+ * partida. Sin esto, marcar el momento crítico era un dato que el usuario
+ * producía y nunca volvía a ver.
+ */
+export function lecturaMomentoCritico(analysis: GameAnalysis, fase1: PhaseOneData): LecturaMomentoCritico | null {
+  const motor = momentoCriticoDelMotor(analysis);
+  if (!motor) return null;
+  const distanciaPlies = Math.abs(fase1.momentoCriticoPly - motor.ply);
+  return {
+    plyUsuario: fase1.momentoCriticoPly,
+    plyMotor: motor.ply,
+    cpPerdidos: motor.cpPerdidos,
+    sanMotor: motor.san,
+    coincide: distanciaPlies <= TOLERANCIA_PLIES,
+    distanciaJugadas: Math.round(distanciaPlies / 2),
+  };
+}
