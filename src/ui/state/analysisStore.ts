@@ -28,6 +28,10 @@ interface MoveInfo {
   san: string;
   fenAntes: string;
   ladoQueMueve: Color;
+  /** Posición ya con la jugada hecha: es lo que se muestra al recorrer la partida. */
+  fenDespues: string;
+  /** Casillas de origen y destino, para resaltar la jugada en el tablero. */
+  lastMove: [string, string];
 }
 
 interface AnalysisState {
@@ -70,8 +74,17 @@ function movesFromPgn(pgn: string): MoveInfo[] {
   const chess = new Chess();
   const moves: MoveInfo[] = [];
   for (const m of history) {
-    moves.push({ ply: moves.length, san: m.san, fenAntes: chess.fen(), ladoQueMueve: chess.turn() });
+    const fenAntes = chess.fen();
+    const ladoQueMueve = chess.turn();
     chess.move({ from: m.from, to: m.to, promotion: m.promotion });
+    moves.push({
+      ply: moves.length,
+      san: m.san,
+      fenAntes,
+      ladoQueMueve,
+      fenDespues: chess.fen(),
+      lastMove: [m.from, m.to],
+    });
   }
   return moves;
 }

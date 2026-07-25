@@ -324,7 +324,11 @@ export const es = {
 
     // Fase 1
     fase1Titulo: 'Fase 1 — tu análisis',
-    momentoConsigna: 'Tocá la jugada donde sentiste que se definía la partida.',
+    momentoConsigna: 'Recorré la partida y elegí la jugada donde sentiste que se definía. El tablero muestra cómo quedó la posición.',
+    momentoAnterior: 'Jugada anterior',
+    momentoSiguienteJugada: 'Jugada siguiente',
+    momentoJugadaActual: 'Jugada {n} · {san}',
+    momentoPosicionInicial: 'Posición inicial',
     momentoSiguiente: 'Confirmar momento crítico',
     planTitulo: '¿Cuál era tu plan ahí?',
     planPlaceholder: 'Un par de líneas alcanza…',

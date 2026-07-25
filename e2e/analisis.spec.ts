@@ -122,3 +122,41 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   await page.reload();
   await page.getByText(/Repaso de errores — \d+ pendientes?/).waitFor();
 });
+
+// RF-3.1a: elegir el momento crítico exige reconocer la posición, no recordar
+// la notación. El tablero acompaña la lista y muestra cómo quedó tras la
+// jugada marcada, con esa jugada resaltada; se puede recorrer con las flechas.
+test('fase 1: el tablero acompaña la elección del momento crítico', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  await seedGame(page);
+  await seedProfileDiagnosticado(page);
+  await page.reload();
+  await page.getByText('Tu sesión de hoy').waitFor();
+
+  await page.locator('nav:visible button', { hasText: 'Panel' }).first().click();
+  await page.getByRole('radio', { name: 'Partidas y datos' }).click();
+  await page.getByRole('button', { name: 'Analizar' }).first().click();
+  await page.getByText('Fase 1 — tu análisis').waitFor();
+
+  // Arranca en la posición inicial: hay tablero y todavía no hay jugada marcada.
+  const board = page.locator('cg-board');
+  await board.waitFor({ timeout: 15_000 });
+  await expect(page.getByText('Posición inicial')).toBeVisible();
+  await expect(page.locator('cg-board square.last-move')).toHaveCount(0);
+
+  // Al marcar una jugada, el tablero la resalta (origen y destino).
+  await page.getByRole('button', { name: 'Bc4', exact: true }).click();
+  await expect(page.getByText('Jugada 3 · Bc4')).toBeVisible();
+  await expect(page.locator('cg-board square.last-move')).toHaveCount(2);
+
+  // Las flechas recorren la partida sin volver a la lista.
+  await page.getByRole('button', { name: 'Jugada siguiente' }).click();
+  await expect(page.getByText('Jugada 3 · Bc5')).toBeVisible();
+  await page.getByRole('button', { name: 'Jugada anterior' }).click();
+  await expect(page.getByText('Jugada 3 · Bc4')).toBeVisible();
+
+  // La jugada que quedó a la vista es la que se confirma.
+  await page.getByRole('button', { name: 'Confirmar momento crítico' }).click();
+  await page.getByText('¿Cuál era tu plan ahí?').waitFor();
+});

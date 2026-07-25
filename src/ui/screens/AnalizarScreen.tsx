@@ -30,25 +30,88 @@ function Encabezado({ titulo }: { titulo: string }) {
   return <h1 className="m-0 font-display text-2xl font-medium">{titulo}</h1>;
 }
 
+// Elegir el momento crítico (RF-3.1a) con la partida a la vista: antes había
+// que reconocerlo leyendo notación de memoria. Ahora el tablero muestra la
+// posición tal como quedó tras la jugada marcada, con esa jugada resaltada, y
+// se puede recorrer la partida con la lista o con las flechas.
 function MomentoCritico() {
-  const { moves, marcarMomentoCritico, volver } = useAnalysisStore();
+  const { moves, game, marcarMomentoCritico, volver } = useAnalysisStore();
   const [seleccion, setSeleccion] = useState<number | null>(null);
 
+  const enTablero = seleccion === null ? null : moves[seleccion];
+  const fen = enTablero?.fenDespues ?? moves[0]?.fenAntes ?? '';
+  // Desde la perspectiva de quien jugó la partida; sin ese dato, blancas.
+  const orientacion = game?.jugadorColor ?? 'w';
+
+  function mover(delta: number) {
+    if (moves.length === 0) return;
+    const base = seleccion === null ? (delta > 0 ? -1 : moves.length) : seleccion;
+    const next = Math.min(moves.length - 1, Math.max(0, base + delta));
+    setSeleccion(next);
+  }
+
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <Encabezado titulo={t.analisis.fase1Titulo} />
-      <p className="m-0 text-secondary">{t.analisis.momentoConsigna}</p>
-      <MoveListPicker
-        moves={moves.map((m) => ({ ply: m.ply, san: m.san }))}
-        selectedPly={seleccion}
-        onSelect={setSeleccion}
-      />
-      <button className="btn-primary" disabled={seleccion === null} onClick={() => seleccion !== null && marcarMomentoCritico(seleccion)}>
-        {t.analisis.momentoSiguiente}
-      </button>
-      <button className="btn-secondary" onClick={() => volver()}>
-        {t.analisis.volver}
-      </button>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <Encabezado titulo={t.analisis.fase1Titulo} />
+        <p className="m-0 text-secondary">{t.analisis.momentoConsigna}</p>
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[52vh] lg:mx-0 lg:w-[55%] lg:max-w-[560px]">
+          <Board
+            fen={fen}
+            orientation={orientacion}
+            turn={enTablero ? (enTablero.ladoQueMueve === 'w' ? 'b' : 'w') : 'w'}
+            lastMove={enTablero?.lastMove ?? null}
+            check={false}
+            dests={new Map()}
+            movableColor={null}
+            onMove={() => {}}
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              className="btn-secondary px-3"
+              onClick={() => mover(-1)}
+              disabled={seleccion === 0 || moves.length === 0}
+              aria-label={t.analisis.momentoAnterior}
+            >
+              ‹
+            </button>
+            <p className="m-0 min-w-0 flex-1 truncate text-center font-mono text-sm text-secondary">
+              {enTablero
+                ? t.analisis.momentoJugadaActual
+                    .replace('{n}', String(Math.floor(enTablero.ply / 2) + 1))
+                    .replace('{san}', enTablero.san)
+                : t.analisis.momentoPosicionInicial}
+            </p>
+            <button
+              className="btn-secondary px-3"
+              onClick={() => mover(1)}
+              disabled={seleccion === moves.length - 1 || moves.length === 0}
+              aria-label={t.analisis.momentoSiguienteJugada}
+            >
+              ›
+            </button>
+          </div>
+
+          <MoveListPicker
+            moves={moves.map((m) => ({ ply: m.ply, san: m.san }))}
+            selectedPly={seleccion}
+            onSelect={setSeleccion}
+          />
+
+          <button className="btn-primary" disabled={seleccion === null} onClick={() => seleccion !== null && marcarMomentoCritico(seleccion)}>
+            {t.analisis.momentoSiguiente}
+          </button>
+          <button className="btn-secondary" onClick={() => volver()}>
+            {t.analisis.volver}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
