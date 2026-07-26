@@ -60,22 +60,55 @@ describe('maiaStore — el tablero es un espejo del estado remoto', () => {
     expect(s.lastMove).toEqual(['g1', 'f3']);
   });
 
-  it('una jugada propia no se pinta hasta que Lichess la devuelve', async () => {
+  // Esperar al stream para pintar la jugada propia hacía que la pieza soltada
+  // volviera de un salto a su casilla y reapareciera en destino un segundo
+  // después. Ahora se aplica en el acto y el servidor sigue siendo la autoridad.
+  it('la jugada propia se ve en el acto, sin esperar al servidor', async () => {
     const enviarJugada = vi.fn(async () => {});
     const { store, emitir } = crearDoble({ enviarJugada });
     await store.getState().empezar('token', 'maia1');
 
     await store.getState().userMove('e2' as never, 'e4' as never);
 
-    // Se mandó, pero el tablero sigue en la posición inicial: si Lichess la
-    // rechazara, mostrar la jugada habría sido mentir.
     expect(enviarJugada).toHaveBeenCalledWith('token', 'abc123', 'e2e4');
-    expect(store.getState().sanMoves).toEqual([]);
-    expect(store.getState().enviando).toBe(true);
+    expect(store.getState().sanMoves).toEqual(['e4']);
+    expect(store.getState().lastMove).toEqual(['e2', 'e4']);
 
+    // Cuando el servidor confirma esa misma jugada, la posición no cambia: no
+    // hay salto ni re-animación.
     emitir({ moves: 'e2e4', status: 'started' });
     expect(store.getState().sanMoves).toEqual(['e4']);
     expect(store.getState().enviando).toBe(false);
+  });
+
+  it('si Lichess rechaza la jugada, el tablero vuelve a la posición confirmada', async () => {
+    const { store, emitir } = crearDoble({
+      enviarJugada: async () => {
+        throw new LichessError('desconocido');
+      },
+    });
+    await store.getState().empezar('token', 'maia1');
+    emitir({ moves: '', status: 'started' });
+
+    await store.getState().userMove('e2' as never, 'e4' as never);
+
+    expect(store.getState().sanMoves).toEqual([]);
+    expect(store.getState().phase).toBe('error');
+  });
+
+  // La respuesta de Maia llega como una jugada nueva sobre la posición que el
+  // usuario ya está viendo: un solo ply de diferencia, que es lo que el tablero
+  // puede animar bien.
+  it('la respuesta del rival avanza un solo ply sobre lo ya mostrado', async () => {
+    const { store, emitir } = crearDoble();
+    await store.getState().empezar('token', 'maia1');
+
+    await store.getState().userMove('e2' as never, 'e4' as never);
+    emitir({ moves: 'e2e4 e7e5', status: 'started' });
+
+    expect(store.getState().sanMoves).toEqual(['e4', 'e5']);
+    expect(store.getState().lastMove).toEqual(['e7', 'e5']);
+    expect(store.getState().turn).toBe('w');
   });
 
   it('no deja jugar cuando no es el turno del usuario', async () => {

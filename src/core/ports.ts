@@ -14,10 +14,21 @@ export interface EngineLevel {
   /** Presupuesto de tiempo por jugada del motor. */
   movetimeMs: number;
   /**
-   * Probabilidad (0–1) de jugar una alternativa en vez de la mejor línea, para
-   * bajar del piso de 1320 que impone `UCI_Elo`. Ausente o 0 = siempre la mejor.
+   * Temperatura en centipeones para muestrear entre las candidatas, con la que
+   * se baja del piso de 1320 que impone `UCI_Elo`. 0 o ausente = siempre la
+   * mejor línea. Misma escala que usa el análisis para clasificar errores
+   * (100 cp = error, 200 = error grave) — ver `core/engineLevels.ts`.
    */
-  imprecision?: number;
+  temperaturaCp?: number;
+  /** Cuántas líneas pedirle al motor (MultiPV). Solo tiene sentido con temperatura. */
+  candidatas?: number;
+  /**
+   * Centipeones perdidos por jugada **medidos** para este nivel
+   * (`npm run measure:niveles`). Vive en la configuración para que el número
+   * que se muestra al usuario esté atado a una medición y no a una fórmula: el
+   * script vuelve a medirlo y avisa si se despegó.
+   */
+  acplMedido?: number;
 }
 
 /** Resultado de evaluar una posición a máxima fuerza (E3, análisis en dos fases). */

@@ -1,7 +1,7 @@
 // Adaptador del motor (ADR-0002): Stockfish WASM single-thread en un Web
 // Worker. El archivo .js real lo publica scripts/copy-engine.mjs en
 // public/engine/ junto con un manifest.json con su nombre.
-import { clampUciElo, elegirJugadaConImprecision, multiPvParaNivel } from '../../core/engineLevels';
+import { clampUciElo, elegirJugadaPorTemperatura, multiPvParaNivel } from '../../core/engineLevels';
 import type { EngineEvaluation, EngineLevel, EnginePort } from '../../core/ports';
 
 interface AnalyzeOptions {
@@ -78,10 +78,7 @@ export class StockfishEngine implements EnginePort {
       movetimeMs: level.movetimeMs,
       multiPv: multiPvParaNivel(level),
     });
-    const elegida = elegirJugadaConImprecision(
-      lineas.map((linea) => linea.move),
-      level.imprecision ?? 0,
-    );
+    const elegida = elegirJugadaPorTemperatura(lineas, level.temperaturaCp ?? 0);
     if (!elegida) throw new Error('El motor no devolvió jugada');
     return elegida;
   }

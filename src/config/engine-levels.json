@@ -1,10 +1,11 @@
 {
-  "version": "engine-levels-v2",
+  "version": "engine-levels-v5",
+  "medicion": "30 jugadas por nivel contra Stockfish a fuerza plena, 2026-07-26 (scripts/measure-engine-levels.mjs)",
   "levels": [
-    { "id": "nivel-1", "uciElo": 1320, "movetimeMs": 400, "imprecision": 0.55 },
-    { "id": "nivel-2", "uciElo": 1320, "movetimeMs": 400, "imprecision": 0.25 },
-    { "id": "nivel-3", "uciElo": 1450, "movetimeMs": 500 },
-    { "id": "nivel-4", "uciElo": 1950, "movetimeMs": 900 },
-    { "id": "nivel-5", "uciElo": 2600, "movetimeMs": 1400 }
+    { "id": "nivel-1", "uciElo": 1320, "movetimeMs": 300, "candidatas": 24, "temperaturaCp": 900, "acplMedido": 201 },
+    { "id": "nivel-2", "uciElo": 1320, "movetimeMs": 350, "candidatas": 18, "temperaturaCp": 520, "acplMedido": 142 },
+    { "id": "nivel-3", "uciElo": 1500, "movetimeMs": 500, "candidatas": 14, "temperaturaCp": 300, "acplMedido": 58 },
+    { "id": "nivel-4", "uciElo": 1900, "movetimeMs": 700, "candidatas": 10, "temperaturaCp": 150, "acplMedido": 42 },
+    { "id": "nivel-5", "uciElo": 2400, "movetimeMs": 1000, "candidatas": 6, "temperaturaCp": 60, "acplMedido": 22 }
   ]
 }

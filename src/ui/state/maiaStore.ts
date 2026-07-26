@@ -60,8 +60,12 @@ export function createMaiaStore(deps: MaiaDeps) {
   let abort: AbortController | null = null;
 
   return create<MaiaState>((set, get) => {
+    /** Último estado confirmado por el servidor, para revertir una jugada rechazada. */
+    let ultimoEstadoConfirmado: EstadoPartidaLichess | null = null;
+
     /** Reconstruye el tablero desde la lista de jugadas que manda Lichess. */
     function aplicarEstado(estado: EstadoPartidaLichess) {
+      ultimoEstadoConfirmado = estado;
       const jugadas = jugadasDeEstado(estado.moves);
       const replay = new Chess();
       let ultima: [Square, Square] | null = null;
@@ -151,6 +155,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         abort?.abort();
         abort = new AbortController();
         chess = new Chess();
+        ultimoEstadoConfirmado = null;
         set({
           phase: 'desafiando', bot, fallo: null, gameId: null, rival: '', guardada: false,
           resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false,
@@ -183,12 +188,32 @@ export function createMaiaStore(deps: MaiaDeps) {
           return;
         }
         const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
-        set({ enviando: true });
+        const uci = from + to + (promo ?? '');
+
+        // La jugada se aplica en el acto. La versión anterior esperaba a que el
+        // stream la devolviera para pintarla, con la idea de "no mostrar lo que
+        // Lichess no confirmó"; el resultado visible era que la pieza soltada
+        // volvía de un salto a su casilla y reaparecía en destino un segundo
+        // después, a veces junto con la respuesta de Maia. El estado remoto
+        // sigue siendo la autoridad —`aplicarEstado` reconstruye desde la lista
+        // de jugadas y revierte esto si Lichess no la aceptó—, pero mientras
+        // tanto el tablero muestra lo que el usuario hizo.
+        chess.move({ from, to, promotion: promo });
+        set({
+          fen: chess.fen(),
+          turn: chess.turn() as Color,
+          dests: computeDests(chess),
+          check: chess.inCheck(),
+          sanMoves: chess.history(),
+          lastMove: [from, to],
+          enviando: true,
+        });
+
         try {
-          await deps.lichess.enviarJugada(tokenActual, s.gameId, from + to + (promo ?? ''));
-          // No se aplica localmente: el stream la devuelve y ahí se aplica. Así
-          // el tablero nunca muestra una jugada que Lichess no aceptó.
+          await deps.lichess.enviarJugada(tokenActual, s.gameId, uci);
         } catch (error) {
+          // Rechazada: se vuelve a la posición confirmada por el servidor.
+          if (ultimoEstadoConfirmado) aplicarEstado(ultimoEstadoConfirmado);
           const motivo = error instanceof LichessError ? error.motivo : 'desconocido';
           set({ enviando: false, phase: 'error', fallo: motivo as FalloMaia });
         }
@@ -213,6 +238,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         abort?.abort();
         abort = null;
         chess = new Chess();
+        ultimoEstadoConfirmado = null;
         set({
           phase: 'inactivo', gameId: null, rival: '', fallo: null, guardada: false,
           resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false,

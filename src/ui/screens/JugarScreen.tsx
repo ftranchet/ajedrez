@@ -16,7 +16,6 @@ import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
 import { isDue } from '../../core/scheduler';
-import { eloAproximado } from '../../core/engineLevels';
 import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
 
@@ -283,9 +282,11 @@ function Setup() {
               {ENGINE_LEVELS.map((l) => (
                 <Chip key={l.id} selected={levelId === l.id} onClick={() => setLevelId(l.id)}>
                   {t.jugar.niveles[l.id] ?? l.id}
-                  <span className="ml-2 font-mono text-xs text-tertiary">
-                    {t.jugar.nivelElo.replace('{elo}', String(eloAproximado(l)))}
-                  </span>
+                  {l.acplMedido !== undefined && (
+                    <span className="ml-2 font-mono text-xs text-tertiary">
+                      {t.jugar.nivelAcpl.replace('{cp}', String(l.acplMedido))}
+                    </span>
+                  )}
                 </Chip>
               ))}
             </div>

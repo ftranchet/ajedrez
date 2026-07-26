@@ -573,16 +573,20 @@ export const es = {
     // El nombre dice el Elo aproximado en vez de un adjetivo: los adjetivos
     // anteriores ("da sus primeros pasos") prometían una curva que el motor no
     // entregaba, y no había forma de que el usuario notara la diferencia.
+    // Se describe lo que el nivel HACE, no un Elo. La versión anterior mostraba
+    // un número calculado con una fórmula inventada —exactamente lo que este
+    // proyecto dice no hacer—; ahora la escala está medida en centipeones
+    // perdidos por jugada (docs/niveles-motor.md) y el nombre describe eso.
     niveles: {
-      'nivel-1': 'Nivel 1 — deja piezas, juega sin plan',
-      'nivel-2': 'Nivel 2 — falla táctica simple',
+      'nivel-1': 'Nivel 1 — cuelga piezas seguido',
+      'nivel-2': 'Nivel 2 — falla tácticas simples',
       'nivel-3': 'Nivel 3 — sólido, castiga descuidos',
       'nivel-4': 'Nivel 4 — exige precisión',
       'nivel-5': 'Nivel 5 — muy fuerte',
     } as Record<string, string>,
-    nivelElo: '≈ {elo} Elo',
+    nivelAcpl: '−{cp} cp/jugada',
     nivelesAyuda:
-      'Los Elo son aproximados: se los pide al motor, que los calibra contra su propia escala. Están medidos entre sí (los niveles altos le ganan a los bajos), no contra una federación.',
+      'El número es cuántos centipeones pierde cada nivel por jugada, medido contra el motor a fuerza plena: la misma escala con la que la app clasifica tus errores (100 = error, 200 = error grave). Está medido, no estimado; el método y sus límites están en docs/niveles-motor.md.',
   },
   analisis: {
     analizar: 'Analizar',

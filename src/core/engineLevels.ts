@@ -1,23 +1,22 @@
 // Fuerza del oponente local (RF-1.3): cómo se pide un nivel y cómo se elige la
 // jugada cuando hay que bajar del piso del motor.
 //
-// **Por qué existe este archivo.** Los niveles se implementaban con el `Skill
-// Level` de Stockfish (0–20), y eso no es una curva de dificultad: Skill Level
-// juega casi a fuerza plena y le inyecta errores aleatorios, con un piso de
-// ~1350 Elo. Sumado a presupuestos de 250–1000 ms —que ya limitan la
-// profundidad por sí solos—, la diferencia entre el nivel más bajo y el más
-// alto quedaba dentro del ruido: el nivel 1 se sentía como el 5 y a veces peor,
-// porque a veces el 5 tenía la suerte de errar y el 1 no. Nadie lo había
-// medido nunca; los nombres ("da sus primeros pasos") eran una promesa que el
-// config no cumplía.
+// **Historia de dos correcciones.** Primero los niveles usaban el `Skill Level`
+// de Stockfish, que no es una curva de dificultad sino fuerza casi plena con
+// errores aleatorios: el nivel 1 se sentía como el 5. Se pasó a
+// `UCI_LimitStrength` + `UCI_Elo` con un mecanismo de imprecisión que elegía
+// entre las cuatro mejores líneas del motor — y seguía sin alcanzar, porque
+// **las cuatro mejores líneas de Stockfish son todas buenas**: elegir la
+// segunda o la tercera no produce un rival débil, produce un rival un poco
+// menos preciso. Encima el Elo que se mostraba en pantalla salía de una fórmula
+// inventada, no de una medición, que es exactamente lo que este proyecto dice
+// no hacer.
 //
-// Ahora se usa el mecanismo que Stockfish expone para esto: `UCI_LimitStrength`
-// + `UCI_Elo`, que el motor calibra contra su propia escala. Su piso duro es
-// 1320, por debajo del cual la persona objetivo del PRD (900–1900) todavía
-// necesita rival, así que los niveles más bajos agregan **imprecisión
-// declarada**: a veces juegan la segunda o tercera mejor línea en vez de la
-// primera. Es la misma idea que Skill Level, pero con un parámetro que se puede
-// medir y ajustar (`scripts/measure-engine-levels.mjs`).
+// Ahora la debilidad se controla con una **temperatura en centipeones** sobre
+// una lista ancha de candidatas: cuanto más alta, más probable es que el motor
+// juegue una jugada que pierde material. Es un parámetro con unidades, medible,
+// y se calibra contra la métrica que la propia app usa para clasificar errores:
+// el promedio de centipeones perdidos por jugada (`npm run measure:niveles`).
 import type { EngineLevel } from './ports';
 
 /** Rango que acepta `UCI_Elo` en Stockfish; fuera de él el motor ignora el valor. */
@@ -29,43 +28,59 @@ export function clampUciElo(elo: number): number {
   return Math.min(UCI_ELO_MAX, Math.max(UCI_ELO_MIN, Math.round(elo)));
 }
 
-/** Cuántas líneas se piden cuando el nivel juega con imprecisión. */
-export const CANDIDATAS_IMPRECISION = 4;
+/** Valor con el que se compara un mate contra una evaluación en centipeones. */
+export const CP_MATE = 100_000;
+
+export interface LineaCandidata {
+  move: string;
+  /** Centipeones desde la perspectiva de quien mueve; null si hay mate. */
+  cp: number | null;
+  /** Jugadas hasta el mate (positivo = a favor de quien mueve); null si no hay. */
+  mateIn: number | null;
+}
+
+/** Puntaje comparable entre líneas, con el mate como extremo de la escala. */
+export function puntajeComparable(linea: LineaCandidata): number {
+  if (linea.mateIn !== null) return linea.mateIn > 0 ? CP_MATE : -CP_MATE;
+  return linea.cp ?? 0;
+}
 
 /**
- * Elige qué línea juega el motor. Con `imprecision` en 0 siempre juega la
- * mejor; con 0,4 juega una de las alternativas cuatro de cada diez veces.
+ * Elige qué línea juega el motor, muestreando entre las candidatas con peso
+ * `exp(-pérdida / temperatura)`.
  *
- * Se elige entre las alternativas del propio motor y no entre jugadas legales
- * al azar a propósito: un rival que de golpe cuelga una dama no enseña nada y
- * no se parece a nadie. Las líneas 2 a 4 de Stockfish son jugadas plausibles
- * pero peores, que es como se equivoca alguien de carne y hueso.
+ * Con temperatura 0 siempre juega la mejor. Con temperatura 100, una jugada que
+ * pierde 100 centipeones tiene ~37% del peso de la mejor: sale seguido, pero no
+ * siempre. Con 300, hasta una jugada que cuelga una pieza aparece de vez en
+ * cuando — que es lo que hace un principiante y lo que el mecanismo anterior no
+ * lograba nunca.
+ *
+ * La escala es la misma que usa `core/analysis.ts` para clasificar errores
+ * (100 cp = "error", 200 = "error grave"), así que la temperatura se lee en la
+ * misma unidad en la que el producto ya piensa.
  */
-export function elegirJugadaConImprecision(
-  jugadas: string[],
-  imprecision: number,
+export function elegirJugadaPorTemperatura(
+  lineas: LineaCandidata[],
+  temperaturaCp: number,
   rng: () => number = Math.random,
 ): string | null {
-  if (jugadas.length === 0) return null;
-  const alternativas = jugadas.slice(1);
-  if (imprecision <= 0 || alternativas.length === 0) return jugadas[0];
-  if (rng() >= Math.min(1, imprecision)) return jugadas[0];
-  const indice = Math.min(alternativas.length - 1, Math.floor(rng() * alternativas.length));
-  return alternativas[indice];
+  if (lineas.length === 0) return null;
+  if (temperaturaCp <= 0 || lineas.length === 1) return lineas[0].move;
+
+  const mejor = Math.max(...lineas.map(puntajeComparable));
+  const pesos = lineas.map((linea) => Math.exp(-(mejor - puntajeComparable(linea)) / temperaturaCp));
+  const total = pesos.reduce((suma, peso) => suma + peso, 0);
+  if (!Number.isFinite(total) || total <= 0) return lineas[0].move;
+
+  let dardo = rng() * total;
+  for (let i = 0; i < lineas.length; i++) {
+    dardo -= pesos[i];
+    if (dardo <= 0) return lineas[i].move;
+  }
+  return lineas[lineas.length - 1].move;
 }
 
 /** Cuántas líneas hay que pedirle al motor para servir este nivel. */
-export function multiPvParaNivel(level: Pick<EngineLevel, 'imprecision'>): number {
-  return (level.imprecision ?? 0) > 0 ? CANDIDATAS_IMPRECISION : 1;
-}
-
-/**
- * Elo aproximado que representa un nivel, para poder nombrarlo con un número
- * en vez de un adjetivo. Cuando hay imprecisión, el nivel juega por debajo del
- * Elo que se le pide al motor, así que se descuenta: es una estimación, y la
- * interfaz debe decir que lo es.
- */
-export function eloAproximado(level: Pick<EngineLevel, 'uciElo' | 'imprecision'>): number {
-  const penalizacion = Math.round((level.imprecision ?? 0) * 900);
-  return Math.max(400, clampUciElo(level.uciElo) - penalizacion);
+export function multiPvParaNivel(level: Pick<EngineLevel, 'candidatas'>): number {
+  return Math.max(1, level.candidatas ?? 1);
 }
