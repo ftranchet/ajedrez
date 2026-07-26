@@ -83,6 +83,33 @@ function cargarCatalogo() {
   return JSON.parse(texto.slice(inicio, texto.lastIndexOf(']') + 1));
 }
 
+/**
+ * Posiciones que **no pueden** entrar al Radar por venir del export.
+ *
+ * La batería de transferencia (RF-12.2) mide si lo aprendido se traslada a
+ * contenido nuevo, y toda su validez descansa en que sus 30 posiciones nunca
+ * se entrenen. Este script elige entre millones de puzzles de la misma base de
+ * Lichess de la que salió parte del resto del contenido: sin este filtro, una
+ * coincidencia contaminaría el único instrumento que distingue aprender de
+ * memorizar.
+ *
+ * Hay un test que compara los catálogos y falla si se solapan, pero detectarlo
+ * después de escribir el archivo obliga a regenerar; descartarlo acá es gratis.
+ * Se excluyen también currículo y Stoyko: una posición duplicada entre
+ * catálogos no invalida nada, pero desperdicia un lugar del Radar.
+ */
+function fensReservadas() {
+  const reservadas = new Set();
+  const archivos = ['transferSeedData.ts', 'curriculumSeedData.ts', 'stoykoSeedData.ts'];
+  for (const archivo of archivos) {
+    const texto = readFileSync(join(scriptDir, '..', 'src', 'services', 'puzzles', archivo), 'utf8');
+    for (const coincidencia of texto.matchAll(/fen:\s*'([^']+)'|"fen":\s*"([^"]+)"/g)) {
+      reservadas.add(coincidencia[1] ?? coincidencia[2]);
+    }
+  }
+  return reservadas;
+}
+
 /** En qué tramo de rating cae un puzzle. */
 function tramoDe(rating, min, max) {
   const ancho = (max - min) / TRAMOS;
@@ -108,9 +135,13 @@ async function main() {
   if (ratingMax <= ratingMin) throw new Error('--rating-max debe ser mayor que --rating-min.');
 
   const existentes = cargarCatalogo();
+  const reservadas = fensReservadas();
   const idsUsados = new Set(existentes.map((i) => i.id));
-  const fensUsados = new Set(existentes.map((i) => i.fen));
+  // Las reservadas entran al mismo conjunto de descarte que las ya presentes:
+  // el bucle no necesita saber la diferencia, solo que esas no se tocan.
+  const fensUsados = new Set([...existentes.map((i) => i.fen), ...reservadas]);
   console.error(`Catálogo actual: ${existentes.length} posiciones. Objetivo: sumar ${objetivo}.`);
+  console.error(`Reservadas y excluidas (transferencia, currículo, Stoyko): ${reservadas.size}.`);
   console.error(`Rating ${ratingMin}–${ratingMax}, popularidad ≥ ${popularidadMin}, ${TRAMOS} tramos.\n`);
 
   const filtros = { ratingMin, ratingMax, popularityMin: popularidadMin };
