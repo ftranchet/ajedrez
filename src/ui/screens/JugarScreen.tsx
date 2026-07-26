@@ -106,7 +106,7 @@ function PartidaScreen() {
         : `${t.jugar.teToca}${s.check ? ` — ${t.jugar.jaque}` : ''}`;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-start">
+    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-start">
       {/* El tablero manda (§1): elemento dominante, mínimo 320 px */}
       <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
         <Board

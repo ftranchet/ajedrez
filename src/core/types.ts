@@ -177,6 +177,26 @@ export interface RadarItem {
    * conformó con la familiar en vez de encontrar la superior.
    */
   dobleSolucion?: { familiar: string };
+  /**
+   * Solo en posiciones `envenenada`: cuál es la captura-carnada y qué la
+   * refuta (RF-5.3). El tablero por sí solo no alcanza para señalarla —en la
+   * mitad del lote hay dos o más capturas que *parecen* ganar material—, así
+   * que la elige el motor fuera de línea (`scripts/build-carnadas.mjs`) y
+   * viaja en el catálogo. Sin este dato el feedback dice "era una trampa" sin
+   * decir dónde estaba, que es justamente la queja que originó RF-5.3.
+   */
+  carnada?: {
+    /** La captura que parece ganar, en SAN. */
+    san: string;
+    /** Material aparente de la captura, en peones, contando recaptura a 1 ply. */
+    ganaPeones: number;
+    /** Continuación del motor tras la carnada, en SAN. Puede venir vacía. */
+    refutacionSan: string[];
+    /** Cuánto peor que la mejor jugada es la carnada, en centipeones. */
+    costoCp: number;
+    /** Profundidad a la que se verificó. */
+    profundidad: number;
+  };
 }
 
 /**

@@ -101,6 +101,74 @@ describe('selectNextRadarItem', () => {
     expect(repetidoInmediato).toBe(0);
   });
 
+  // Medido con `npm run measure:radar` antes del arreglo: evitando solo los 8
+  // ids más recientes —una sesión— una posición volvía AL DÍA SIGUIENTE en las
+  // cinco bandas de la dieta, y a los 30 días el usuario había visto 33–48 de
+  // las 116. Una táctica que uno recuerda no entrena nada.
+  it('una posición no vuelve en la sesión siguiente cuando el pool da para más', () => {
+    // Pool grande a propósito: acá la banda tiene 36 posiciones, así que la
+    // ventana (60% = 21) cubre de sobra una sesión de 8.
+    const pool = buildPool(120);
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
+    const rng = seededRng(21);
+    const sesiones: string[][] = [];
+    for (let sesion = 0; sesion < 2; sesion++) {
+      const servidas: string[] = [];
+      for (let i = 0; i < 8; i++) {
+        const item = selectNextRadarItem(pool, state, rng);
+        if (!item) continue;
+        servidas.push(item.id);
+        state = recordServed(state, item);
+      }
+      sesiones.push(servidas);
+    }
+    const primera = new Set(sesiones[0]);
+    expect(sesiones[1].filter((id) => primera.has(id))).toEqual([]);
+  });
+
+  it('con una banda chica la ventana se recorta, pero sigue siendo la más ancha posible', () => {
+    // Con 16 posiciones alcanzables no hay manera de proteger 8 por sesión
+    // entera: lo honesto es evitar todo lo que se pueda (60% = 9) y no fingir
+    // una garantía que el catálogo no da.
+    const pool = buildPool(50); // banda de 16 en el centro 50
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
+    const rng = seededRng(21);
+    const servidas: string[] = [];
+    for (let i = 0; i < 30; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      if (!item) continue;
+      servidas.push(item.id);
+      state = recordServed(state, item);
+    }
+    for (let i = 9; i < servidas.length; i++) {
+      expect(servidas.slice(i - 9, i)).not.toContain(servidas[i]);
+    }
+  });
+
+  it('la ventana se achica con el pool en vez de vaciar la selección', () => {
+    // Con 6 posiciones no hay forma de no repetir: lo que no puede pasar es
+    // que el filtro se quede sin candidatos y deje de servir.
+    const pool = buildPool(6);
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
+    const rng = seededRng(4);
+    for (let i = 0; i < 60; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      expect(item).not.toBeNull();
+      state = recordServed(state, item!);
+    }
+  });
+
+  it('la memoria de ids no crece sin límite', () => {
+    const pool = buildPool(50);
+    let state: RadarSelectionState = RADAR_INITIAL_STATE;
+    const rng = seededRng(8);
+    for (let i = 0; i < 400; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      state = recordServed(state, item!);
+    }
+    expect(state.historialIds.length).toBeLessThanOrEqual(120);
+  });
+
   it('respeta la banda normalizada cuando hay candidatos suficientes', () => {
     const pool = buildPool(50);
     const state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
@@ -132,6 +200,95 @@ describe('selectNextRadarItem', () => {
     ];
     expect(dificultadNormalizada(pool[0], pool)).toBe(50);
     expect(dificultadNormalizada(pool[1], pool)).toBe(50);
+  });
+});
+
+// El lote publicado reproduce esto tal cual: las 8 envenenadas y las 8 de
+// doble solución vienen de autojuego, todas con rating fijo 1500, y por eso
+// viven exactamente en el percentil 50. Medido antes del arreglo: con el
+// centro adaptativo en 70 o más, el Radar servía CERO ofertas envenenadas.
+describe('cobertura de tipos fuera de la banda (RF-5.1)', () => {
+  /** Catálogo con la forma del real: un tipo entero encerrado en el percentil 50. */
+  function poolConTipoEncerrado(): RadarItem[] {
+    const base = buildPool(1)[0];
+    const calibradas: RadarItem[] = Array.from({ length: 40 }, (_, i) => ({
+      ...base,
+      id: `cc0-${i}`,
+      tipo: TIPOS[i % 4], // los cuatro tipos con rating calibrado
+      fuente: 'lichess-cc0',
+      rating: 800 + i * 30,
+    }));
+    const generadas: RadarItem[] = Array.from({ length: 8 }, (_, i) => ({
+      ...base,
+      id: `enven-${i}`,
+      tipo: 'envenenada',
+      fuente: 'pipeline-envenenada',
+      rating: 1500, // cohorte constante ⇒ percentil 50 para todas
+    }));
+    return [...calibradas, ...generadas];
+  }
+
+  it('un usuario que mejora sigue viendo ofertas envenenadas', () => {
+    const pool = poolConTipoEncerrado();
+    // 85 está a 35 percentiles del 50: muy afuera de la banda de ±15.
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 85 };
+    const rng = seededRng(7);
+    const vistos = new Set<TipoRadar>();
+    for (let i = 0; i < 300; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      if (!item) continue;
+      vistos.add(item.tipo);
+      state = recordServed(state, item);
+    }
+    // Sin el rescate esto era 0: "capturar siempre está bien" pasaba a ser
+    // cierto el 100% de las veces, que es el patrón trivial que RF-5.1 prohíbe.
+    expect(vistos.has('envenenada')).toBe(true);
+    expect(vistos.size).toBe(5);
+  });
+
+  it('tampoco desaparece en el extremo fácil de la escala', () => {
+    const pool = poolConTipoEncerrado();
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 5 };
+    const rng = seededRng(11);
+    const vistos = new Set<TipoRadar>();
+    for (let i = 0; i < 300; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      if (!item) continue;
+      vistos.add(item.tipo);
+      state = recordServed(state, item);
+    }
+    expect(vistos.has('envenenada')).toBe(true);
+  });
+
+  it('el rescate no inunda la sesión con el tipo escaso', () => {
+    const pool = poolConTipoEncerrado();
+    let state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 85 };
+    const rng = seededRng(3);
+    let envenenadas = 0;
+    const total = 400;
+    for (let i = 0; i < total; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      if (!item) continue;
+      if (item.tipo === 'envenenada') envenenadas++;
+      state = recordServed(state, item);
+    }
+    // Presente de verdad, pero sin desplazar al catálogo calibrado: 8
+    // posiciones no pueden sostener un tercio de las sesiones sin volverse
+    // memorizadas.
+    expect(envenenadas).toBeGreaterThan(total * 0.05);
+    expect(envenenadas).toBeLessThan(total * 0.35);
+  });
+
+  it('cuando la banda ya cubre todos los tipos, no rescata nada', () => {
+    // buildPool reparte los cinco tipos por toda la escala de rating: la banda
+    // de ±15 alcanza para todos y la selección tiene que seguir respetándola.
+    const pool = buildPool(50);
+    const state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
+    const rng = seededRng(5);
+    for (let i = 0; i < 50; i++) {
+      const item = selectNextRadarItem(pool, state, rng);
+      expect(Math.abs(dificultadNormalizada(item!, pool) - 50)).toBeLessThanOrEqual(15);
+    }
   });
 });
 
@@ -212,7 +369,8 @@ describe('adjustDifficulty', () => {
 describe('explainFeedback', () => {
   const item: RadarItem = {
     id: 'x',
-    fen: '8/8/8/8/8/8/8/8 w - - 0 1',
+    // Posición real: desde la ronda C el texto se deriva del tablero.
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     tipo: 'tranquila',
     temas: [],
     rating: 1000,

@@ -183,7 +183,17 @@ export default function App() {
         </button>
       </nav>
 
-      <main ref={mainRef} tabIndex={-1} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24 focus:outline-none lg:pb-4">
+      {/*
+        `scroll-pb-24` reserva, dentro del scrollport, la franja que tapa la
+        navegación inferior fija. `pb-24` solo agrega espacio al final del
+        contenido: alcanza si uno scrollea hasta abajo, pero cuando el navegador
+        trae un elemento a la vista por su cuenta —al enfocar el botón de
+        continuar del feedback, por ejemplo— lo deja pegado al borde inferior
+        del scrollport, o sea debajo de la barra. Con el panel de feedback más
+        alto (línea completa de la solución) eso pasó a ser el caso normal en un
+        celular angosto: el botón quedaba tapado hasta scrollear a mano.
+      */}
+      <main ref={mainRef} tabIndex={-1} className="min-h-0 flex-1 scroll-pb-24 overflow-x-hidden overflow-y-auto p-4 pb-24 focus:outline-none lg:scroll-pb-4 lg:pb-4">
         {route === 'hoy' && <HoyScreen />}
         {route === 'jugar' && <JugarScreen />}
         {route === 'calculo' && <CalculoScreen />}

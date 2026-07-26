@@ -5,6 +5,7 @@
 // igual que cualquier otro ítem — su lógica de puntuación vive en
 // core/dobleSolucion.ts, no acá.
 import type { CategoriaError, ErrorCard, RadarItem, TipoRadar } from './types';
+import { explicarPosicion } from './radarExplicacion';
 
 export interface RadarSelectionState {
   /** Últimos tipos servidos, más reciente al final. */
@@ -22,7 +23,34 @@ export const RADAR_INITIAL_STATE: RadarSelectionState = {
 };
 
 const VENTANA_TIPOS = 3; // cuántos tipos recientes penalizan la repetición
-const VENTANA_IDS = 8; // cuántos ids recientes se evitan
+
+/**
+ * Qué fracción del pool alcanzable se reserva como "ya vista" antes de poder
+ * repetir (RF-5.6).
+ *
+ * **Por qué es una fracción y no un número fijo.** La versión anterior evitaba
+ * los últimos 8 ids: exactamente una sesión. Medido con
+ * `npm run measure:radar` sobre el lote publicado, eso hacía que una posición
+ * volviera **al día siguiente** en las cinco bandas de la dieta, y que a los
+ * 30 días el usuario hubiera visto solo 33–48 de las 116 posiciones. Una
+ * táctica que uno recuerda no entrena nada: repetirla al otro día es tiempo
+ * tirado.
+ *
+ * Una ventana fija grande tampoco sirve, porque el pool alcanzable depende de
+ * la dificultad del usuario (entre 30 y 45 posiciones en este catálogo): si la
+ * ventana lo supera, el filtro se vacía y el selector termina repitiendo igual,
+ * pero encima perdiendo el control de dificultad. Atada al tamaño del pool,
+ * siempre queda al menos un 40% disponible para elegir.
+ */
+const FRACCION_EVITADA = 0.6;
+
+/**
+ * Cuántos ids se recuerdan. Tiene que superar cómodamente la ventana efectiva
+ * (0.6 × pool alcanzable) para que la fracción de arriba no quede recortada por
+ * falta de memoria. Es dato del usuario y se persiste, pero son cadenas cortas:
+ * el costo es despreciable frente a repetir ejercicios.
+ */
+const MEMORIA_IDS = 120;
 const ANCHO_BANDA = 15; // ± percentiles sobre dificultadCentro
 const PASO_AJUSTE = 4; // cuánto se mueve dificultadCentro por respuesta
 const DIFICULTAD_MIN = 0;
@@ -167,6 +195,51 @@ function pesosAcumulados<T>(items: T[], peso: (item: T) => number): { item: T; a
   });
 }
 
+/**
+ * Cuántos ítems de un tipo ausente de la banda se rescatan por cercanía.
+ * Chico a propósito: garantiza que el tipo siga apareciendo sin que un tipo
+ * de 8 posiciones inunde la sesión.
+ */
+const RESCATE_POR_TIPO = 3;
+
+/**
+ * Tipos que existen en el pool pero que la banda de dificultad dejó afuera,
+ * con sus ítems más cercanos al centro (RF-5.1).
+ *
+ * **Por qué hace falta.** Todo el contenido generado por autojuego lleva un
+ * rating fijo de 1500 porque no hay una comunidad que lo calibre (ADR-0007).
+ * Una cohorte constante devuelve percentil 50 para *todos* sus ítems, así que
+ * las 8 envenenadas y las 8 de doble solución vivían exactamente en 50 y solo
+ * eran alcanzables con el centro adaptativo entre 35 y 65. Medido sobre el
+ * lote publicado: fuera de esa ventana el Radar servía **cero** ofertas
+ * envenenadas. Un usuario que mejora —y cuyo centro sube a 70— dejaba de ver
+ * trampas para siempre, con lo cual "capturar siempre está bien" pasaba a ser
+ * cierto el 100% de las veces. Eso es justo el patrón trivial que RF-5.1
+ * prohíbe, y no lo arregla agrandar el catálogo: es la selección la que dejaba
+ * un tipo entero fuera de alcance.
+ *
+ * La alternativa —inventarle un rating a cada posición generada para
+ * repartirla en la escala— sería fabricar precisión que nadie midió, que es
+ * exactamente lo que ADR-0007 decidió no hacer.
+ */
+function rescatarTiposAusentes(
+  pool: RadarItem[],
+  presentes: RadarItem[],
+  state: RadarSelectionState,
+  recientes: string[],
+): RadarItem[] {
+  const tiposEnBanda = new Set(presentes.map((item) => item.tipo));
+  const faltantes = [...new Set(pool.map((item) => item.tipo))].filter((tipo) => !tiposEnBanda.has(tipo));
+  return faltantes.flatMap((tipo) =>
+    pool
+      .filter((item) => item.tipo === tipo && !recientes.includes(item.id))
+      .map((item) => ({ item, distancia: Math.abs(dificultadNormalizada(item, pool) - state.dificultadCentro) }))
+      .sort((a, b) => a.distancia - b.distancia)
+      .slice(0, RESCATE_POR_TIPO)
+      .map(({ item }) => item),
+  );
+}
+
 /** Elige la próxima posición del Radar. Devuelve null si el pool está vacío. */
 export function selectNextRadarItem(
   pool: RadarItem[],
@@ -175,13 +248,22 @@ export function selectNextRadarItem(
 ): RadarItem | null {
   if (pool.length === 0) return null;
 
-  const banda = pool.filter(
-    (item) =>
-      Math.abs(dificultadNormalizada(item, pool) - state.dificultadCentro) <= ANCHO_BANDA &&
-      !state.historialIds.slice(-VENTANA_IDS).includes(item.id),
+  const enBanda = pool.filter(
+    (item) => Math.abs(dificultadNormalizada(item, pool) - state.dificultadCentro) <= ANCHO_BANDA,
   );
-  const candidatos = banda.length > 0 ? banda : pool.filter((item) => !state.historialIds.slice(-VENTANA_IDS).includes(item.id));
-  const universo = candidatos.length > 0 ? candidatos : pool;
+  const alcanzables = enBanda.length > 0 ? enBanda : pool;
+
+  // La ventana se mide contra lo que este usuario puede llegar a ver, no
+  // contra el catálogo entero: es su pool efectivo el que determina cuántas
+  // sesiones puede aguantar sin repetir.
+  const ventana = Math.min(state.historialIds.length, Math.floor(alcanzables.length * FRACCION_EVITADA));
+  const recientes = ventana > 0 ? state.historialIds.slice(-ventana) : [];
+
+  const candidatos = alcanzables.filter((item) => !recientes.includes(item.id));
+  const universo =
+    candidatos.length > 0
+      ? [...candidatos, ...rescatarTiposAusentes(pool, candidatos, state, recientes)]
+      : alcanzables;
 
   const pesados = pesosAcumulados(universo, (item) => pesoPorTipo(item.tipo, state.historialTipos));
   const total = pesados[pesados.length - 1].acumulado;
@@ -199,29 +281,22 @@ export function recordServed(state: RadarSelectionState, item: RadarItem): Radar
     historialTipos: isOwnErrorRadarItem(item)
       ? state.historialTipos
       : [...state.historialTipos, item.tipo].slice(-20),
-    historialIds: [...state.historialIds, item.id].slice(-20),
+    historialIds: [...state.historialIds, item.id].slice(-MEMORIA_IDS),
   };
 }
 
-const EXPLICACIONES_ACIERTO: Record<TipoRadar, string> = {
-  ofensiva: 'Encontraste el golpe táctico: había una combinación ganadora y la viste.',
-  defensa: 'Encontraste el único recurso defensivo — el resto de las jugadas perdía material o el juego.',
-  tranquila: 'No había ninguna táctica y elegiste una jugada sólida en lugar de forzar algo que no estaba. Eso también es acertar.',
-  genuina: 'La oferta era real: capturar ganaba material limpio, sin ninguna trampa detrás.',
-  envenenada: 'Detectaste la trampa: esa captura parecía ganar algo pero perdía material a cambio.',
-};
-
-const EXPLICACIONES_FALLO: Record<TipoRadar, string> = {
-  ofensiva: 'Había una combinación ganadora que no se jugó — se perdió la oportunidad de sacar ventaja decisiva.',
-  defensa: 'Esta posición exigía el único recurso defensivo disponible; otra jugada dejaba pasar la amenaza.',
-  tranquila: 'No había ninguna táctica acá: la posición pedía una jugada sólida y tranquila, no forzar una combinación que no existía.',
-  genuina: 'La oferta era genuina — no había trampa. No capturar dejó pasar material gratis.',
-  envenenada: 'Era una trampa: esa captura parecía ganar algo pero en realidad perdía material.',
-};
-
-/** Texto de feedback (RF-5.3): explica el porqué también cuando no había táctica. */
+/**
+ * Texto de feedback (RF-5.3): explica el porqué también cuando no había
+ * táctica.
+ *
+ * Hasta la ronda C esto era una tabla de cinco frases fijas —una por tipo—
+ * que las 116 posiciones del catálogo se repartían. La composición por
+ * posición vive en `core/radarExplicacion.ts`, que solo afirma lo que puede
+ * comprobar sobre el tablero; acá queda la puerta de entrada que ya usaban
+ * las dos pantallas.
+ */
 export function explainFeedback(item: RadarItem, acierto: boolean): string {
-  return (acierto ? EXPLICACIONES_ACIERTO : EXPLICACIONES_FALLO)[item.tipo];
+  return explicarPosicion(item, acierto);
 }
 
 /** Feedback que revela el origen propio recién después de responder. */

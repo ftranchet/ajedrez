@@ -79,6 +79,73 @@ El lote publicado ahora re-deriva el tipo de cada puzzle con Stockfish local (`s
 
 El `rating` crudo mezcla magnitudes que no son comparables: rating de puzzle de Lichess, Elo promedio de los jugadores de una partida y un 1500 fijo para contenido generado. Se conserva para trazabilidad, pero el selector adaptativo (RF-5.5) ya no lo usa como una escala única: calcula un percentil 0–100 dentro de cada `fuente`, con percentil medio para empates y 50 para cohortes constantes. El progreso personal y cada intento nuevo guardan esa dificultad normalizada. La migración a esquema v12 reinicia únicamente el centro adaptativo en 50 y conserva todo el historial previo. La decisión y sus límites están documentados en [ADR-0007](adr/0007-dificultad-normalizada-radar.md).
 
+## Explicación por posición (RF-5.3, ronda C)
+
+Hasta la ronda C, el feedback del Radar era **una frase fija por tipo**: las 116 posiciones se repartían cinco textos, y el panel mostraba solo la primera jugada de la solución. Fallabas y leías "había una combinación ganadora que no se jugó" sin enterarte de cuál era. Peor, la frase afirmaba cosas que no siempre eran ciertas de esa posición concreta.
+
+Ahora `core/radarExplicacion.ts` compone el texto por posición, y **solo afirma lo que puede comprobar reproduciendo la línea sobre el tablero** con chess.js:
+
+- **Mate en N** — la posición final es mate; N cuenta jugadas del solucionador, no plies.
+- **Material al terminar la línea** — contado pieza por pieza. La pieza se nombra solo si el número es exactamente el suyo (3 = una pieza, 5 = una torre); 4 peones netos se dicen "4 peones", no "una pieza".
+- **Motivo táctico** — solo las etiquetas de Lichess que describen un mecanismo (`fork`, `pin`, `backRankMate`…), ordenadas de más a menos específica. Las genéricas (`crushing`, `short`, `middlegame`) no aportan nada que el usuario no vea. Las que el tipo ya declara (`defensiveMove` en una defensa) no se repiten.
+- **Alternativas equivalentes** en las tranquilas, con la lista recortada: una posición del lote tiene 23 y enumerarlas convertía el feedback en una pared de notación.
+- **La línea completa**, numerada desde la jugada real de la posición.
+
+**Lo que deliberadamente no se afirma.** Ocho posiciones del lote terminan su línea con el solucionador *abajo* en material, porque la línea se corta cuando la ventaja ya es clara y la compensación llega después. Ahí no se dice nada de material: contar "perdés una pieza" sería cierto del tablero y falso de la partida.
+
+### La carnada de las envenenadas
+
+Lo único que el tablero no puede decidir solo es **cuál** de las capturas aparentemente ganadoras es la trampa: en la mitad de las envenenadas del lote hay dos o más (`enven-07` tiene cuatro, las cuatro promociones de `dxc8`). Lo decide el motor fuera de línea y viaja en el catálogo, en `RadarItem.carnada`:
+
+```sh
+npm run build:carnadas   # profundidad 17, refutación de 4 plies re-verificada con chess.js
+```
+
+Se guarda la captura, su material aparente, la continuación del motor y cuánto cuesta. Cuando el costo llega al centinela de mate, la explicación cambia de forma: la carnada no cuesta material, tira un mate que ya estaba. Si una posición no tuviera carnada identificable, el texto cae a la frase genérica del tipo — no se inventa.
+
+**Corolario que apareció midiendo esto:** el catálogo tenía una solución cortada a la mitad. `lichess-004LZ` corona con `c2c1q`, y el código que reproducía líneas UCI emparejaba solo origen y destino: chess.js devolvía primero `c1=N`, que da jaque donde la dama no lo da y volvía ilegal el resto de la línea. Estaba igual en `ui/state/chessBoardUtils.ts#sanDeLinea`, que alimenta los feedback de Cálculo comprometido y Stoyko.
+
+## Cuánto aguanta el catálogo antes de repetirse
+
+```sh
+npm run measure:radar
+```
+
+Simula sesiones reales contra el catálogo publicado, para cada banda de la dieta, y reporta el pool efectivo, a los cuántos días vuelve una posición ya vista y qué porción del catálogo se llegó a ver en 30 días. El catálogo **no se sirve entero**: el selector filtra por una banda de ±15 percentiles alrededor del centro adaptativo, así que el pool efectivo de un usuario concreto son 30–45 de las 116.
+
+Medido antes de la ronda C, evitando solo los 8 ids más recientes (una sesión):
+
+| Banda | Pool efectivo | Repite a los | Visto en 30 días |
+|---|---:|---:|---:|
+| principiante | 30 | 2 días | 33/116 |
+| elemental | 44 | **1 día** | 44/116 |
+| intermedio | 45 | **1 día** | 45/116 |
+| avanzado | 45 | **1 día** | 48/116 |
+| experto | 31 | **1 día** | 36/116 |
+
+Una táctica que uno recuerda no entrena nada: verla al día siguiente es tiempo tirado. La ventana anti-repetición pasó a ser una **fracción del pool alcanzable** (60%) en vez de un número fijo, porque el pool depende de la dificultad del usuario y una ventana fija demasiado grande se vacía y termina repitiendo igual, pero encima perdiendo el control de dificultad. Después del cambio:
+
+| Banda | Repite a los | Visto en 30 días |
+|---|---:|---:|
+| principiante | 3 días | 36/116 |
+| elemental | 3 días | 50/116 |
+| intermedio | 4 días | 54/116 |
+| avanzado | 3 días | 54/116 |
+| experto | 2 días | 39/116 |
+
+**El límite que queda es el tamaño del catálogo, y es real.** Con 116 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
+
+- **Puzzles CC0 de Lichess** — la vía buena, y la única que agranda los extremos de dificultad, porque traen rating calibrado por la comunidad. Requiere descargar el export oficial (ver "Generación reproducible"); el entorno de desarrollo donde se hizo esta ronda no tiene salida a `database.lichess.org`, así que quedó pendiente de correrse en una máquina con red.
+- **Autojuego local** — funciona pero es carísimo para los tipos raros: minando envenenadas se obtuvo **1 candidata cada ~300 posiciones revisadas**, unas 70 horas de cómputo para las 12 que faltarían. No es un problema de técnica sino de tiempo de máquina.
+
+**Y ojo con una interacción:** todo el contenido de autojuego lleva rating fijo 1500 y, por ADR-0007, una cohorte constante queda en el percentil 50. Sumar más posiciones generadas **no ayuda a un usuario cuyo centro adaptativo esté lejos del medio**: sigue siendo invisible salvo por el rescate por tipo descrito abajo. Darles una dificultad medida (por ejemplo, a qué profundidad se estabiliza la mejor jugada del motor) sería una decisión de diseño nueva, no un ajuste.
+
+### Cobertura de tipos fuera de la banda (RF-5.1)
+
+Consecuencia directa de lo anterior, encontrada midiendo: las 8 envenenadas y las 8 de doble solución viven exactamente en el percentil 50, así que con la banda de ±15 **solo eran alcanzables con el centro adaptativo entre 35 y 65**. Fuera de esa ventana el Radar servía **cero** ofertas envenenadas. Un usuario que mejora —y cuyo centro sube a 70— dejaba de ver trampas para siempre, con lo cual "capturar siempre está bien" pasaba a ser cierto el 100% de las veces: justo el patrón trivial que RF-5.1 prohíbe.
+
+`selectNextRadarItem` ahora rescata, para cada tipo que la banda dejó afuera, sus 3 posiciones más cercanas al centro. Chico a propósito: garantiza que el tipo siga apareciendo sin que 8 posiciones inunden la sesión.
+
 ## Validación de uso real
 
 La validación técnica no reemplaza el criterio humano de salida de Fase 1. Durante siete días, una persona debe hacer una sesión diaria de al menos 15 minutos y verificar:

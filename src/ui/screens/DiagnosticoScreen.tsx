@@ -77,7 +77,7 @@ function EstadoEtapa({
   pauseAvailable?: boolean;
 }) {
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4">
+    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-4">
       <header className="flex flex-col gap-2">
         <ProgresoGlobal etapa={etapa} />
         <DiagnosticoHeading>{titulo}</DiagnosticoHeading>
@@ -139,7 +139,7 @@ function Juego() {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4">
+    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-4">
       <header className="flex flex-col gap-2">
         <ProgresoGlobal etapa={etapa} />
         <DiagnosticoHeading>{titulo}</DiagnosticoHeading>
@@ -219,7 +219,7 @@ function RadarDiagnostico() {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4">
+    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-4">
       <header className="flex flex-col gap-2">
         <ProgresoGlobal etapa={3} />
         <DiagnosticoHeading>{t.radar.titulo}</DiagnosticoHeading>
@@ -270,6 +270,7 @@ function RadarDiagnostico() {
             <FeedbackPanel
               acierto={s.radarUltimoAcierto ?? false}
               texto={s.radarFeedbackTexto}
+              linea={s.radarLinea ?? undefined}
               jugadaCorrecta={s.radarJugadaCorrecta ?? ''}
               onContinuar={() => void s.radarContinuar()}
             />

@@ -215,9 +215,28 @@ test.describe('sesión simple: Radar', () => {
     expect(await successArrow.evaluate((element) => getComputedStyle(element).animationDuration)).toBe('0.18s');
     expect(await successArrow.evaluate((element) => getComputedStyle(element).stroke)).toBe('rgb(127, 166, 106)');
     await expect(page.getByRole('button', { name: 'Siguiente' })).toBeFocused();
-    // El feedback siempre explica el porqué (RF-5.3), también sin táctica.
+    // El feedback siempre explica el porqué (RF-5.3), también sin táctica, y
+    // dice algo de ESTA posición: hasta la ronda C eran cinco frases fijas
+    // repartidas entre las 116 del catálogo.
     const explicacion = await page.locator('p.text-primary').first().innerText();
     expect(explicacion.length).toBeGreaterThan(10);
+    await expect(page.getByText('Línea completa:')).toBeVisible();
+
+    // La sesión no puede terminar debajo de la barra de navegación fija. El
+    // contenedor de pantalla era `h-full`, así que lo que sobrepasaba el alto
+    // del viewport no extendía el área scrolleable de `main`: en un celular
+    // angosto el botón de continuar quedaba tapado y sin forma de scrollear
+    // hasta él. Con `min-h-full` el contenido crece y `main` scrollea.
+    const alcanzable = await page.evaluate(() => {
+      const main = document.querySelector('main')!;
+      const nav = document.querySelector('nav[class*="fixed"]')!;
+      const boton = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Siguiente')!;
+      return {
+        mainScrollea: main.scrollHeight > main.clientHeight,
+        botonSobreLaBarra: boton.getBoundingClientRect().bottom <= nav.getBoundingClientRect().top,
+      };
+    });
+    expect(alcanzable).toEqual({ mainScrollea: true, botonSobreLaBarra: true });
 
     await page.getByRole('button', { name: 'Siguiente' }).click();
     await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 10_000 });

@@ -474,6 +474,7 @@ export const es = {
     acertaste: 'Acertaste',
     fallaste: 'No era esa',
     jugadaCorrecta: 'Jugada correcta',
+    lineaCompleta: 'Línea completa',
     continuar: 'Siguiente',
   },
   calculo: {

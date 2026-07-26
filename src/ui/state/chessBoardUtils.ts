@@ -22,7 +22,14 @@ export function sanDeLinea(fen: string, uciMoves: string[]): string[] {
   const chess = new Chess(fen);
   const san: string[] = [];
   for (const uci of uciMoves) {
-    const move = chess.moves({ verbose: true }).find((m) => m.from === uci.slice(0, 2) && m.to === uci.slice(2, 4));
+    const from = uci.slice(0, 2);
+    const to = uci.slice(2, 4);
+    const promocion = uci.slice(4, 5) || undefined;
+    // La pieza de promoción no es decorativa: emparejar solo origen y destino
+    // hacía que `c2c1q` se resolviera como `c1=N`, que da jaque donde la dama
+    // no lo da y volvía ilegal —y por lo tanto invisible— el resto de la línea.
+    const candidatas = chess.moves({ verbose: true }).filter((m) => m.from === from && m.to === to);
+    const move = promocion ? candidatas.find((m) => m.promotion === promocion) : candidatas[0];
     if (!move) break;
     san.push(chess.move(move).san);
   }

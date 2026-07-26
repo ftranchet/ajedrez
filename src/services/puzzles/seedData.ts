@@ -1,10 +1,10 @@
 // GENERADO por scripts/build-radar-dataset.mjs — no editar a mano.
-// Lote radar-e5a6c2d9788c: puzzles de Lichess (CC0) y posiciones tranquilas de
+// Lote radar-3f9a3f325069: puzzles de Lichess (CC0) y posiciones tranquilas de
 // partidas reales verificadas por Stockfish. Ver docs/radar-dataset.md,
 // ADR-0005 y RF-5.6 para reproducirlo.
 import type { RadarItem } from '../../core/types';
 
-export const RADAR_DATASET_VERSION = "radar-e5a6c2d9788c";
+export const RADAR_DATASET_VERSION = "radar-3f9a3f325069";
 
 export const seedRadarItems: RadarItem[] = [
   {
@@ -1761,7 +1761,19 @@ export const seedRadarItems: RadarItem[] = [
       "e5e8",
       "d8e8"
     ],
-    "fuente": "lichess-cc0"
+    "fuente": "lichess-cc0",
+    "carnada": {
+      "san": "Nxe5",
+      "ganaPeones": 5,
+      "refutacionSan": [
+        "Kf8",
+        "Ra1",
+        "a4",
+        "Nc4"
+      ],
+      "costoCp": 100000,
+      "profundidad": 17
+    }
   },
   {
     "id": "lichess-00Knu",
@@ -2302,7 +2314,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "g5d2"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Qxc6",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Qxg5",
+        "fxg4",
+        "Qc1+",
+        "Kf2"
+      ],
+      "costoCp": 189,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-02",
@@ -2316,7 +2340,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "h2h3"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Nxe5",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Bxd1",
+        "Bxf4",
+        "Bh5",
+        "Nc3"
+      ],
+      "costoCp": 491,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-03",
@@ -2330,7 +2366,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "c5e7"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Bxb4",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Qa4+",
+        "Nbd7",
+        "Qxb4",
+        "Nc5"
+      ],
+      "costoCp": 322,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-04",
@@ -2344,7 +2392,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "g6e4"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Qxa2",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Qc8+",
+        "Ke7",
+        "Qxc7+",
+        "Ke8"
+      ],
+      "costoCp": 569,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-05",
@@ -2358,7 +2418,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "f7f6"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Qxb2",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Bxh8",
+        "f6",
+        "Nf3",
+        "Nc6"
+      ],
+      "costoCp": 246,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-06",
@@ -2372,7 +2444,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "c2c3"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Qxb7",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "e5",
+        "Nxe4",
+        "f5",
+        "Ng3"
+      ],
+      "costoCp": 173,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-07",
@@ -2386,7 +2470,19 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "d1e1"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "dxc8=B",
+      "ganaPeones": 2,
+      "refutacionSan": [
+        "Nxd1",
+        "Bxb7",
+        "Nc3",
+        "Nd2"
+      ],
+      "costoCp": 337,
+      "profundidad": 17
+    }
   },
   {
     "id": "enven-08",
@@ -2400,6 +2496,18 @@ export const seedRadarItems: RadarItem[] = [
     "solucion": [
       "c1h6"
     ],
-    "fuente": "pipeline-envenenada"
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Bxf8",
+      "ganaPeones": 2,
+      "refutacionSan": [
+        "Nxc1",
+        "Rxc1",
+        "Qxf8",
+        "Ne5"
+      ],
+      "costoCp": 625,
+      "profundidad": 17
+    }
   }
 ];

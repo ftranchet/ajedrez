@@ -22,6 +22,7 @@ import {
   selectNextRadarItem,
   type RadarSelectionState,
 } from '../../core/radar';
+import { lineaParaMostrar } from '../../core/radarExplicacion';
 import { dueCurriculumItems, esDemostracionLimpia, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
 import { DEFAULT_PROFILE, detectarFugaCalculo, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { prescripcionesExternas, type PrescripcionExterna } from '../../core/prescripcionesExternas';
@@ -141,6 +142,8 @@ interface SessionState {
   radarUltimoAcierto: boolean | null;
   radarFeedbackTexto: string;
   radarJugadaCorrecta: string | null;
+  /** Solución completa en SAN (RF-5.3): la primera jugada sola no explica un mate en 3. */
+  radarLinea: string | null;
   radarJugadaUsuario: string | null;
   /** Regla de candidatas (RF-5.8): si este ítem fue muestreado para preguntar "¿hay algo mejor?" antes de revelar. */
   radarCandidataActiva: boolean;
@@ -295,6 +298,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       radarUltimoAcierto: null,
       radarFeedbackTexto: '',
       radarJugadaCorrecta: null,
+      radarLinea: null,
       radarJugadaUsuario: null,
       radarCandidataActiva: shouldSampleCandidata(),
       radarCandidataJugadaOriginal: null,
@@ -475,6 +479,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     radarUltimoAcierto: null,
     radarFeedbackTexto: '',
     radarJugadaCorrecta: null,
+    radarLinea: null,
     radarJugadaUsuario: null,
     radarCandidataActiva: false,
     radarCandidataJugadaOriginal: null,
@@ -923,6 +928,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       lastMove,
       radarUltimoAcierto: acierto,
       radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
+      radarLinea: lineaParaMostrar(item),
       radarJugadaUsuario: jugadaUsuario,
       radarFeedbackTexto: isOwnErrorRadarItem(item)
         ? explainOwnErrorFeedback(acierto)

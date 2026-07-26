@@ -537,7 +537,7 @@ function SesionActiva() {
       : 'normal';
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
+    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-3">
       <SessionHeader />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[640px] sm:mx-0 sm:w-[60%]">
@@ -769,6 +769,7 @@ function RadarPanel() {
         <FeedbackPanel
           acierto={s.radarUltimoAcierto ?? false}
           texto={s.radarFeedbackTexto}
+          linea={s.radarLinea ?? undefined}
           jugadaCorrecta={s.radarJugadaCorrecta ?? ''}
           onContinuar={() => void s.radarContinuar()}
         />

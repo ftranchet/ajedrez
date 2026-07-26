@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
 import type { CalibrationRecord, Color, EvalGuess, PerfilDeFugas, RadarAttempt, RadarItem, RatingExterno } from '../../core/types';
 import { RADAR_INITIAL_STATE, categoriaFromTipo, centroInicialDesdeDiagnostico, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
+import { lineaParaMostrar } from '../../core/radarExplicacion';
 import { perfilDeFugasDesdeIntentos } from '../../core/leakProfile';
 import { brierScore } from '../../core/calibration';
 import { estimarBandaElo, type ResultadoPartida } from '../../core/prescriptor';
@@ -81,6 +82,8 @@ interface DiagnosticoState {
   radarUltimoAcierto: boolean | null;
   radarFeedbackTexto: string;
   radarJugadaCorrecta: string | null;
+  /** Solución completa en SAN (RF-5.3). */
+  radarLinea: string | null;
   /** Evaluación rápida declarada antes de jugar (RF-5.2). */
   radarEvalGuess: EvalGuess | null;
   /** Jugada del usuario en la posición actual, retenida hasta cerrar la confianza. */
@@ -157,6 +160,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       radarUltimoAcierto: null,
       radarFeedbackTexto: '',
       radarJugadaCorrecta: null,
+      radarLinea: null,
       radarJugadaUsuario: null,
       ...boardSnapshot(),
       boardOrientation: chess.turn() as Color,
@@ -258,6 +262,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
     radarUltimoAcierto: null,
     radarFeedbackTexto: '',
     radarJugadaCorrecta: null,
+    radarLinea: null,
     radarEvalGuess: null,
     radarJugadaUsuario: null,
     radarRespuestas: [],
@@ -389,6 +394,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
         radarUltimoAcierto: acierto,
         radarJugadaUsuario: jugadaUsuario,
         radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
+        radarLinea: lineaParaMostrar(item),
         radarFeedbackTexto: explainFeedback(item, acierto),
         radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
         radarServidos: posicion,
