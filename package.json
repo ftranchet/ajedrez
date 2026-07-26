@@ -15,6 +15,7 @@
     "measure:niveles": "node scripts/measure-engine-levels.mjs",
     "measure:radar": "node scripts/measure-radar-repeticion.mjs",
     "build:carnadas": "node scripts/build-carnadas.mjs",
+    "add:puzzles": "node scripts/add-lichess-puzzles.mjs",
     "verify:patrones": "node scripts/verify-curriculum-patrones.mjs",
     "build:transfer-battery": "node scripts/mine-transfer-battery.mjs --target 30",
     "dev": "vite",

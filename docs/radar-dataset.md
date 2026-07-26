@@ -37,7 +37,37 @@ Sin fuente de dificultad calibrada (igual que doble solución) y sin rating: Sto
 node scripts/mine-stoyko.mjs --target 8 --max-checked 800
 ```
 
-## Generación reproducible
+## Agrandar el catálogo: una descarga y un comando
+
+Es lo único que destraba el límite real (el catálogo se repite a los 2–4 días). No regenera nada: **suma** puzzles al lote que ya está, sin tocar las 48 posiciones de autojuego que costaron horas de minado.
+
+```sh
+wget -c https://database.lichess.org/lichess_db_puzzle.csv.zst
+npm run add:puzzles -- --puzzles lichess_db_puzzle.csv.zst --target 400
+npm test && npm run measure:radar
+```
+
+Eso es todo. Requiere `zstd` instalado (o descomprimir a mano y pasar el `.csv`). Opciones:
+
+| Opción | Por defecto | Para qué |
+|---|---|---|
+| `--target` | 400 | cuántas sumar |
+| `--rating-min` / `--rating-max` | 600 / 2600 | ancho de la escala de dificultad |
+| `--popularidad` | 50 | calidad mínima (votos de la comunidad) |
+| `--dry-run` | — | ver el resultado sin escribir |
+| `--max-motor` | 300 | tope de posiciones que van al motor |
+
+**Por qué el rango por defecto es más ancho que el del lote original (800–2000).** La dificultad del Radar es un percentil *dentro de cada fuente* (ADR-0007), así que un rango angosto deja los extremos de la escala sin contenido propio. Los puzzles CC0 son la única fuente con dificultad calibrada por miles de personas: son lo único que puede estirar los extremos, y ese es justamente el hueco que el autojuego no cubre.
+
+**Qué garantiza.** Reparto en ocho tramos de rating para que la escala se estire de verdad y no se amontone en el medio; tope del 50% para un mismo tipo dentro de cada tramo, para que la mezcla de RF-5.1 se sostenga por catálogo y no solo por el peso del selector; descarte por FEN e id ya presentes; y **descarte —no etiquetado dudoso— de toda posición que no se pueda clasificar**. Se está eligiendo entre millones: meter una con el tipo equivocado invierte su feedback, que es exactamente el defecto que corrigió la auditoría de 2026-07.
+
+**Por qué ahora tarda segundos y no horas.** La clasificación autoritativa del tipo parecía exigir el motor en cada posición. Medido sobre los 80 puzzles del lote: **1 solo** lo necesita. `defensa` sale de una etiqueta de Lichess, `genuina` es aritmética de material y `ofensiva` es el resto; solo `envenenada` pide una opinión del motor, y **solo puede aplicar** si la solución declina material y además existe una captura que aparente ganarlo. `clasificarPorTablero` aplica ese prefiltro. Corriendo `reclassify-radar-tipos.mjs` con él contra los 80 puzzles reales: **0 cambios** respecto de la versión que buscaba en todas.
+
+Las envenenadas nuevas salen con su carnada ya marcada, aprovechando las líneas de esa misma búsqueda (a profundidad 14; `npm run build:carnadas` las re-verifica a 17 junto con el resto si se quiere uniformidad).
+
+Medido con datos sintéticos de prueba, sumar 154 posiciones llevó el catálogo de 128 a 282 y la repetición de 2–4 días a **5–8**, con la cobertura a 30 días de 39–67 a 75–108.
+
+## Generación reproducible (lote completo, desde cero)
 
 Requisitos: Node 20+, `zstd`, y `script` (util-linux; da un pseudo-terminal al binario WASM de Stockfish). Los archivos de entrada no se versionan en este repositorio.
 

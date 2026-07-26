@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Chess } from 'chess.js';
 import { StockfishEngine } from './lib/stockfish.mjs';
-import { MIN_POR_TIPO, datasetVersion, renderSeedDataModule, validateRadarDataset } from './lib/radarDataset.mjs';
+import { MIN_POR_TIPO, clasificarPorTablero, datasetVersion, renderSeedDataModule, validateRadarDataset } from './lib/radarDataset.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const SEED_PATH = join(scriptDir, '..', 'src', 'services', 'puzzles', 'seedData.ts');
@@ -54,7 +54,12 @@ function netoCaptura(fen, uci) {
 }
 
 async function clasificar(engine, item) {
-  if (item.temas.includes('defensiveMove')) return 'defensa';
+  // El tablero resuelve tres de las cuatro reglas sin buscar. Solo se llama al
+  // motor cuando la solución declina material Y existe alguna captura que
+  // aparente ganarlo — la única situación en la que "envenenada" puede aplicar.
+  // Medido sobre este lote: 1 de 80. Antes se buscaba en los 80.
+  const previa = clasificarPorTablero(item);
+  if (previa.tipo !== null) return previa.tipo;
 
   const chess = new Chess(item.fen);
   const legales = chess.moves({ verbose: true });
