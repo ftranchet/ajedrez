@@ -6,7 +6,11 @@ export function computeDests(c: Chess): Map<string, string[]> {
   const dests = new Map<string, string[]>();
   for (const m of c.moves({ verbose: true })) {
     const list = dests.get(m.from) ?? [];
-    list.push(m.to);
+    // Destinos, no jugadas: un peón que corona produce cuatro jugadas hacia la
+    // misma casilla y antes las cuatro entraban en la lista. chessground solo
+    // pregunta "¿puedo soltar acá?", y qué pieza se corona lo resuelve el
+    // diálogo de promoción.
+    if (!list.includes(m.to)) list.push(m.to);
     dests.set(m.from, list);
   }
   return dests;

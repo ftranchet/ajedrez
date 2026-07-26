@@ -164,6 +164,32 @@ describe('explicarPosicion', () => {
     expect(texto).toContain('La oferta era genuina');
   });
 
+  // Una solución ilegal desde su FEN no debería existir (hay un test que lo
+  // recorre sobre el lote publicado), pero si un lote futuro la trajera, el
+  // usuario no puede leer "El motor prefiere undefined" a mitad de sesión.
+  it('una solución ilegal no imprime "undefined" en la cara del usuario', () => {
+    const tranquila = explicarPosicion(
+      item({
+        tipo: 'tranquila',
+        fen: 'rn2kb1r/pbpp1p1p/1p2p1q1/7p/3PP1B1/P1N2N2/1PP2PPP/R2QK2R w KQkq - 2 9',
+        solucion: ['a1a8'], // ilegal en esta posición
+        jugadasAceptables: ['g4h3'],
+      }),
+      false,
+    );
+    expect(tranquila).not.toContain('undefined');
+
+    const doble = explicarPosicion(
+      item({
+        fen: 'rn2kb1r/pbpp1p1p/1p2p1q1/7p/3PP1B1/P1N2N2/1PP2PPP/R2QK2R w KQkq - 2 9',
+        solucion: ['a1a8'],
+        dobleSolucion: { familiar: 'f3e5' },
+      }),
+      true,
+    );
+    expect(doble).not.toContain('undefined');
+  });
+
   it('en una tranquila aclara que la jugada equivalente también valía', () => {
     const texto = explicarPosicion(
       item({

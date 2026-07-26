@@ -3,8 +3,22 @@
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
-import { ElomaxDB } from './db';
+import { ElomaxDB, SCHEMA_VERSION } from './db';
 import type { GameRecord } from '../../core/types';
+
+// `SCHEMA_VERSION` es un número escrito a mano que tiene que seguir a la última
+// `this.version(N)` de Dexie. Si alguien declara una migración nueva y se
+// olvida de subirlo, el manifiesto de exportación miente sobre el esquema y la
+// guarda de "este archivo es de una app más nueva" deja pasar paquetes que esta
+// versión no sabe leer. Nada lo comprobaba.
+describe('SCHEMA_VERSION (RF-14.1/14.2)', () => {
+  it('coincide con la última versión declarada en Dexie', async () => {
+    const db = new ElomaxDB(`elomax-test-${crypto.randomUUID()}`);
+    await db.open();
+    expect(db.verno).toBe(SCHEMA_VERSION);
+    db.close();
+  });
+});
 
 describe('migración de esquema Dexie', () => {
   it('migra registros v1 (sin fuente ni analizada) al esquema v2', async () => {

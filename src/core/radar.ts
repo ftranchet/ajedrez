@@ -6,6 +6,7 @@
 // core/dobleSolucion.ts, no acá.
 import type { CategoriaError, ErrorCard, RadarItem, TipoRadar } from './types';
 import { explicarPosicion } from './radarExplicacion';
+import seleccion from '../config/radar-seleccion.json';
 
 export interface RadarSelectionState {
   /** Últimos tipos servidos, más reciente al final. */
@@ -22,7 +23,11 @@ export const RADAR_INITIAL_STATE: RadarSelectionState = {
   dificultadCentro: 50,
 };
 
-const VENTANA_TIPOS = 3; // cuántos tipos recientes penalizan la repetición
+// Las perillas viven en `config/radar-seleccion.json` y no como literales acá:
+// `scripts/measure-radar-repeticion.mjs` tiene que simular **este** selector
+// para que su medición signifique algo, y mientras las tuvo duplicadas el
+// instrumento podía estar midiendo un selector distinto del que corre en la app.
+const VENTANA_TIPOS = seleccion.ventanaTipos; // cuántos tipos recientes penalizan la repetición
 
 /**
  * Qué fracción del pool alcanzable se reserva como "ya vista" antes de poder
@@ -37,12 +42,12 @@ const VENTANA_TIPOS = 3; // cuántos tipos recientes penalizan la repetición
  * tirado.
  *
  * Una ventana fija grande tampoco sirve, porque el pool alcanzable depende de
- * la dificultad del usuario (entre 30 y 45 posiciones en este catálogo): si la
+ * la dificultad del usuario (entre 30 y 57 posiciones en este catálogo): si la
  * ventana lo supera, el filtro se vacía y el selector termina repitiendo igual,
  * pero encima perdiendo el control de dificultad. Atada al tamaño del pool,
  * siempre queda al menos un 40% disponible para elegir.
  */
-const FRACCION_EVITADA = 0.6;
+const FRACCION_EVITADA = seleccion.fraccionEvitada;
 
 /**
  * Cuántos ids se recuerdan. Tiene que superar cómodamente la ventana efectiva
@@ -50,13 +55,13 @@ const FRACCION_EVITADA = 0.6;
  * falta de memoria. Es dato del usuario y se persiste, pero son cadenas cortas:
  * el costo es despreciable frente a repetir ejercicios.
  */
-const MEMORIA_IDS = 120;
-const ANCHO_BANDA = 15; // ± percentiles sobre dificultadCentro
-const PASO_AJUSTE = 4; // cuánto se mueve dificultadCentro por respuesta
+const MEMORIA_IDS = seleccion.memoriaIds;
+const ANCHO_BANDA = seleccion.anchoBanda; // ± percentiles sobre dificultadCentro
+const PASO_AJUSTE = seleccion.pasoAjuste; // cuánto se mueve dificultadCentro por respuesta
 const DIFICULTAD_MIN = 0;
 const DIFICULTAD_MAX = 100;
 /** RF-5.9: los errores propios complementan el Radar; no reemplazan su catálogo. */
-export const OWN_ERROR_RADAR_MAX_SHARE = 0.25;
+export const OWN_ERROR_RADAR_MAX_SHARE = seleccion.cuotaErroresPropios;
 const OWN_ERROR_RADAR_PREFIX = 'error-propio:';
 
 function tipoFromCategoria(categoria: CategoriaError): TipoRadar {
@@ -134,6 +139,50 @@ export function dificultadNormalizada(item: RadarItem, pool: RadarItem[]): numbe
 }
 
 /**
+ * Percentil de cada ítem del pool, calculado de una sola pasada.
+ *
+ * `dificultadNormalizada` filtra y ordena el pool **entero por cada ítem**, y
+ * la selección la llamaba una vez por ítem: coste cuadrático sobre un catálogo
+ * que el proyecto planea agrandar a propósito con el export CC0 de Lichess.
+ * Medido antes de esto: 1 ms por selección con 128 posiciones, 8 ms con 800 y
+ * **67 ms con 2000** — un tirón visible en el celular, justo en el momento en
+ * que el catálogo deje de ser chico. Acá se ordena una vez por fuente y se
+ * resuelve cada ítem por búsqueda en un índice; el resultado es idéntico, y de
+ * eso se encarga un test.
+ */
+function percentilesDelPool(pool: RadarItem[]): Map<string, number> {
+  const porFuente = new Map<string, number[]>();
+  for (const item of pool) {
+    const ratings = porFuente.get(item.fuente);
+    if (ratings) ratings.push(item.rating);
+    else porFuente.set(item.fuente, [item.rating]);
+  }
+  // Por cada fuente: rating → percentil, con rango medio para los empates.
+  const percentilPorFuente = new Map<string, Map<number, number>>();
+  for (const [fuente, ratings] of porFuente) {
+    ratings.sort((a, b) => a - b);
+    const tabla = new Map<number, number>();
+    if (ratings.length <= 1) {
+      percentilPorFuente.set(fuente, tabla); // vacía: se resuelve en 50
+      continue;
+    }
+    for (let i = 0; i < ratings.length; ) {
+      let j = i;
+      while (j + 1 < ratings.length && ratings[j + 1] === ratings[i]) j++;
+      tabla.set(ratings[i], ((i + j) / 2 / (ratings.length - 1)) * 100);
+      i = j + 1;
+    }
+    percentilPorFuente.set(fuente, tabla);
+  }
+
+  const percentiles = new Map<string, number>();
+  for (const item of pool) {
+    percentiles.set(item.id, percentilPorFuente.get(item.fuente)?.get(item.rating) ?? 50);
+  }
+  return percentiles;
+}
+
+/**
  * Ajusta el centro de la banda de dificultad tras una respuesta (RF-5.5):
  * sube si el acierto reciente supera 80%, baja si cae debajo de 60%.
  */
@@ -200,7 +249,7 @@ function pesosAcumulados<T>(items: T[], peso: (item: T) => number): { item: T; a
  * Chico a propósito: garantiza que el tipo siga apareciendo sin que un tipo
  * de 8 posiciones inunde la sesión.
  */
-const RESCATE_POR_TIPO = 3;
+const RESCATE_POR_TIPO = seleccion.rescatePorTipo;
 
 /**
  * Tipos que existen en el pool pero que la banda de dificultad dejó afuera,
@@ -226,14 +275,15 @@ function rescatarTiposAusentes(
   pool: RadarItem[],
   presentes: RadarItem[],
   state: RadarSelectionState,
-  recientes: string[],
+  recientes: Set<string>,
+  percentiles: Map<string, number>,
 ): RadarItem[] {
   const tiposEnBanda = new Set(presentes.map((item) => item.tipo));
   const faltantes = [...new Set(pool.map((item) => item.tipo))].filter((tipo) => !tiposEnBanda.has(tipo));
   return faltantes.flatMap((tipo) =>
     pool
-      .filter((item) => item.tipo === tipo && !recientes.includes(item.id))
-      .map((item) => ({ item, distancia: Math.abs(dificultadNormalizada(item, pool) - state.dificultadCentro) }))
+      .filter((item) => item.tipo === tipo && !recientes.has(item.id))
+      .map((item) => ({ item, distancia: Math.abs((percentiles.get(item.id) ?? 50) - state.dificultadCentro) }))
       .sort((a, b) => a.distancia - b.distancia)
       .slice(0, RESCATE_POR_TIPO)
       .map(({ item }) => item),
@@ -248,8 +298,9 @@ export function selectNextRadarItem(
 ): RadarItem | null {
   if (pool.length === 0) return null;
 
+  const percentiles = percentilesDelPool(pool);
   const enBanda = pool.filter(
-    (item) => Math.abs(dificultadNormalizada(item, pool) - state.dificultadCentro) <= ANCHO_BANDA,
+    (item) => Math.abs((percentiles.get(item.id) ?? 50) - state.dificultadCentro) <= ANCHO_BANDA,
   );
   const alcanzables = enBanda.length > 0 ? enBanda : pool;
 
@@ -257,12 +308,14 @@ export function selectNextRadarItem(
   // contra el catálogo entero: es su pool efectivo el que determina cuántas
   // sesiones puede aguantar sin repetir.
   const ventana = Math.min(state.historialIds.length, Math.floor(alcanzables.length * FRACCION_EVITADA));
-  const recientes = ventana > 0 ? state.historialIds.slice(-ventana) : [];
+  // Set y no array: `includes` sobre la ventana, dentro de un filter sobre el
+  // pool, era el otro término cuadrático de esta función.
+  const recientes = new Set(ventana > 0 ? state.historialIds.slice(-ventana) : []);
 
-  const candidatos = alcanzables.filter((item) => !recientes.includes(item.id));
+  const candidatos = alcanzables.filter((item) => !recientes.has(item.id));
   const universo =
     candidatos.length > 0
-      ? [...candidatos, ...rescatarTiposAusentes(pool, candidatos, state, recientes)]
+      ? [...candidatos, ...rescatarTiposAusentes(pool, candidatos, state, recientes, percentiles)]
       : alcanzables;
 
   const pesados = pesosAcumulados(universo, (item) => pesoPorTipo(item.tipo, state.historialTipos));

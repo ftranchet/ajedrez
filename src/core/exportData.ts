@@ -18,7 +18,7 @@ import type {
   TriageAttempt,
   TransferMeasurement,
 } from './types';
-import { SCHEMA_VERSION } from '../services/storage/db';
+import { SCHEMA_VERSION } from './schemaVersion';
 import { DEFAULT_PROFILE } from './prescriptor';
 import { isValidWeeklyPlan } from './adherence';
 import { isValidReminder } from './reminder';

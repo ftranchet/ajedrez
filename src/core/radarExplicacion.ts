@@ -269,7 +269,14 @@ function fraseDesenlace(analisis: AnalisisSolucion): string | null {
  */
 const CP_MATE = 100_000;
 
-function fraseCarnada(item: RadarItem, analisis: AnalisisSolucion): string | null {
+/**
+ * La frase de la carnada, y si ya nombró el mate. El booleano existe para que
+ * quien la use no tenga que olfatear la prosa: una versión anterior decidía si
+ * repetir la frase del desenlace buscando la palabra "mate" dentro del texto
+ * generado, y cualquier reescritura del texto habría roto esa decisión en
+ * silencio, duplicando la oración.
+ */
+function fraseCarnada(item: RadarItem, analisis: AnalisisSolucion): { texto: string; nombraElMate: boolean } | null {
   if (!item.carnada) return null;
   const { san, ganaPeones, refutacionSan, costoCp } = item.carnada;
   const cebo =
@@ -281,10 +288,12 @@ function fraseCarnada(item: RadarItem, analisis: AnalisisSolucion): string | nul
   // falso: en una, capturar cuesta material; en otra, capturar tira un mate
   // que ya estaba. El costo medido distingue las dos.
   if (costoCp >= CP_MATE && analisis.mateEn !== null) {
-    return `${cebo}, pero tira el mate que ya estaba en la posición.`;
+    return { texto: `${cebo}, pero tira el mate que ya estaba en la posición.`, nombraElMate: true };
   }
-  if (refutacionSan.length === 0) return `${cebo}, pero es la carnada: el motor la condena.`;
-  return `${cebo}, pero es la carnada: sigue ${refutacionSan.join(' ')}.`;
+  if (refutacionSan.length === 0) {
+    return { texto: `${cebo}, pero es la carnada: el motor la condena.`, nombraElMate: false };
+  }
+  return { texto: `${cebo}, pero es la carnada: sigue ${refutacionSan.join(' ')}.`, nombraElMate: false };
 }
 
 /**
@@ -300,15 +309,19 @@ export function explicarPosicion(item: RadarItem, acierto: boolean): string {
   const analisis = analizarSolucion(item);
   const partes: string[] = [];
 
+  // La jugada del motor. Puede faltar si la solución del catálogo resultara
+  // ilegal desde su FEN: sin esta guarda, el texto salía con un "undefined"
+  // impreso en la cara del usuario.
+  const jugadaDelMotor: string | undefined = analisis.lineaSan[0];
+
   if (item.tipo === 'tranquila') {
     partes.push(acierto ? GENERICA_ACIERTO.tranquila : GENERICA_FALLO.tranquila);
-    if (analisis.equivalentesSan.length > 0) {
-      const [principal] = analisis.lineaSan;
+    if (analisis.equivalentesSan.length > 0 && jugadaDelMotor) {
       // Sin esto, ver "Jugada correcta: Ce5" después de haber jugado Ah3 —que
       // el pipeline verificó como equivalente— se lee como si Ah3 estuviera
       // mal. La aclaración es la definición misma de "tranquila".
       partes.push(
-        `El motor prefiere ${principal}, pero ${listaCorta(analisis.equivalentesSan)} ${
+        `El motor prefiere ${jugadaDelMotor}, pero ${listaCorta(analisis.equivalentesSan)} ${
           analisis.equivalentesSan.length > 1 ? 'también valían' : 'también valía'
         }: en una posición tranquila varias jugadas son prácticamente equivalentes.`,
       );
@@ -318,13 +331,13 @@ export function explicarPosicion(item: RadarItem, acierto: boolean): string {
 
   if (item.tipo === 'envenenada') {
     const carnada = fraseCarnada(item, analisis);
-    partes.push(carnada ?? (acierto ? GENERICA_ACIERTO.envenenada : GENERICA_FALLO.envenenada));
+    partes.push(carnada?.texto ?? (acierto ? GENERICA_ACIERTO.envenenada : GENERICA_FALLO.envenenada));
     if (analisis.lineaSan.length > 0) {
       partes.push(`Lo correcto era declinar con ${formatearLinea(item.fen, analisis.lineaSan)}.`);
     }
     const remate = fraseDesenlace(analisis);
     // No se repite el mate si la frase de la carnada ya lo nombró.
-    if (remate && !(analisis.mateEn !== null && carnada?.includes('mate'))) partes.push(remate);
+    if (remate && !carnada?.nombraElMate) partes.push(remate);
     return partes.join(' ');
   }
 
@@ -340,10 +353,8 @@ export function explicarPosicion(item: RadarItem, acierto: boolean): string {
   if (motivos.length > 0) {
     partes.push(`El mecanismo: ${motivos.slice(0, 2).join(' y ')}.`);
   }
-  if (analisis.familiarSan) {
-    partes.push(
-      `Ojo: ${analisis.familiarSan} también gana, pero ${analisis.lineaSan[0]} es objetivamente mejor.`,
-    );
+  if (analisis.familiarSan && jugadaDelMotor) {
+    partes.push(`Ojo: ${analisis.familiarSan} también gana, pero ${jugadaDelMotor} es objetivamente mejor.`);
   }
   return partes.join(' ');
 }

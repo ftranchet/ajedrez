@@ -10,7 +10,7 @@ Documento vivo. Sin fechas: cada fase tiene entregables y un **criterio de salid
 ## Fase 1 — Radar + Cola Universal (el MVP diferencial)
 **Estado:** 🟡 Completa técnicamente; pendiente la validación de uso real de siete días indicada en el criterio de salida. No se marca como cerrada hasta medir esa experiencia con una persona.
 > **Validez de contenido (auditoría 2026-07):** la regla de "jugadas aceptables" en tranquilas (RF-5.3) y la clasificación de tipos del Radar (RF-5.1) ya se corrigieron — los tipos ahora se re-derivan con el motor, no por etiqueta de tema, y la envenenada real (declinar la carnada) se genera por autojuego como las tranquilas. La escala heterogénea de `rating` también quedó resuelta para la selección: el Radar conserva el dato crudo para trazabilidad pero adapta sobre un percentil 0–100 dentro de cada fuente (ADR-0007; detalle en `docs/radar-dataset.md`).
-**Entregables:** catálogo offline `radar-e5a6c2d9788c` con 116 posiciones (80 puzzles Lichess CC0, 20 tranquilas de partidas reales y 16 posiciones de autojuego verificadas por Stockfish; procedimiento en `docs/radar-dataset.md`) ✅; pipeline reproducible que filtra rating/popularidad, clasifica con motor y genera tranquilas/envenenadas ✅; el Radar completo (E5), incluido el reciclaje aleatorio de errores de partidas propias sin duplicar la Cola vencida ni alterar FSRS o la dificultad calibrada (RF-5.9) ✅; Cola Universal con FSRS (E4) ✅; calibración muestreada (RF-10.1, 10.2) ✅; progreso de dificultad normalizada y tasa de acierto persistentes entre sesiones (RF-5.5, ADR-0007) ✅; sesiones y bloques persistidos ✅; exportación e importación de tarjetas, calibración, progreso, sesiones e historial del Radar (RF-14.1, 14.2) ✅.
+**Entregables:** catálogo offline `radar-009a3563237b` con 128 posiciones (80 puzzles Lichess CC0, 20 tranquilas de partidas reales y 28 posiciones de autojuego verificadas por Stockfish; procedimiento en `docs/radar-dataset.md`) ✅; pipeline reproducible que filtra rating/popularidad, clasifica con motor y genera tranquilas/envenenadas ✅; el Radar completo (E5), incluido el reciclaje aleatorio de errores de partidas propias sin duplicar la Cola vencida ni alterar FSRS o la dificultad calibrada (RF-5.9) ✅; Cola Universal con FSRS (E4) ✅; calibración muestreada (RF-10.1, 10.2) ✅; progreso de dificultad normalizada y tasa de acierto persistentes entre sesiones (RF-5.5, ADR-0007) ✅; sesiones y bloques persistidos ✅; exportación e importación de tarjetas, calibración, progreso, sesiones e historial del Radar (RF-14.1, 14.2) ✅.
 **Criterio de salida:** un usuario entrena 15 minutos diarios durante una semana solo con Radar+Cola; los fallos reaparecen espaciados; la tasa de acierto converge a 60–80%; una exportación hecha en un dispositivo restaura el estado completo en otro. *(El espaciado, la restauración y la medición persistente están cubiertos por tests; falta registrar la semana de uso real, que no se puede sustituir por automatización.)*
 
 ## Fase 2 — Partidas y análisis en dos fases
@@ -90,9 +90,20 @@ HTTP delgado, el dominio con tests, el flujo probado contra un doble del puerto 
 una guía de verificación manual (`docs/maia-prueba.md`). Decisiones sobre el
 token y el reloj en ADR-0014.
 
-**Sigue pendiente de esta línea de trabajo:** la amplitud de los catálogos (116
-posiciones de Radar repiten a los ~12 días) y las explicaciones del Radar, que
-hoy son una frase fija por tipo y no dicen nada de la posición concreta (RF-5.3).
+**Resuelto en la ronda C:** las explicaciones del Radar dejaron de ser una frase
+fija por tipo y se componen por posición, afirmando solo lo que se comprueba
+reproduciendo la línea sobre el tablero (RF-5.3a/b/c); los cinco tipos volvieron
+a ser alcanzables a cualquier dificultad (RF-5.1a); y la repetición pasó a ser
+medible con `npm run measure:radar`. La estimación de "~12 días" de esta línea
+era, además, optimista: medida, una posición volvía **al día siguiente**.
+
+**Sigue pendiente de esta línea de trabajo:** la amplitud del catálogo. Con 128
+posiciones se repite a los 2–4 días según la banda, y en los extremos de la
+escala a los 2–3. El autojuego local no lo destraba —todo entra con rating fijo
+1500 y vive en el percentil 50—: hace falta el export CC0 de Lichess, que trae
+rating calibrado por la comunidad y es lo único que agranda los extremos. El
+comando está en `docs/radar-dataset.md`; requiere una máquina con salida a
+`database.lichess.org`.
 
 ## Fase 6+ — Extensiones (cada una con su ADR previo)
 Candidatas: sincronización opcional en la nube, Maia self-hosted con niveles finos, inglés, cuentas para entrenadores con alumnos, cohortes agregadas con consentimiento para evidencia de eficacia.

@@ -111,7 +111,7 @@ Se guarda la captura, su material aparente, la continuación del motor y cuánto
 npm run measure:radar
 ```
 
-Simula sesiones reales contra el catálogo publicado, para cada banda de la dieta, y reporta el pool efectivo, a los cuántos días vuelve una posición ya vista y qué porción del catálogo se llegó a ver en 30 días. El catálogo **no se sirve entero**: el selector filtra por una banda de ±15 percentiles alrededor del centro adaptativo, así que el pool efectivo de un usuario concreto son 30–45 de las 116.
+Simula sesiones reales contra el catálogo publicado, para cada banda de la dieta, y reporta el pool efectivo, a los cuántos días vuelve una posición ya vista y qué porción del catálogo se llegó a ver en 30 días. El catálogo **no se sirve entero**: el selector filtra por una banda de ±15 percentiles alrededor del centro adaptativo, así que el pool efectivo de un usuario concreto son 30–57 de las 128.
 
 Medido antes de la ronda C, evitando solo los 8 ids más recientes (una sesión):
 
@@ -145,7 +145,7 @@ Y con las 12 envenenadas nuevas (catálogo de 128), que además engordan el pool
 
 Los extremos (principiante y experto) no se movieron, y ese es justo el punto del párrafo siguiente: el contenido de autojuego entra todo en el percentil 50.
 
-**El límite que queda es el tamaño del catálogo, y es real.** Con 116 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
+**El límite que queda es el tamaño del catálogo, y es real.** Con 128 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
 
 - **Puzzles CC0 de Lichess** — la vía buena, y la única que agranda los extremos de dificultad, porque traen rating calibrado por la comunidad. Requiere descargar el export oficial (ver "Generación reproducible"); el entorno de desarrollo donde se hizo esta ronda no tiene salida a `database.lichess.org`, así que quedó pendiente de correrse en una máquina con red.
 - **Autojuego local** — funciona, pero es caro y solo engorda el medio de la escala. En esta ronda se minaron **12 envenenadas nuevas** (de 9 a 21 en total, el tipo más escaso del catálogo) revisando 871 posiciones de autojuego: **1 candidata cada ~73 revisadas**, unas dos horas de cómputo. Reproducible con `node scripts/mine-envenenada.mjs --target N --checkpoint ruta.json` y `node scripts/finalize-envenenada.mjs --checkpoint ruta.json --conservar` (sin `--conservar` reemplaza el lote entero en vez de sumar).

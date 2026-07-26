@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RADAR_INITIAL_STATE, OWN_ERROR_RADAR_MAX_SHARE, adjustDifficulty, centroInicialDesdeDiagnostico, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, isOwnErrorRadarItem, ownErrorRadarItems, recordServed, scheduleOwnErrorRadarSlots, selectNextRadarItem, type RadarSelectionState } from './radar';
 import type { RadarItem, TipoRadar } from './types';
 import { buildErrorCard } from './errorCard';
+import { seedRadarItems } from '../services/puzzles/seedData';
 
 function seededRng(seed: number): () => number {
   let s = seed;
@@ -190,6 +191,33 @@ describe('selectNextRadarItem', () => {
     ];
     expect(dificultadNormalizada(pool[1], pool)).toBe(50);
     expect(dificultadNormalizada(pool[4], pool)).toBe(50);
+  });
+
+  // `selectNextRadarItem` dejó de llamar a `dificultadNormalizada` por ítem
+  // (filtraba y ordenaba el pool entero cada vez: 67 ms por selección con 2000
+  // posiciones) y precalcula los percentiles de una pasada. El atajo solo vale
+  // si da exactamente lo mismo, y eso no se puede afirmar leyéndolo.
+  it('el atajo de percentiles coincide con dificultadNormalizada en todo el catálogo', () => {
+    const pool = [...seedRadarItems];
+    // La banda de selección es el único consumidor del atajo: si algún ítem
+    // difiriera, entraría o saldría de la banda y la selección cambiaría.
+    for (const centro of [0, 20, 50, 65, 80, 100]) {
+      const porFuncionPublica = pool
+        .filter((item) => Math.abs(dificultadNormalizada(item, pool) - centro) <= 15)
+        .map((item) => item.id)
+        .sort();
+      const state: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: centro };
+      // Se sirve todo el catálogo con memoria vacía y ventana 0: sin descarte
+      // por repetición, lo servible es exactamente la banda (más el rescate).
+      const servibles = new Set<string>();
+      const rng = seededRng(centro + 1);
+      for (let i = 0; i < 2000; i++) {
+        const item = selectNextRadarItem(pool, state, rng);
+        if (item) servibles.add(item.id);
+      }
+      // Todo lo que la función pública pone en la banda tiene que ser servible.
+      for (const id of porFuncionPublica) expect(servibles.has(id), `${id} en centro ${centro}`).toBe(true);
+    }
   });
 
   it('una cohorte de rating constante queda honestamente en el centro', () => {

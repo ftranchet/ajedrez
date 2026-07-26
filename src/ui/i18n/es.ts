@@ -171,7 +171,6 @@ export const es = {
       'sin-conexion': 'No pudimos hablar con Lichess. Revisá tu conexión.',
       desconocido: 'Algo salió mal con Lichess.',
     } as Record<string, string>,
-    caidaTitulo: 'Podés seguir sin Maia',
     caidaTexto:
       'Si el bot no aparece, el motor local sigue disponible en “Partida libre”. No juega como una persona, pero sus niveles están medidos.',
     caidaIr: 'Jugar contra el motor local',
@@ -202,17 +201,6 @@ export const es = {
   },
   hoy: {
     titulo: 'Tu sesión de hoy',
-    partidaLentaTitulo: 'Tu partida lenta de la semana',
-    partidaLentaSinJugar: 'Todavía no jugaste una partida lenta esta semana. Es el ejercicio que más te hace mejorar, y de ahí salen tus repasos.',
-    partidaLentaSinAnalizar: 'Jugaste tu partida lenta, pero falta analizarla. Analizala para cerrar el círculo y convertir tus errores en repasos.',
-    partidaLentaCompleta: 'Esta semana jugaste y analizaste tu partida lenta. Ese es el ciclo que más te hace mejorar.',
-    partidaLentaIrJugar: 'Ir a Jugar',
-    partidaLentaIrAnalizar: 'Analizar mi partida',
-    partidaLentaCalculo: 'Tus errores recientes son sobre todo tácticos: una sesión de Cálculo puede ayudar.',
-    partidaLentaIrCalculo: 'Ir a Cálculo',
-    finalesTitulo: 'Finales teóricos',
-    finalesTexto: 'Técnicas de final que conviene tener automáticas (te quedan {n}). Se juegan enteras contra el motor, así que viven en Jugar.',
-    finalesIr: 'Practicar finales',
     tambienHoyTitulo: 'También te toca hoy',
     tambienHoyAyuda: 'Ejercicios que no entran en el formato de la sesión y se hacen en otra pantalla. Aparecen solo cuando corresponden.',
     prescripciones: {
@@ -377,8 +365,6 @@ export const es = {
     juegoConsigna: 'Jugá con calma y sin reloj contra el motor.',
     radarProgreso: 'Posición {actual} de {total}',
     radarConsigna: 'Jugá tu respuesta en el tablero.',
-    resultadoTitulo: 'Diagnóstico completo',
-    resultadoBanda: 'Banda de arranque: {banda}',
     resultadoTexto: 'Tu dieta de hoy ya está armada con esta banda. Se va a ajustar sola con cada partida que analices.',
     continuar: 'Empezar a entrenar',
 
@@ -405,7 +391,6 @@ export const es = {
     informeFugasTitulo: 'Dónde se te escapan las posiciones',
     informeFugasSinSenal:
       'Con 20 posiciones no aparece todavía una fuga clara. Vas a verla acá cuando el Radar acumule más respuestas: preferimos no señalar una debilidad que no podemos sostener.',
-    informeFugaLinea: '{tipo}: {aciertos} de {total}',
     informeFugaDestacada: 'Tu punto flojo de hoy: {tipo}.',
     informeFugasAyuda: 'Acierto por tipo de posición en el diagnóstico. Con ~4 posiciones por tipo, esto marca una tendencia, no una conclusión.',
     informeRecomendacionesTitulo: 'Qué conviene hacer primero',

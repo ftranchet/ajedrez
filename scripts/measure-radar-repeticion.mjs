@@ -38,14 +38,18 @@ function cargarCatalogo() {
   return JSON.parse(text.slice(start, text.lastIndexOf(']') + 1));
 }
 
-// Réplica exacta de core/radar.ts. Si la selección cambia, esta copia tiene
-// que cambiar con ella: el número que imprime este script solo vale si simula
-// el selector real.
-const ANCHO_BANDA = 15;
-const FRACCION_EVITADA = 0.6;
-const VENTANA_TIPOS = 3;
-const RESCATE_POR_TIPO = 3;
-const MEMORIA_IDS = 120;
+// Las perillas salen del MISMO archivo que lee core/radar.ts. Antes estaban
+// copiadas acá como literales, con un comentario que prometía "réplica exacta":
+// una promesa que nadie podía hacer cumplir, en el script cuyo único propósito
+// es medir el selector real. La lógica sigue reescrita abajo (los scripts son
+// .mjs y no pueden importar TypeScript sin un runner extra), pero los números
+// que gobiernan el comportamiento ya no pueden desviarse en silencio.
+const seleccion = JSON.parse(readFileSync(join(scriptDir, '..', 'src', 'config', 'radar-seleccion.json'), 'utf8'));
+const ANCHO_BANDA = seleccion.anchoBanda;
+const FRACCION_EVITADA = seleccion.fraccionEvitada;
+const VENTANA_TIPOS = seleccion.ventanaTipos;
+const RESCATE_POR_TIPO = seleccion.rescatePorTipo;
+const MEMORIA_IDS = seleccion.memoriaIds;
 
 function dificultadNormalizada(item, pool) {
   const ratings = pool.filter((c) => c.fuente === item.fuente).map((c) => c.rating).sort((a, b) => a - b);

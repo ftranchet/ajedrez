@@ -27,8 +27,10 @@ import type {
 } from '../../core/types';
 
 export const DB_NAME = 'elomax';
-/** Versión de esquema expuesta en el manifiesto de exportación (RF-14.1/14.2). */
-export const SCHEMA_VERSION = 16;
+// La versión de esquema es el contrato del paquete de exportación, así que vive
+// en `core`; se re-exporta acá para no romper a quien ya la importaba de este
+// módulo. Un test comprueba que coincida con la última `this.version(N)`.
+export { SCHEMA_VERSION } from '../../core/schemaVersion';
 
 /**
  * Ventana hacia atrás desde `diagnosticoCompletadoEn` dentro de la cual una

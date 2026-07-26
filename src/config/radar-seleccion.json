@@ -1,0 +1,11 @@
+{
+  "version": "radar-seleccion-v1",
+  "nota": "Perillas del selector del Radar (core/radar.ts, RF-5.1/5.5/5.6). Viven acá y no como literales en el código porque scripts/measure-radar-repeticion.mjs las necesita para simular el selector real: mientras estuvieron duplicadas, el instrumento que valida el comportamiento podía medir algo distinto del que corre en la app.",
+  "anchoBanda": 15,
+  "fraccionEvitada": 0.6,
+  "memoriaIds": 120,
+  "ventanaTipos": 3,
+  "rescatePorTipo": 3,
+  "pasoAjuste": 4,
+  "cuotaErroresPropios": 0.25
+}
