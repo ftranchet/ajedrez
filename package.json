@@ -14,6 +14,7 @@
     "verify:finales": "node scripts/verify-curriculum-finales.mjs",
     "measure:niveles": "node scripts/measure-engine-levels.mjs",
     "measure:radar": "node scripts/measure-radar-repeticion.mjs",
+    "measure:elo": "node scripts/measure-elo-anclas.mjs",
     "build:carnadas": "node scripts/build-carnadas.mjs",
     "add:puzzles": "node scripts/add-lichess-puzzles.mjs",
     "verify:patrones": "node scripts/verify-curriculum-patrones.mjs",

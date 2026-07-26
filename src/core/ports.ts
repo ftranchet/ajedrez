@@ -24,11 +24,26 @@ export interface EngineLevel {
   candidatas?: number;
   /**
    * Centipeones perdidos por jugada **medidos** para este nivel
-   * (`npm run measure:niveles`). Vive en la configuración para que el número
-   * que se muestra al usuario esté atado a una medición y no a una fórmula: el
-   * script vuelve a medirlo y avisa si se despegó.
+   * (`npm run measure:niveles`). Es la señal interna de que la escalera no se
+   * desordena; ya no es lo que se le muestra al usuario, porque casi nadie
+   * piensa su ajedrez en centipeones.
    */
   acplMedido?: number;
+  /**
+   * Elo **medido** de este nivel (`npm run measure:elo`), en la escala de
+   * Stockfish: sale de jugar N partidas contra Stockfish limitado a `UCI_Elo`
+   * 1320 y aplicar la definición de Elo sobre el puntaje obtenido
+   * (`1320 + 400·log10(S/(1−S))`).
+   *
+   * Es lo que la interfaz muestra. Tres intentos anteriores fracasaron y vale
+   * la pena recordarlos: adjetivos ("da sus primeros pasos") que prometían una
+   * curva inexistente; un Elo calculado con una fórmula inventada; y
+   * centipeones por jugada, honestos pero ilegibles para un jugador. También
+   * se descartó traducir cp/jugada a Elo comparando contra Stockfish limitado,
+   * porque la curva medida salió no monótona y porque el piso de Stockfish
+   * (1320) ya es más fuerte que media escalera.
+   */
+  eloAproximado?: number;
 }
 
 /** Resultado de evaluar una posición a máxima fuerza (E3, análisis en dos fases). */

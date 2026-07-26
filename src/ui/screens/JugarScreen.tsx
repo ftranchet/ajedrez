@@ -282,9 +282,9 @@ function Setup() {
               {ENGINE_LEVELS.map((l) => (
                 <Chip key={l.id} selected={levelId === l.id} onClick={() => setLevelId(l.id)}>
                   {t.jugar.niveles[l.id] ?? l.id}
-                  {l.acplMedido !== undefined && (
+                  {l.eloAproximado !== undefined && (
                     <span className="ml-2 font-mono text-xs text-tertiary">
-                      {t.jugar.nivelAcpl.replace('{cp}', String(l.acplMedido))}
+                      {t.jugar.nivelElo.replace('{elo}', String(l.eloAproximado))}
                     </span>
                   )}
                 </Chip>
@@ -662,6 +662,11 @@ function MaiaScreen() {
                   </Chip>
                 ))}
               </div>
+              {/* Maia 1100 es el modelo más flojo que el proyecto Maia entrenó:
+                  no hay una perilla para bajarlo. Decirlo, y señalar dónde SÍ
+                  hay algo más fácil, es más útil que dejar al usuario buscando
+                  una opción que no existe. */}
+              <p className="m-0 mt-2 text-xs text-tertiary">{t.maia.botPiso}</p>
             </fieldset>
             <button onClick={() => void s.empezar(token, bot)} className="btn-primary">
               {t.maia.empezar.replace('{bot}', bot)}

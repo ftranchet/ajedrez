@@ -18,6 +18,7 @@
 //   node scripts/measure-engine-levels.mjs --solo acpl      solo la absoluta
 //   node scripts/measure-engine-levels.mjs --solo partidas  solo la ordinal
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 import { Chess } from 'chess.js';
 import { StockfishEngine } from './lib/stockfish.mjs';
@@ -104,22 +105,60 @@ async function evaluarFuerzaPlena(engine, fen, depth = 12) {
 }
 
 /**
- * Centipeones que pierde un nivel por jugada. Para cada posición: se evalúa a
- * fuerza plena antes, el nivel juega, y se vuelve a evaluar desde la
- * perspectiva del mismo bando. La caída es lo que costó su jugada.
+ * Banco de posiciones, el mismo para todos los niveles.
+ *
+ * **Por qué no cada nivel su propia partida.** La versión anterior arrancaba
+ * cada nivel desde la posición inicial y lo dejaba jugar solo: cada uno medía
+ * sobre posiciones distintas, así que una partida que se ponía filosa inflaba
+ * el promedio de ese nivel y nada más. Medido con esa versión sobre la
+ * escalera de ocho, el nivel 5 dio 146 cp/jugada entre un nivel 4 de 61 y un
+ * nivel 6 de 35 — un desorden que era del instrumento, no de la configuración.
+ *
+ * Enfrentando a todos a **las mismas** posiciones la comparación queda pareada
+ * y esa fuente de ruido desaparece. Salen del catálogo del Radar, que ya está
+ * en el repositorio, es diverso (tácticas reales, posiciones tranquilas de
+ * partidas y autojuego verificado) y es determinista: la misma medición hoy y
+ * dentro de un año.
  */
-async function medirAcpl(engine, level, jugadas) {
-  const chess = new Chess();
+function bancoDePosiciones(cuantas) {
+  const texto = readFileSync(new URL('../src/services/puzzles/seedData.ts', import.meta.url), 'utf8');
+  const marca = 'seedRadarItems: RadarItem[] = [';
+  const items = JSON.parse(texto.slice(texto.indexOf(marca) + marca.length - 1, texto.lastIndexOf(']') + 1));
+  const usables = items
+    .map((item) => item.fen)
+    .filter((fen) => {
+      try {
+        const chess = new Chess(fen);
+        return !chess.isGameOver() && chess.moves().length >= 4;
+      } catch {
+        return false;
+      }
+    });
+  // Muestreo parejo a lo largo del catálogo, no los primeros N: el archivo
+  // está intercalado por tipo y los primeros serían todos de la misma cosecha.
+  const paso = Math.max(1, Math.floor(usables.length / cuantas));
+  const banco = [];
+  for (let i = 0; i < usables.length && banco.length < cuantas; i += paso) banco.push(usables[i]);
+  return banco;
+}
+
+/**
+ * Centipeones que pierde un nivel por jugada. Para cada posición del banco: se
+ * evalúa a fuerza plena, el nivel juega **una** jugada, y se vuelve a evaluar
+ * desde la perspectiva del mismo bando. La caída es lo que costó esa jugada.
+ */
+async function medirAcpl(engine, level, banco) {
   const perdidas = [];
-  while (perdidas.length < jugadas && !chess.isGameOver()) {
-    const antes = await evaluarFuerzaPlena(engine, chess.fen());
-    const uci = await jugadaDelNivel(engine, chess.fen(), level);
+  for (const fen of banco) {
+    const antes = await evaluarFuerzaPlena(engine, fen);
+    const uci = await jugadaDelNivel(engine, fen, level);
+    const chess = new Chess(fen);
     const move = chess.moves({ verbose: true }).find(
       (m) => m.from + m.to + (m.promotion ?? '') === uci || m.from + m.to === uci,
     );
-    if (!move) break;
+    if (!move) continue;
     chess.move(move);
-    if (chess.isGameOver()) break;
+    if (chess.isGameOver()) continue;
     // Tras mover, evalúa el rival: se invierte para volver a la perspectiva
     // del que acaba de jugar.
     const despues = -(await evaluarFuerzaPlena(engine, chess.fen()));
@@ -177,10 +216,11 @@ try {
   }
 
   if (SOLO !== 'partidas') {
-    console.log(`\n— Centipeones perdidos por jugada (${JUGADAS_ACPL} jugadas por nivel) —\n`);
+    const banco = bancoDePosiciones(JUGADAS_ACPL);
+    console.log(`\n— Centipeones perdidos por jugada (${banco.length} posiciones, las mismas para todos) —\n`);
     const acpls = [];
     for (const level of config.levels) {
-      const { acpl, jugadas } = await medirAcpl(engine, level, JUGADAS_ACPL);
+      const { acpl, jugadas } = await medirAcpl(engine, level, banco);
       acpls.push(acpl);
       const declarado = level.acplMedido;
       // El número que la app le muestra al usuario tiene que seguir siendo

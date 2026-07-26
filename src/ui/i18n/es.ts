@@ -147,7 +147,13 @@ export const es = {
     tokenFalta: 'Para jugar contra Maia hace falta conectar tu cuenta de Lichess.',
     tokenIr: 'Conectar Lichess en Ajustes',
     elegirBot: '¿Contra cuál?',
-    botElo: '≈ {elo} Elo',
+    // No dice "juega a 1100 Elo": ese número es el promedio de los HUMANOS con
+    // cuyas partidas se entrenó cada modelo, no una medición de cómo juega el
+    // bot a este ritmo. Presentarlo como su fuerza sería el mismo número
+    // inventado que se sacó del selector del motor local.
+    botElo: 'aprendió de partidas de ~{elo}',
+    botPiso:
+      'Maia 1100 es el modelo más flojo que existe: abajo de eso no hay Maia. Si te resulta fuerte, el motor local de “Partida libre” baja bastante más y sus niveles están medidos.',
     sugerido: 'Sugerido para tu banda',
     empezar: 'Desafiar a {bot}',
     desafiando: 'Buscando partida con {bot}…',
@@ -556,23 +562,26 @@ export const es = {
       porAhogado: 'por ahogado',
       porRegla: 'por regla de tablas',
     },
-    // El nombre dice el Elo aproximado en vez de un adjetivo: los adjetivos
-    // anteriores ("da sus primeros pasos") prometían una curva que el motor no
-    // entregaba, y no había forma de que el usuario notara la diferencia.
-    // Se describe lo que el nivel HACE, no un Elo. La versión anterior mostraba
-    // un número calculado con una fórmula inventada —exactamente lo que este
-    // proyecto dice no hacer—; ahora la escala está medida en centipeones
-    // perdidos por jugada (docs/niveles-motor.md) y el nombre describe eso.
+    // El nombre describe lo que el nivel HACE; el Elo va aparte, medido.
+    // Historia: primero fueron adjetivos ("da sus primeros pasos") que
+    // prometían una curva que el motor no entregaba; después un Elo salido de
+    // una fórmula inventada; después centipeones por jugada, que son honestos
+    // pero que casi ningún jugador usa para saber contra qué está jugando.
+    // Ahora el Elo vuelve, pero medido contra una escalera de rivales de
+    // fuerza conocida (`npm run measure:elo`), no calculado.
     niveles: {
-      'nivel-1': 'Nivel 1 — cuelga piezas seguido',
-      'nivel-2': 'Nivel 2 — falla tácticas simples',
-      'nivel-3': 'Nivel 3 — sólido, castiga descuidos',
-      'nivel-4': 'Nivel 4 — exige precisión',
-      'nivel-5': 'Nivel 5 — muy fuerte',
+      'nivel-1': 'Nivel 1 — regala material',
+      'nivel-2': 'Nivel 2 — cuelga piezas seguido',
+      'nivel-3': 'Nivel 3 — falla tácticas simples',
+      'nivel-4': 'Nivel 4 — juega de memoria, sin calcular',
+      'nivel-5': 'Nivel 5 — sólido, castiga descuidos',
+      'nivel-6': 'Nivel 6 — aprovecha cada imprecisión',
+      'nivel-7': 'Nivel 7 — exige precisión',
+      'nivel-8': 'Nivel 8 — muy fuerte',
     } as Record<string, string>,
-    nivelAcpl: '−{cp} cp/jugada',
+    nivelElo: '≈{elo}',
     nivelesAyuda:
-      'El número es cuántos centipeones pierde cada nivel por jugada, medido contra el motor a fuerza plena: la misma escala con la que la app clasifica tus errores (100 = error, 200 = error grave). Está medido, no estimado; el método y sus límites están en docs/niveles-motor.md.',
+      'El Elo sale de jugar partidas: la escalera está anclada en tres puntos medidos contra un Stockfish de fuerza declarada, y los escalones intermedios se interpolan sobre esa curva. Es la escala de Stockfish, no la de la FIDE ni la de Lichess, así que no esperes que coincida con tu rating de otro sitio. Es aproximado de verdad —hay unos ±200 de margen y dos niveles vecinos pueden estar más cerca de lo que sugiere el número—: sirve para ubicarte y para subir de a poco, no para compararte.',
   },
   analisis: {
     analizar: 'Analizar',

@@ -146,4 +146,35 @@ describe('catálogo de niveles (RF-1.3)', () => {
       expect(elos[i]).toBeGreaterThanOrEqual(elos[i - 1]);
     }
   });
+
+  // Cinco escalones eran pocos para notar progreso: el usuario juega meses
+  // contra esto y necesita que subir de nivel sea un paso alcanzable, no un
+  // salto. Ocho también reparte mejor la parte baja, que es donde el motor
+  // tenía menos resolución (los tres primeros comparten el piso de UCI_Elo y
+  // se diferencian solo por temperatura).
+  it('hay suficientes escalones para que subir uno se sienta alcanzable', () => {
+    expect(LEVELS.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('cada nivel declara un Elo medido y la escalera no se desordena', () => {
+    // El Elo sale de jugar partidas contra un rival de fuerza declarada
+    // (`npm run measure:elo`), no de una fórmula: es lo único que la interfaz
+    // muestra, así que no puede faltar ni ir para atrás.
+    const elos = LEVELS.map((level) => level.eloAproximado);
+    for (const [i, elo] of elos.entries()) {
+      expect(elo, `${LEVELS[i].id} sin eloAproximado medido`).toBeTypeOf('number');
+    }
+    for (let i = 1; i < elos.length; i++) {
+      expect(elos[i]!, `${LEVELS[i].id} vs ${LEVELS[i - 1].id}`).toBeGreaterThan(elos[i - 1]!);
+    }
+  });
+
+  it('el escalón entre niveles contiguos es alcanzable, no un salto', () => {
+    const elos = LEVELS.map((level) => level.eloAproximado!);
+    for (let i = 1; i < elos.length; i++) {
+      // Un salto enorme entre dos escalones deja un hueco donde el usuario no
+      // tiene rival a su medida, que es lo que motivó pasar de cinco a ocho.
+      expect(elos[i] - elos[i - 1], `${LEVELS[i - 1].id} → ${LEVELS[i].id}`).toBeLessThanOrEqual(400);
+    }
+  });
 });
