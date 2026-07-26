@@ -4,7 +4,7 @@ Este documento describe cómo se genera el catálogo offline del Radar de ELOmax
 
 ## Lote publicado
 
-El catálogo vigente, `radar-e5a6c2d9788c`, contiene 116 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 16 generadas por autojuego (8 de doble solución y 8 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 9 de oferta envenenada.
+El catálogo vigente contiene 128 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 28 generadas por autojuego (8 de doble solución y 20 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 21 de oferta envenenada.
 
 Los exports de base de datos de Lichess son CC0 y su formato oficial explica que el FEN del puzzle es anterior a la jugada de armado; por eso el pipeline aplica la primera UCI antes de guardar la posición que ve el usuario. Fuente: [Lichess open database](https://database.lichess.org/).
 
@@ -133,10 +133,22 @@ Una táctica que uno recuerda no entrena nada: verla al día siguiente es tiempo
 | avanzado | 3 días | 54/116 |
 | experto | 2 días | 39/116 |
 
+Y con las 12 envenenadas nuevas (catálogo de 128), que además engordan el pool efectivo de las bandas medias de 44–45 a 56–57:
+
+| Banda | Pool efectivo | Repite a los | Visto en 30 días |
+|---|---:|---:|---:|
+| principiante | 30 | 3 días | 36/128 |
+| elemental | 56 | 4 días | 62/128 |
+| intermedio | 57 | 4 días | 67/128 |
+| avanzado | 57 | 4 días | 67/128 |
+| experto | 31 | 2 días | 39/128 |
+
+Los extremos (principiante y experto) no se movieron, y ese es justo el punto del párrafo siguiente: el contenido de autojuego entra todo en el percentil 50.
+
 **El límite que queda es el tamaño del catálogo, y es real.** Con 116 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
 
 - **Puzzles CC0 de Lichess** — la vía buena, y la única que agranda los extremos de dificultad, porque traen rating calibrado por la comunidad. Requiere descargar el export oficial (ver "Generación reproducible"); el entorno de desarrollo donde se hizo esta ronda no tiene salida a `database.lichess.org`, así que quedó pendiente de correrse en una máquina con red.
-- **Autojuego local** — funciona pero es carísimo para los tipos raros: minando envenenadas se obtuvo **1 candidata cada ~300 posiciones revisadas**, unas 70 horas de cómputo para las 12 que faltarían. No es un problema de técnica sino de tiempo de máquina.
+- **Autojuego local** — funciona, pero es caro y solo engorda el medio de la escala. En esta ronda se minaron **12 envenenadas nuevas** (de 9 a 21 en total, el tipo más escaso del catálogo) revisando 871 posiciones de autojuego: **1 candidata cada ~73 revisadas**, unas dos horas de cómputo. Reproducible con `node scripts/mine-envenenada.mjs --target N --checkpoint ruta.json` y `node scripts/finalize-envenenada.mjs --checkpoint ruta.json --conservar` (sin `--conservar` reemplaza el lote entero en vez de sumar).
 
 **Y ojo con una interacción:** todo el contenido de autojuego lleva rating fijo 1500 y, por ADR-0007, una cohorte constante queda en el percentil 50. Sumar más posiciones generadas **no ayuda a un usuario cuyo centro adaptativo esté lejos del medio**: sigue siendo invisible salvo por el rescate por tipo descrito abajo. Darles una dificultad medida (por ejemplo, a qué profundidad se estabiliza la mejor jugada del motor) sería una decisión de diseño nueva, no un ajuste.
 

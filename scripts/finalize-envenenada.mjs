@@ -55,12 +55,30 @@ function main() {
   }
 
   const previos = loadItems();
-  const removidas = previos.filter((i) => i.fuente === 'pipeline-envenenada').length;
-  const items = previos.filter((i) => i.fuente !== 'pipeline-envenenada');
+  // Por defecto reemplaza el lote entero (el caso de regenerarlo de cero).
+  // `--conservar` suma a las que ya están, que es lo que corresponde cuando el
+  // minado se corre en tandas: la envenenada es el tipo más caro de generar
+  // (≈1 candidata cada 300 posiciones revisadas) y tirar las anteriores para
+  // quedarse con menos sería exactamente al revés de lo que se busca.
+  const conservar = options.conservar !== undefined || process.argv.includes('--conservar');
+  const anteriores = previos.filter((i) => i.fuente === 'pipeline-envenenada');
+  const items = conservar ? [...previos] : previos.filter((i) => i.fuente !== 'pipeline-envenenada');
+  const removidas = conservar ? 0 : anteriores.length;
 
-  found.forEach((c, index) => {
+  const fensPresentes = new Set(items.map((i) => i.fen));
+  let siguiente = conservar ? anteriores.length : 0;
+  let omitidas = 0;
+  found.forEach((c) => {
+    // Un FEN repetido rompería la validación del lote; en tandas sucesivas del
+    // minador es un desenlace posible, no un error.
+    if (fensPresentes.has(c.fen)) {
+      omitidas++;
+      return;
+    }
+    fensPresentes.add(c.fen);
+    siguiente++;
     items.push({
-      id: `enven-${String(index + 1).padStart(2, '0')}`,
+      id: `enven-${String(siguiente).padStart(2, '0')}`,
       fen: c.fen,
       tipo: 'envenenada',
       temas: ['envenenada', 'autojuego-verificado'],
@@ -69,13 +87,19 @@ function main() {
       fuente: 'pipeline-envenenada',
     });
   });
+  if (omitidas > 0) console.error(`${omitidas} candidata(s) omitida(s) por FEN ya presente.`);
 
   const check = validateRadarDataset(items, MIN_POR_TIPO);
   if (!check.ok) throw new Error(`Lote inválido tras el agregado:\n- ${check.errors.join('\n- ')}`);
 
   const version = datasetVersion(items);
   writeFileSync(SEED_PATH, renderSeedDataModule(items, { version }));
-  console.error(`Listo: ${removidas} envenenada viejas reemplazadas por ${found.length} nuevas. Distribución: ${JSON.stringify(check.counts)}. Nueva versión: ${version}.`);
+  const total = items.filter((i) => i.fuente === 'pipeline-envenenada').length;
+  console.error(
+    conservar
+      ? `Listo: se conservaron ${anteriores.length} y ahora hay ${total} envenenadas de autojuego. Distribución: ${JSON.stringify(check.counts)}. Nueva versión: ${version}.`
+      : `Listo: ${removidas} envenenada viejas reemplazadas por ${total} nuevas. Distribución: ${JSON.stringify(check.counts)}. Nueva versión: ${version}.`,
+  );
 }
 
 main();
