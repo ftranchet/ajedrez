@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   MIN_OBSERVACIONES_FUGA,
+  SESGO_FUGA,
   fugasPrincipales,
   lecturaPerfilDeFugas,
   perfilDeFugasDesdeIntentos,
+  perfilVigente,
+  sesgoPorFugas,
   tasaGlobalPerfil,
 } from './leakProfile';
-import type { PerfilDeFugas, TipoRadar } from './types';
+import type { PerfilDeFugas, RadarAttempt, TipoRadar } from './types';
 
 function intentos(especificacion: Array<[TipoRadar, number, number]>) {
   return especificacion.flatMap(([tipo, aciertos, total]) =>
@@ -118,5 +121,73 @@ describe('fugasPrincipales — honestidad con muestras chicas', () => {
     );
     expect(fugas).toHaveLength(2);
     expect(fugas.map((fuga) => fuga.tipo)).toEqual(['envenenada', 'defensa']);
+  });
+});
+
+describe('perfilVigente (RF-11.2)', () => {
+  const AHORA = new Date('2026-07-27T12:00:00.000Z');
+  const diagnostico = perfil([
+    { tipo: 'defensa', aciertos: 0, total: 4 },
+    { tipo: 'ofensiva', aciertos: 4, total: 4 },
+  ]);
+
+  function respuestas(
+    especificacion: Array<[TipoRadar, number, number]>,
+    diasAtras = 1,
+    origenContenido: RadarAttempt['origenContenido'] = 'catalogo',
+  ) {
+    const fecha = new Date(AHORA.getTime() - diasAtras * 24 * 60 * 60 * 1000).toISOString();
+    return intentos(especificacion).map((intento) => ({ ...intento, fecha, origenContenido }));
+  }
+
+  it('sin evidencia propia suficiente, sigue rigiendo el perfil del diagnóstico', () => {
+    expect(perfilVigente(diagnostico, [], AHORA)).toBe(diagnostico);
+    // 10 respuestas no alcanzan el mínimo: la foto del diagnóstico sigue.
+    expect(perfilVigente(diagnostico, respuestas([['defensa', 5, 10]]), AHORA)).toBe(diagnostico);
+  });
+
+  it('con evidencia propia reciente, esa manda sobre el diagnóstico', () => {
+    // El usuario mejoró en defensa: el perfil vigente ya no la muestra como fuga.
+    const vigente = perfilVigente(
+      diagnostico,
+      respuestas([
+        ['defensa', 12, 15],
+        ['tranquila', 3, 15],
+      ]),
+      AHORA,
+    );
+    expect(vigente).not.toBe(diagnostico);
+    expect(fugasPrincipales(vigente).map((fuga) => fuga.tipo)).toEqual(['tranquila']);
+  });
+
+  it('ignora las respuestas viejas, las del diagnóstico y las de errores propios', () => {
+    // 30 respuestas, pero ninguna computable: fuera de ventana o de otro origen.
+    const viejas = respuestas([['defensa', 0, 30]], 45);
+    expect(perfilVigente(diagnostico, viejas, AHORA)).toBe(diagnostico);
+
+    const delDiagnostico = respuestas([['defensa', 0, 30]], 1, 'diagnostico');
+    expect(perfilVigente(diagnostico, delDiagnostico, AHORA)).toBe(diagnostico);
+
+    const propios = respuestas([['defensa', 0, 30]], 1, 'error-propio');
+    expect(perfilVigente(diagnostico, propios, AHORA)).toBe(diagnostico);
+  });
+});
+
+describe('sesgoPorFugas', () => {
+  it('sesga solo los tipos con fuga declarada, con el multiplicador acotado', () => {
+    const sesgo = sesgoPorFugas(
+      perfil([
+        { tipo: 'ofensiva', aciertos: 6, total: 6 },
+        { tipo: 'defensa', aciertos: 1, total: 6 },
+      ]),
+    );
+    expect(sesgo.get('defensa')).toBe(SESGO_FUGA);
+    expect(sesgo.get('ofensiva')).toBeUndefined();
+    expect(SESGO_FUGA).toBeLessThanOrEqual(2); // acotado a propósito
+  });
+
+  it('sin fuga con evidencia no sesga nada: el Radar sirve su mezcla de siempre', () => {
+    expect(sesgoPorFugas(undefined).size).toBe(0);
+    expect(sesgoPorFugas(perfil([{ tipo: 'defensa', aciertos: 0, total: 2 }])).size).toBe(0);
   });
 });

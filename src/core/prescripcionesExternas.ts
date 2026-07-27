@@ -18,6 +18,7 @@
 import type { CompromisoAttempt, GameRecord, Profile } from './types';
 import { partidaLentaSemanal } from './slowGame';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from './stoyko';
+import { presupuestoPorSesion } from './duracion';
 import type { AjusteFugaCalculo } from './prescriptor';
 
 export type PrescripcionExternaTipo = 'partida-lenta' | 'finales' | 'stoyko' | 'compromiso';
@@ -30,9 +31,19 @@ export type PrescripcionEstado =
   /** No corresponde todavía (Stoyko en enfriamiento). */
   | 'en-espera';
 
+/**
+ * Cuándo toca hacerla. Separar "hoy" de "esta semana" es la diferencia entre
+ * un plan y una lista de deudas: la partida lenta y el Stoyko son semanales
+ * por definición —así se llaman en la propia interfaz—, y presentarlos como
+ * tareas de hoy hacía que una cuenta nueva viera unos 83 minutos "para hoy",
+ * casi el plan semanal completo, el primer día.
+ */
+export type PrescripcionCadencia = 'hoy' | 'esta-semana';
+
 export interface PrescripcionExterna {
   tipo: PrescripcionExternaTipo;
   estado: PrescripcionEstado;
+  cadencia: PrescripcionCadencia;
   /** Duración estimada, en la misma unidad que los bloques de la sesión. */
   minutos: number;
   /** Ruta hash a la pantalla donde se hace. */
@@ -43,6 +54,8 @@ export interface PrescripcionExterna {
   /** En espera porque nunca se hizo (escalonamiento inicial), no por el
    * enfriamiento semanal: el texto del motivo es distinto. */
   primeraVez?: boolean;
+  /** Se movió a "esta semana" porque hoy no entra en el presupuesto declarado. */
+  fueraDePresupuesto?: boolean;
 }
 
 /** Estimaciones honestas: una partida lenta con su análisis no entra en 25 min,
@@ -75,9 +88,11 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 export interface EntradaPrescripciones {
   games: GameRecord[];
   finalesPendientes: number;
-  profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'diagnosticoCompletadoEn'>;
+  profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'diagnosticoCompletadoEn' | 'planSemanal'>;
   compromisoAttempts: CompromisoAttempt[];
   fugaCalculo: AjusteFugaCalculo;
+  /** Minutos que ya ocupa la sesión del día; se descuentan del presupuesto. */
+  minutosSesion?: number;
   now?: Date;
 }
 
@@ -105,22 +120,37 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
   const now = entrada.now ?? new Date();
   const prescripciones: PrescripcionExterna[] = [];
 
+  // Lo que el usuario declaró tener por sesión, menos lo que ya ocupa la
+  // sesión del día: ese resto es todo lo que se puede pedir hoy además.
+  const presupuesto = Math.max(0, presupuestoPorSesion(entrada.profile.planSemanal) - (entrada.minutosSesion ?? 0));
+
   const partidaLenta = partidaLentaSemanal(entrada.games, now);
   prescripciones.push({
     tipo: 'partida-lenta',
     estado: partidaLenta === 'completa' ? 'cumplida' : 'pendiente',
+    // Semanal por definición, incluso en su nombre ("tu partida lenta de la
+    // semana"): pedirla hoy, todos los días, es lo que hacía que el primer
+    // día pareciera imposible.
+    cadencia: 'esta-semana',
     minutos: partidaLenta === 'sin-analizar' ? 20 : MINUTOS['partida-lenta'],
     ruta: partidaLenta === 'sin-analizar' ? '#/panel/partidas' : '#/jugar',
   });
 
   if (entrada.finalesPendientes > 0) {
-    const finalesHoy = Math.min(entrada.finalesPendientes, FINALES_POR_DIA);
+    // Los finales sí vencen día a día (FSRS), así que son la carga diaria que
+    // el presupuesto tiene que acotar: entran los que quepan, y si no entra
+    // ninguno la técnica no desaparece — pasa a la semana, dicho como tal.
+    const cabenHoy = Math.floor(presupuesto / MINUTOS.finales);
+    const finalesHoy = Math.min(entrada.finalesPendientes, FINALES_POR_DIA, Math.max(0, cabenHoy));
+    const cantidad = Math.max(1, finalesHoy);
     prescripciones.push({
       tipo: 'finales',
       estado: 'pendiente',
-      minutos: MINUTOS.finales * finalesHoy,
+      cadencia: finalesHoy > 0 ? 'hoy' : 'esta-semana',
+      ...(finalesHoy > 0 ? {} : { fueraDePresupuesto: true }),
+      minutos: MINUTOS.finales * cantidad,
       ruta: '#/jugar/finales',
-      cantidad: finalesHoy,
+      cantidad,
     });
   }
 
@@ -128,21 +158,24 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
     ? new Date(new Date(entrada.profile.diagnosticoCompletadoEn).getTime() + STOYKO_ESPERA_INICIAL_DIAS * DIA_MS)
     : null;
   const proximoStoyko = stoykoProximaDisponibleEn(entrada.profile, now);
+  // Stoyko también es semanal por definición ("Stoyko de la semana").
   prescripciones.push(
     primerStoykoDesde && now.getTime() < primerStoykoDesde.getTime()
       ? {
           tipo: 'stoyko',
           estado: 'en-espera',
+          cadencia: 'esta-semana',
           minutos: MINUTOS.stoyko,
           ruta: '#/calculo/stoyko',
           fecha: primerStoykoDesde.toISOString(),
           primeraVez: true,
         }
       : stoykoDisponible(entrada.profile, now)
-        ? { tipo: 'stoyko', estado: 'pendiente', minutos: MINUTOS.stoyko, ruta: '#/calculo/stoyko' }
+        ? { tipo: 'stoyko', estado: 'pendiente', cadencia: 'esta-semana', minutos: MINUTOS.stoyko, ruta: '#/calculo/stoyko' }
         : {
             tipo: 'stoyko',
             estado: 'en-espera',
+            cadencia: 'esta-semana',
             minutos: MINUTOS.stoyko,
             ruta: '#/calculo/stoyko',
             ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
@@ -150,9 +183,14 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
   );
 
   if (entrada.fugaCalculo.activa) {
+    // Seis minutos: el ejercicio corto. Entra hoy salvo que no quede nada de
+    // presupuesto, y ahí espera a la semana como los demás.
+    const entraHoy = presupuesto >= MINUTOS.compromiso;
     prescripciones.push({
       tipo: 'compromiso',
       estado: compromisoHechoHoy(entrada.compromisoAttempts, now) ? 'cumplida' : 'pendiente',
+      cadencia: entraHoy ? 'hoy' : 'esta-semana',
+      ...(entraHoy ? {} : { fueraDePresupuesto: true }),
       minutos: MINUTOS.compromiso,
       ruta: '#/calculo',
       cantidad: Math.round((entrada.fugaCalculo.fallos / entrada.fugaCalculo.total) * 100),
@@ -165,4 +203,12 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
 /** Cuántas prescripciones externas quedan por hacer hoy, para el resumen de Hoy. */
 export function prescripcionesPendientes(prescripciones: PrescripcionExterna[]): number {
   return prescripciones.filter((prescripcion) => prescripcion.estado === 'pendiente').length;
+}
+
+/** Las de una cadencia, conservando el orden por valor documentado. */
+export function prescripcionesDe(
+  prescripciones: PrescripcionExterna[],
+  cadencia: PrescripcionCadencia,
+): PrescripcionExterna[] {
+  return prescripciones.filter((prescripcion) => prescripcion.cadencia === cadencia);
 }

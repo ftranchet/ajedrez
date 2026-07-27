@@ -209,6 +209,9 @@ export const es = {
     titulo: 'Tu sesión de hoy',
     tambienHoyTitulo: 'También te toca hoy',
     tambienHoyAyuda: 'Ejercicios que no entran en el formato de la sesión y se hacen en otra pantalla. Aparecen solo cuando corresponden.',
+    estaSemanaTitulo: 'Esta semana',
+    estaSemanaAyuda: 'No son de hoy: entran en cualquier momento de la semana. Ajustá tu disponibilidad abajo y la carga diaria se acomoda.',
+    fueraDePresupuesto: 'No entra en los minutos que declaraste para hoy.',
     prescripciones: {
       'partida-lenta': {
         titulo: 'Tu partida lenta de la semana',
@@ -265,6 +268,7 @@ export const es = {
     bloqueRadar: 'Radar — {n} posiciones',
     bloqueRadarPorque: 'Posiciones de partidas para que decidas la mejor jugada.',
     bloqueRadarPorqueFuga: 'Reforzado: la mayoría de tus errores recientes son tácticos.',
+    bloqueRadarPorqueTipo: 'Con algo más de {tipo}: es donde venís fallando más.',
     bloqueRadarExplica: 'Evaluás, decidís y jugás la mejor en posiciones mezcladas como en partida, sin que nadie te avise si hay táctica. La dificultad se adapta a tu nivel.',
     hechoHoy: 'Hecho hoy',
     hechoHoyRepetir: 'Ya lo hiciste hoy: la sesión no te lo vuelve a pedir. Practicarlo de nuevo no cuenta para el plan.',
@@ -411,10 +415,14 @@ export const es = {
     informeRecomendacionPartida:
       'Jugá y analizá una partida lenta por semana. Es el ejercicio con más respaldo de todos los que hay acá.',
     informeRecomendacionFuga:
-      'Hoy fallaste más en {tipo}: esos fallos vuelven como repasos en tu Cola. La sesión todavía no insiste con ese tipo de posición por sí sola.',
+      'Hoy fallaste más en {tipo}: tu Radar va a servir un poco más de ese tipo hasta que la diferencia se cierre, y esos fallos vuelven como repasos en tu Cola.',
     informeMedicionTitulo: 'Cómo vas a saber si sirve',
     informeMedicionTexto:
       'La línea base es una batería de 30 posiciones que nunca se entrenan ni se muestran resueltas. Tu primera toma ya está disponible en Panel → Medición, y se repite cada siete semanas: comparar una toma con la siguiente es la prueba más honesta de que lo entrenado se traslada a posiciones nuevas, y no de que te aprendiste el catálogo.',
+    informeDisponibilidadTitulo: '¿Cuánto podés entrenar?',
+    informeDisponibilidadTexto:
+      'Define cuánto te pedimos por día: lo que no entra en tu presupuesto pasa a "esta semana" en vez de acumularse como deuda de hoy. Lo cambiás cuando quieras desde Hoy.',
+    informeDisponibilidadGuardado: 'Listo: {sesiones} días por semana, unos {minutos} minutos cada uno.',
     informeRatingTitulo: 'Tu rating de partidas lentas (opcional)',
     informeRatingTexto:
       'La medida que más importa es cuánto sube tu Elo real por hora entrenada. Si jugás en Lichess, Chess.com o un club, anotá tu rating de partidas rápidas o clásicas para tener contra qué comparar. Podés cargarlo o cambiarlo después desde Ajustes.',

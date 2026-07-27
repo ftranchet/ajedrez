@@ -123,6 +123,12 @@ test('diagnóstico inicial: dos partidas y 20 posiciones del Radar arman la prim
   await expect(page.getByText('Falta analizar una partida')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Analizar mi partida del diagnóstico' })).toBeVisible();
 
+  // La disponibilidad se declara acá y pasa a gobernar la carga diaria: el
+  // diagnóstico medía habilidad y nunca preguntaba cuánto tiempo hay.
+  await expect(page.getByRole('heading', { name: '¿Cuánto podés entrenar?' })).toBeVisible();
+  await page.getByRole('button', { name: /Ligero/ }).click();
+  await expect(page.getByText('Listo: 2 días por semana, unos 30 minutos cada uno.')).toBeVisible();
+
   // El rating declarado es opcional y se puede cargar acá mismo.
   await page.getByRole('spinbutton', { name: 'Rating' }).fill('1450');
   await page.getByRole('button', { name: 'Guardar rating' }).click();

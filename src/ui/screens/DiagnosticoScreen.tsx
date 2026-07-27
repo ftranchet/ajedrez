@@ -19,6 +19,7 @@ import { useAnalysisStore } from '../state/analysisStore';
 import { useGameStore } from '../state/gameStore';
 import { useSessionStore } from '../state/sessionStore';
 import { fugasPrincipales, lecturaPerfilDeFugas } from '../../core/leakProfile';
+import { WEEKLY_PLAN_PRESETS, weeklyPlanPreset, type WeeklyPlanPreset } from '../../core/adherence';
 import type { RatingExterno } from '../../core/types';
 import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
@@ -368,6 +369,47 @@ function PerfilDeFugasCard({ lineaBase }: { lineaBase: LineaBaseDiagnostico }) {
   );
 }
 
+/**
+ * Disponibilidad declarada (RF-11.3), en un toque.
+ *
+ * El diagnóstico medía habilidad y nunca preguntaba cuánto tiempo tiene el
+ * usuario, así que la carga diaria salía de la nada: una cuenta recién
+ * diagnosticada veía del orden de 83 minutos "para hoy", casi el plan semanal
+ * entero. Con esto el presupuesto pasa a existir — lo que no entra hoy se
+ * muestra como tarea de la semana, en vez de acumularse como deuda diaria.
+ */
+function DisponibilidadCard() {
+  const guardado = useDiagnosticoStore((state) => state.planSemanalGuardado);
+  const preset = guardado ? weeklyPlanPreset(guardado) : null;
+
+  return (
+    <section className={`flex flex-col gap-3 rounded-lg border p-4 ${guardado ? 'border-success/35 bg-success-subtle' : 'border-info/40 bg-surface'}`}>
+      <div>
+        <SectionHeading>{t.diagnostico.informeDisponibilidadTitulo}</SectionHeading>
+        <p className="m-0 mt-1 text-sm text-secondary">{t.diagnostico.informeDisponibilidadTexto}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(WEEKLY_PLAN_PRESETS) as WeeklyPlanPreset[]).map((nombre) => (
+          <Chip
+            key={nombre}
+            selected={preset === nombre}
+            onClick={() => void useDiagnosticoStore.getState().guardarPlanSemanal(WEEKLY_PLAN_PRESETS[nombre])}
+          >
+            {t.adherencia[nombre === 'ligero' ? 'planLigero' : nombre === 'constante' ? 'planConstante' : 'planIntenso']}
+          </Chip>
+        ))}
+      </div>
+      {guardado && (
+        <p className="m-0 text-sm text-primary">
+          {t.diagnostico.informeDisponibilidadGuardado
+            .replace('{sesiones}', String(guardado.sesionesObjetivo))
+            .replace('{minutos}', String(Math.round(guardado.minutosObjetivo / guardado.sesionesObjetivo)))}
+        </p>
+      )}
+    </section>
+  );
+}
+
 const FUENTES_RATING: RatingExterno['fuente'][] = ['lichess', 'chesscom', 'otro'];
 
 /** Captura del rating real (PRD §3.1). Es opcional y no bloquea nada: sin él
@@ -522,6 +564,8 @@ function Resultado() {
           )}
         </ol>
       </section>
+
+      <DisponibilidadCard />
 
       <RatingExternoCard />
 

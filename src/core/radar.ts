@@ -226,13 +226,24 @@ export function centroInicialDesdeDiagnostico(tasaAcierto: number): number {
   return Math.min(DIFICULTAD_MAX, Math.max(DIFICULTAD_MIN, Math.round(centro)));
 }
 
-function pesoPorTipo(tipo: TipoRadar, historialTipos: TipoRadar[]): number {
+/**
+ * Peso de un tipo al sortear la próxima posición.
+ *
+ * `sesgoPorTipo` es el perfil de fugas entrando en la selección (RF-11.2): un
+ * multiplicador acotado para los tipos donde el usuario falla más, calculado
+ * en core/leakProfile.ts. Se aplica **antes** de la penalización por
+ * repetición a propósito: un tipo que ya salió dos veces en la ventana cae a
+ * 0,3 aunque sea la fuga, así que insistir nunca degenera en un bloque
+ * monotemático ni vuelve predecible la mezcla que RF-5.1 protege.
+ */
+function pesoPorTipo(tipo: TipoRadar, historialTipos: TipoRadar[], sesgoPorTipo?: Map<TipoRadar, number>): number {
   const recientes = historialTipos.slice(-VENTANA_TIPOS);
   const apariciones = recientes.filter((t) => t === tipo).length;
+  const sesgo = sesgoPorTipo?.get(tipo) ?? 1;
   // Penalización suave, no exclusión dura: evita bloques monotemáticos sin
   // caer en una rotación fija (que sería, a su vez, un patrón predecible).
-  if (apariciones === 0) return 3;
-  if (apariciones === 1) return 1;
+  if (apariciones === 0) return 3 * sesgo;
+  if (apariciones === 1) return 1 * sesgo;
   return 0.3;
 }
 
@@ -290,11 +301,19 @@ function rescatarTiposAusentes(
   );
 }
 
-/** Elige la próxima posición del Radar. Devuelve null si el pool está vacío. */
+/**
+ * Elige la próxima posición del Radar. Devuelve null si el pool está vacío.
+ *
+ * `sesgoPorTipo` (opcional) inclina la mezcla hacia los tipos donde el usuario
+ * falla más, con el tope descrito en `pesoPorTipo`. El diagnóstico no lo pasa:
+ * ahí se mide con el instrumento sin adaptar, y sesgarlo contaminaría la
+ * medición con lo que la medición todavía no dijo.
+ */
 export function selectNextRadarItem(
   pool: RadarItem[],
   state: RadarSelectionState,
   rng: () => number = Math.random,
+  sesgoPorTipo?: Map<TipoRadar, number>,
 ): RadarItem | null {
   if (pool.length === 0) return null;
 
@@ -318,7 +337,7 @@ export function selectNextRadarItem(
       ? [...candidatos, ...rescatarTiposAusentes(pool, candidatos, state, recientes, percentiles)]
       : alcanzables;
 
-  const pesados = pesosAcumulados(universo, (item) => pesoPorTipo(item.tipo, state.historialTipos));
+  const pesados = pesosAcumulados(universo, (item) => pesoPorTipo(item.tipo, state.historialTipos, sesgoPorTipo));
   const total = pesados[pesados.length - 1].acumulado;
   const dardo = rng() * total;
   const elegido = pesados.find((p) => dardo <= p.acumulado) ?? pesados[pesados.length - 1];

@@ -483,3 +483,61 @@ describe('centroInicialDesdeDiagnostico (RF-11.4 → RF-5.5)', () => {
     expect(elegido!.rating).toBeGreaterThan(1000 + 9 * 100);
   });
 });
+
+// El perfil de fugas entrando en la selección (RF-11.2). Antes se medía, se
+// guardaba y se mostraba en el informe del diagnóstico sin que nadie lo
+// consumiera: la interfaz prometía una personalización que no existía.
+describe('selectNextRadarItem — sesgo por fugas', () => {
+  const pool: RadarItem[] = TIPOS.map((tipo, index) => ({
+    id: `sesgo-${tipo}`,
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    tipo,
+    temas: [],
+    rating: 1500 + index, // percentiles repartidos, todos dentro de la banda
+    solucion: ['e2e4'],
+    fuente: 'seed-dev',
+  }));
+
+  /**
+   * Proporción exacta con la que sale un tipo, barriendo la ruleta de pesos de
+   * forma uniforme. Determinista a propósito: mide el peso resultante, no una
+   * muestra aleatoria que podría fallar de vez en cuando.
+   */
+  function proporcion(tipo: TipoRadar, state: RadarSelectionState, sesgo?: Map<TipoRadar, number>): number {
+    const muestras = 1000;
+    let cuenta = 0;
+    for (let i = 0; i < muestras; i++) {
+      const item = selectNextRadarItem(pool, state, () => (i + 0.5) / muestras, sesgo);
+      if (item?.tipo === tipo) cuenta++;
+    }
+    return cuenta / muestras;
+  }
+
+  const sinHistorial: RadarSelectionState = { ...RADAR_INITIAL_STATE, dificultadCentro: 50 };
+
+  it('sirve más del tipo señalado como fuga, sin llegar a dominar la mezcla', () => {
+    const sinSesgo = proporcion('defensa', sinHistorial);
+    const conSesgo = proporcion('defensa', sinHistorial, new Map([['defensa', 1.5]]));
+
+    expect(sinSesgo).toBeCloseTo(0.2, 1); // cinco tipos, mismo peso
+    expect(conSesgo).toBeGreaterThan(sinSesgo);
+    // Se nota a lo largo de una sesión y no convierte al Radar en un
+    // monotema: el resto de los tipos conserva la mayoría de las posiciones.
+    expect(conSesgo).toBeLessThan(0.35);
+  });
+
+  it('la penalización por repetición gana sobre el sesgo: no hay bloques monotemáticos (RF-5.1)', () => {
+    // El tipo fugado ya salió dos veces en la ventana reciente.
+    const repetido: RadarSelectionState = { ...sinHistorial, historialTipos: ['defensa', 'defensa'] };
+    const sesgo = new Map<TipoRadar, number>([['defensa', 1.5]]);
+
+    const fugado = proporcion('defensa', repetido, sesgo);
+    const otro = proporcion('ofensiva', repetido, sesgo);
+    expect(fugado).toBeLessThan(otro);
+    expect(fugado).toBeLessThan(0.1);
+  });
+
+  it('sin sesgo se comporta igual que antes: un mapa vacío no cambia nada', () => {
+    expect(proporcion('defensa', sinHistorial, new Map())).toBeCloseTo(proporcion('defensa', sinHistorial), 5);
+  });
+});

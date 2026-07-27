@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prescripcionesExternas, prescripcionesPendientes } from './prescripcionesExternas';
+import { prescripcionesDe, prescripcionesExternas, prescripcionesPendientes } from './prescripcionesExternas';
 import type { AjusteFugaCalculo } from './prescriptor';
 import type { CompromisoAttempt, GameRecord } from './types';
 
@@ -149,5 +149,65 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
       }),
     );
     expect(prescripcionesPendientes(lista)).toBe(1);
+  });
+});
+
+// La carga de hoy no puede ser "todo lo que existe": el plan semanal declara
+// cuánto tiempo hay, y lo que no entra se muestra como tarea de la semana en
+// vez de acumularse como deuda diaria (E11, feedback 2026-07).
+describe('cadencia y presupuesto (RF-11.3)', () => {
+  it('la partida lenta y el Stoyko son semanales, no tareas de hoy', () => {
+    const lista = prescripcionesExternas(entrada());
+    expect(lista.find((p) => p.tipo === 'partida-lenta')!.cadencia).toBe('esta-semana');
+    expect(lista.find((p) => p.tipo === 'stoyko')!.cadencia).toBe('esta-semana');
+  });
+
+  it('los finales vencen día a día: entran hoy si el presupuesto alcanza', () => {
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 8 }));
+    const finales = lista.find((p) => p.tipo === 'finales')!;
+    // Plan por defecto: 90 min / 3 sesiones = 30 min, sin sesión encima.
+    expect(finales.cadencia).toBe('hoy');
+    expect(finales.cantidad).toBe(2); // el tope diario, que cabe en 30 min
+  });
+
+  it('con la sesión ocupando casi todo el presupuesto, entra un solo final', () => {
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 8, minutosSesion: 20 }));
+    const finales = lista.find((p) => p.tipo === 'finales')!;
+    expect(finales.cadencia).toBe('hoy');
+    expect(finales.cantidad).toBe(1); // quedan 10 min: entra uno de 8
+  });
+
+  it('sin presupuesto libre, los finales pasan a la semana y dicen por qué', () => {
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 8, minutosSesion: 30 }));
+    const finales = lista.find((p) => p.tipo === 'finales')!;
+    expect(finales.cadencia).toBe('esta-semana');
+    expect(finales.fueraDePresupuesto).toBe(true);
+    // No desaparece: sigue listada, con una técnica como unidad mínima.
+    expect(finales.cantidad).toBe(1);
+  });
+
+  it('un plan más grande admite más carga diaria', () => {
+    const conPlanChico = prescripcionesExternas(
+      entrada({
+        finalesPendientes: 8,
+        minutosSesion: 20,
+        profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, planSemanal: { sesionesObjetivo: 3, minutosObjetivo: 90 } },
+      }),
+    );
+    const conPlanGrande = prescripcionesExternas(
+      entrada({
+        finalesPendientes: 8,
+        minutosSesion: 20,
+        profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, planSemanal: { sesionesObjetivo: 3, minutosObjetivo: 180 } },
+      }),
+    );
+    expect(conPlanChico.find((p) => p.tipo === 'finales')!.cantidad).toBe(1);
+    expect(conPlanGrande.find((p) => p.tipo === 'finales')!.cantidad).toBe(2);
+  });
+
+  it('prescripcionesDe separa las dos listas sin perder el orden por valor', () => {
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 2, fugaCalculo: { activa: true, fallos: 6, total: 10 } }));
+    expect(tipos(prescripcionesDe(lista, 'hoy'))).toEqual(['finales', 'compromiso']);
+    expect(tipos(prescripcionesDe(lista, 'esta-semana'))).toEqual(['partida-lenta', 'stoyko']);
   });
 });

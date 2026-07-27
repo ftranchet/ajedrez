@@ -81,3 +81,67 @@ export function fugasPrincipales(perfil: PerfilDeFugas | undefined): LecturaFuga
     )
     .slice(0, MAX_FUGAS);
 }
+
+// --- El perfil como insumo del Radar (RF-11.2 punto 3) ---
+
+/** Ventana de respuestas propias que reemplaza al perfil del diagnóstico. */
+export const VENTANA_PERFIL_VIGENTE_DIAS = 30;
+/**
+ * Respuestas de catálogo necesarias para dejar de mirar el diagnóstico. Con
+ * cinco tipos, 25 respuestas dan del orden de 5 por tipo: la misma base
+ * modesta que el diagnóstico, pero **reciente**.
+ */
+export const MIN_INTENTOS_PERFIL_VIGENTE = 25;
+
+/**
+ * El perfil que rige hoy. Prefiere las respuestas recientes del Radar; cae al
+ * perfil del diagnóstico solo mientras no haya evidencia propia suficiente.
+ *
+ * **Por qué no alcanza con el diagnóstico solo.** Es una foto de 20 posiciones
+ * de un día: usarla para siempre significaría insistir con un tipo que el
+ * usuario quizá ya domina, sin forma de enterarse. Con la ventana móvil, el
+ * sesgo se apaga solo cuando la tasa de ese tipo sube — un lazo de control que
+ * se cierra con evidencia, no una etiqueta permanente.
+ *
+ * Solo entran respuestas de catálogo: las del diagnóstico se sirvieron sin
+ * adaptar dificultad y las de errores propios no tienen un tipo verificado
+ * (`radarItemFromOwnError` lo deriva de la categoría), así que ninguna de las
+ * dos es comparable con la tasa del Radar adaptativo.
+ */
+export function perfilVigente(
+  perfilDiagnostico: PerfilDeFugas | undefined,
+  attempts: Pick<RadarAttempt, 'tipo' | 'acierto' | 'fecha' | 'origenContenido'>[],
+  now: Date = new Date(),
+): PerfilDeFugas | undefined {
+  const desde = now.getTime() - VENTANA_PERFIL_VIGENTE_DIAS * 24 * 60 * 60 * 1000;
+  const recientes = attempts.filter((attempt) => {
+    if (attempt.origenContenido !== 'catalogo') return false;
+    const t = new Date(attempt.fecha).getTime();
+    return Number.isFinite(t) && t >= desde && t <= now.getTime();
+  });
+  if (recientes.length < MIN_INTENTOS_PERFIL_VIGENTE) return perfilDiagnostico;
+  return perfilDeFugasDesdeIntentos(recientes, now);
+}
+
+/**
+ * Cuánto se multiplica el peso de un tipo señalado como fuga al elegir la
+ * próxima posición del Radar.
+ *
+ * Deliberadamente chico. Con los pesos base del selector (3 para un tipo no
+ * visto en la ventana reciente), 1,5 lleva a un tipo de ~20% a ~28% de las
+ * posiciones: se nota a lo largo de una sesión y no se nota en ninguna
+ * posición puntual. El tope duro no lo pone este número sino la penalización
+ * por repetición, que actúa **después** y hunde a 0,3 el peso de cualquier
+ * tipo que aparezca dos veces en la ventana — así el sesgo no puede producir
+ * bloques monotemáticos ni volver predecible la mezcla que RF-5.1 protege.
+ */
+export const SESGO_FUGA = 1.5;
+
+/**
+ * Multiplicadores de peso por tipo, para `selectNextRadarItem`. Vacío cuando
+ * no hay fuga con evidencia suficiente, que es el caso normal al empezar:
+ * sin señal, el Radar sirve su mezcla de siempre.
+ */
+export function sesgoPorFugas(perfil: PerfilDeFugas | undefined): Map<TipoRadar, number> {
+  return new Map(fugasPrincipales(perfil).map((fuga) => [fuga.tipo, SESGO_FUGA]));
+}

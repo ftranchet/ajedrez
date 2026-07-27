@@ -5,7 +5,9 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, DailyAssignment, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, DailyAssignment, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord, TipoRadar } from '../../core/types';
+import { fugasPrincipales, perfilVigente, sesgoPorFugas } from '../../core/leakProfile';
+import { minutosPendientesDelPlan } from '../../core/duracion';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
@@ -162,6 +164,14 @@ interface SessionState {
   /** Posiciones 0-based sorteadas para intercalarlos sin patrón fijo. */
   radarOwnErrorSlots: number[];
   radarSelState: RadarSelectionState;
+  /**
+   * Multiplicadores de peso por tipo (RF-11.2): el perfil de fugas entrando
+   * en la selección del Radar. Vacío mientras no haya una fuga con evidencia
+   * suficiente, que es el caso normal al empezar.
+   */
+  radarSesgoTipos: Map<TipoRadar, number>;
+  /** Tipos que hoy se están reforzando, para poder decirlo en la interfaz. */
+  radarFugas: TipoRadar[];
   radarItem: RadarItem | null;
   radarSubPhase: RadarSubPhase;
   radarServidos: number;
@@ -385,10 +395,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
     };
     const ownErrorTurn = s.radarOwnErrorSlots.includes(s.radarServidos);
     if (ownErrorTurn) {
+      // Sin sesgo por fugas acá: el tipo de un error propio se deriva de su
+      // categoría y no está verificado (ver `radarItemFromOwnError`), así que
+      // no puede decidir si esta posición refuerza una fuga o no.
       const ownItem = selectNextRadarItem(sinRepetir(s.radarOwnErrorItems), selectionState, Math.random);
       if (ownItem) return ownItem;
     }
-    return selectNextRadarItem(sinRepetir(s.radarPool), selectionState, Math.random);
+    return selectNextRadarItem(sinRepetir(s.radarPool), selectionState, Math.random, s.radarSesgoTipos);
   }
 
   function loadColaCard(card: ErrorCard | null) {
@@ -540,6 +553,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     radarOwnErrorItems: [],
     radarOwnErrorSlots: [],
     radarSelState: RADAR_INITIAL_STATE,
+    radarSesgoTipos: new Map(),
+    radarFugas: [],
     radarItem: null,
     radarSubPhase: 'evaluando',
     radarServidos: 0,
@@ -646,11 +661,17 @@ export const useSessionStore = create<SessionState>((set, get) => {
               profile,
               compromisoAttempts,
               fugaCalculo: detectarFugaCalculo(radarAttempts, radarItems),
+              // El plan semanal gobierna la carga: lo que no entra en el
+              // presupuesto de hoy se muestra como tarea de la semana.
+              minutosSesion: minutosPendientesDelPlan(assignment),
             }),
             profile,
             dieta,
             assignment,
             sessions,
+            // La portada explica por qué el Radar va a insistir con un tipo,
+            // antes de empezar (el mismo cálculo que hace `start`).
+            radarFugas: fugasPrincipales(perfilVigente(profile.perfilDeFugas, radarAttempts)).map((fuga) => fuga.tipo),
             summaryStatus: 'ready',
           });
         } catch {
@@ -670,16 +691,24 @@ export const useSessionStore = create<SessionState>((set, get) => {
         await assignmentWriteQueue;
         await sessionRepo.abandonInProgress();
         await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
-        const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile] = await Promise.all([
+        const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile, radarAttempts] = await Promise.all([
           errorCardRepo.list(),
           radarItemRepo.list(),
           radarProgressRepo.get(),
           curriculumItemRepo.list(),
           curriculumProgressRepo.list(),
           profileRepo.get(),
+          radarAttemptRepo.list(),
         ]);
         const due = dueErrorCards(allCards);
         const dieta = dietaPorBanda(profile.bandaElo, allCards);
+        // El perfil de fugas entra en la selección del Radar (RF-11.2): las
+        // respuestas recientes mandan, y el diagnóstico solo mientras no haya
+        // evidencia propia. Antes esto se medía, se guardaba, se mostraba en el
+        // informe… y no lo consumía nadie.
+        const perfil = perfilVigente(profile.perfilDeFugas, radarAttempts);
+        const radarSesgoTipos = sesgoPorFugas(perfil);
+        const radarFugas = fugasPrincipales(perfil).map((fuga) => fuga.tipo);
         const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
         // Interlevar y recién ahí topar preserva la mezcla de patrones dentro
         // del cupo de la dieta (RF-6.1), en vez de topar antes y arriesgar un
@@ -794,6 +823,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
           curriculumQueue,
           curriculumIndex: 0,
           radarSelState: selectionFromProgress(progress),
+          radarSesgoTipos,
+          radarFugas,
           radarAciertosRecientes: progress?.aciertosRecientes ?? [],
           radarServidos: 0,
           curriculumItemsAll: curriculumItems,

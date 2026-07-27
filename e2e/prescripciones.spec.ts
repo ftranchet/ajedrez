@@ -36,12 +36,26 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
-  await page.getByRole('heading', { name: 'También te toca hoy' }).waitFor();
-
-  // La partida lenta encabeza: es el ejercicio con más respaldo documentado.
-  const prescripciones = page.locator('li a, li div').filter({ hasText: /min|Ya lo hiciste/ });
+  // La partida lenta y el Stoyko son semanales por definición: van en "Esta
+  // semana", no en la lista de hoy. Pedirlos todos los días es lo que hacía
+  // que el primer día sumara ~83 minutos, casi el plan semanal completo.
+  await page.getByRole('heading', { name: 'Esta semana' }).waitFor();
+  const seccionSemanal = page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Esta semana' }) });
   await expect(page.getByRole('link', { name: /Tu partida lenta de la semana/ })).toBeVisible();
-  await expect(prescripciones.first()).toContainText('Tu partida lenta de la semana');
+  // Encabeza igual dentro de su lista: es el ejercicio con más respaldo.
+  await expect(seccionSemanal.locator('li').first()).toContainText('Tu partida lenta de la semana');
+  await expect(seccionSemanal).toContainText('Stoyko de la semana');
+
+  // Lo que sí vence día a día —las técnicas de final— queda en la lista de
+  // hoy, topeada al presupuesto: dos técnicas, no el catálogo entero.
+  const seccionHoy = page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'También te toca hoy' }) });
+  await expect(seccionHoy).toContainText('Finales teóricos');
+  await expect(seccionHoy).toContainText('2 técnica(s)');
+  await expect(seccionHoy).not.toContainText('Tu partida lenta de la semana');
 
   // Stoyko deja de descubrirse solo entrando a la pestaña Cálculo. El enlace
   // tiene que aterrizar en el modo Stoyko visible, no en Línea comprometida
@@ -63,9 +77,28 @@ test('el primer Stoyko se escalona: recién diagnosticado, avisa cuándo se suma
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
-  await page.getByRole('heading', { name: 'También te toca hoy' }).waitFor();
+  await page.getByRole('heading', { name: 'Esta semana' }).waitFor();
   await expect(page.getByText(/Se suma a tu plan el /)).toBeVisible();
   await expect(page.getByRole('link', { name: /Stoyko de la semana/ })).toHaveCount(0);
+});
+
+test('el plan semanal gobierna la carga: con poco tiempo declarado, los finales pasan a la semana', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  // Plan mínimo: 2 sesiones de ~8 minutos. La sesión del día ya se los come,
+  // así que ninguna técnica de final entra hoy.
+  await seedProfileDiagnosticado(page, {
+    diagnosticoCompletadoEn: haceDias(4),
+    planSemanal: { sesionesObjetivo: 2, minutosObjetivo: 16 },
+  });
+  await page.reload();
+  await page.getByText('Tu sesión de hoy').waitFor();
+
+  await page.getByRole('heading', { name: 'Esta semana' }).waitFor();
+  await expect(page.getByText('Finales teóricos')).toBeVisible();
+  // No desaparece ni se presenta como deuda de hoy: dice por qué no es de hoy.
+  await expect(page.getByText('No entra en los minutos que declaraste para hoy.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'También te toca hoy' })).toHaveCount(0);
 });
 
 test('Stoyko ya hecho esta semana sigue listado, con la fecha en que vuelve', async ({ page }) => {

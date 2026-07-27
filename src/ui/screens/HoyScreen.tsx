@@ -4,10 +4,12 @@
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
 import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
-import type { DailyAssignment, SessionBlockType } from '../../core/types';
+import type { DailyAssignment, SessionBlockType, TipoRadar } from '../../core/types';
 import { bloquesHechosHoy } from '../../core/session';
 import { planEmpezado } from '../../core/dailyAssignment';
+import { minutosDeBloque } from '../../core/duracion';
 import type { DietaSesion } from '../../core/prescriptor';
+import { prescripcionesDe } from '../../core/prescripcionesExternas';
 import type { PrescripcionExterna } from '../../core/prescripcionesExternas';
 import { Board, type BoardFeedback } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
@@ -57,13 +59,9 @@ export function HoyScreen() {
   return <SesionActiva />;
 }
 
-// Minutos estimados por elemento de cada bloque: heurística simple v1 (RF-11.1
-// pide una duración visible, no un cronómetro exacto) para mostrar "~N min"
-// antes de empezar.
-const MIN_POR_COLA = 0.75;
-const MIN_POR_CURRICULO = 0.75;
-const MIN_POR_TRIAGE = 0.5;
-const MIN_POR_RADAR = 1.25;
+// La estimación de duración vive en core/duracion.ts: dejó de ser
+// presentación cuando el presupuesto del plan semanal empezó a compararla con
+// los minutos que el usuario declaró tener.
 const DURACION_MINIMA_MIN = 15;
 
 interface Bloque {
@@ -177,7 +175,19 @@ function BloqueAccordion({
  * fue, marcado como hecho. `bloquesDeLaSesion` queda como respaldo para el
  * instante en que el resumen todavía no trajo el plan.
  */
-function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion): Bloque[] {
+/**
+ * Por qué el Radar viene como viene. La fuga por tipo (RF-11.2) es más
+ * específica que el refuerzo por errores tácticos, así que manda cuando hay
+ * las dos; sin ninguna, el porqué de siempre.
+ */
+function porqueRadar(dieta: DietaSesion, fugas: TipoRadar[]): string {
+  if (fugas.length > 0) {
+    return t.sesion.bloqueRadarPorqueTipo.replace('{tipo}', t.diagnostico.tiposRadar[fugas[0]].toLowerCase());
+  }
+  return dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque;
+}
+
+function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion, fugas: TipoRadar[]): Bloque[] {
   return assignment.bloques.map((bloque) => {
     const n = bloque.estado === 'completado'
       ? bloque.planificados
@@ -189,7 +199,7 @@ function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion): Bloque
           texto: n === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(n)),
           porque: t.sesion.bloqueColaPorque,
           explicacion: t.sesion.bloqueColaExplica,
-          minutos: Math.max(1, Math.round(n * MIN_POR_COLA)),
+          minutos: minutosDeBloque('cola', n),
         };
       case 'curriculo':
         return {
@@ -197,7 +207,7 @@ function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion): Bloque
           texto: t.sesion.bloqueCurriculo.replace('{n}', String(n)),
           porque: t.sesion.bloqueCurriculoPorque,
           explicacion: t.sesion.bloqueCurriculoExplica,
-          minutos: Math.max(1, Math.round(n * MIN_POR_CURRICULO)),
+          minutos: minutosDeBloque('curriculo', n),
         };
       case 'triage':
         return {
@@ -205,15 +215,15 @@ function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion): Bloque
           texto: t.sesion.bloqueTriage.replace('{n}', String(n)),
           porque: t.sesion.bloqueTriagePorque,
           explicacion: t.sesion.bloqueTriageExplica,
-          minutos: Math.max(1, Math.round(n * MIN_POR_TRIAGE)),
+          minutos: minutosDeBloque('triage', n),
         };
       case 'radar':
         return {
           tipo: 'radar' as const,
           texto: t.sesion.bloqueRadar.replace('{n}', String(n)),
-          porque: dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
+          porque: porqueRadar(dieta, fugas),
           explicacion: t.sesion.bloqueRadarExplica,
-          minutos: Math.max(1, Math.round(n * MIN_POR_RADAR)),
+          minutos: minutosDeBloque('radar', n),
         };
     }
   });
@@ -228,7 +238,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       texto: vencidas === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(vencidas)),
       porque: t.sesion.bloqueColaPorque,
       explicacion: t.sesion.bloqueColaExplica,
-      minutos: Math.max(1, Math.round(vencidas * MIN_POR_COLA)),
+      minutos: minutosDeBloque('cola', vencidas),
     });
   }
   const curriculo = Math.min(s.curriculumDueCount ?? 0, s.dieta.curriculumMax);
@@ -238,7 +248,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       texto: t.sesion.bloqueCurriculo.replace('{n}', String(curriculo)),
       porque: t.sesion.bloqueCurriculoPorque,
       explicacion: t.sesion.bloqueCurriculoExplica,
-      minutos: Math.max(1, Math.round(curriculo * MIN_POR_CURRICULO)),
+      minutos: minutosDeBloque('curriculo', curriculo),
     });
   }
   if (s.dieta.criterioActivo) {
@@ -247,15 +257,15 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
       texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),
       porque: t.sesion.bloqueTriagePorque,
       explicacion: t.sesion.bloqueTriageExplica,
-      minutos: Math.max(1, Math.round(TRIAGE_SESSION_SIZE * MIN_POR_TRIAGE)),
+      minutos: minutosDeBloque('triage', TRIAGE_SESSION_SIZE),
     });
   }
   bloques.push({
     tipo: 'radar',
     texto: t.sesion.bloqueRadar.replace('{n}', String(s.dieta.radarCount)),
-    porque: s.dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
+    porque: porqueRadar(s.dieta, s.radarFugas),
     explicacion: t.sesion.bloqueRadarExplica,
-    minutos: Math.max(1, Math.round(s.dieta.radarCount * MIN_POR_RADAR)),
+    minutos: minutosDeBloque('radar', s.dieta.radarCount),
   });
   return bloques;
 }
@@ -288,7 +298,7 @@ function Portada() {
 
   // El plan del día manda (RF-11.1): bloques con lo que falta, hechos con lo
   // que fue. `bloquesDeLaSesion` es el respaldo si el plan no llegó todavía.
-  const bloques = s.assignment ? bloquesDelPlan(s.assignment, s.dieta) : bloquesDeLaSesion(s);
+  const bloques = s.assignment ? bloquesDelPlan(s.assignment, s.dieta, s.radarFugas) : bloquesDeLaSesion(s);
   const hechos = s.assignment
     ? new Set<SessionBlockType>(s.assignment.bloques.filter((b) => b.estado === 'completado').map((b) => b.tipo))
     : bloquesHechosHoy(s.sessions ?? []);
@@ -359,7 +369,19 @@ function Portada() {
           venís esta semana. Nunca compite con el botón primario —todo acá es
           secundario— y acompaña el scroll en pantallas altas. */}
       <aside className="flex flex-col gap-4 lg:sticky lg:top-0">
-        <PrescripcionesExternasCard prescripciones={s.prescripcionesExternas ?? []} />
+        {/* "Hoy" y "esta semana" son listas distintas: la partida lenta y el
+            Stoyko son semanales por definición, y presentarlos como deuda
+            diaria hacía que el primer día pareciera imposible (E11). */}
+        <PrescripcionesExternasCard
+          prescripciones={prescripcionesDe(s.prescripcionesExternas ?? [], 'hoy')}
+          titulo={t.hoy.tambienHoyTitulo}
+          ayuda={t.hoy.tambienHoyAyuda}
+        />
+        <PrescripcionesExternasCard
+          prescripciones={prescripcionesDe(s.prescripcionesExternas ?? [], 'esta-semana')}
+          titulo={t.hoy.estaSemanaTitulo}
+          ayuda={t.hoy.estaSemanaAyuda}
+        />
 
         <div className="flex flex-col gap-1 border-t border-subtle pt-4 lg:border-t-0 lg:pt-0">
           <SectionHeading>{t.hoy.constanciaTitulo}</SectionHeading>
@@ -383,13 +405,21 @@ function Portada() {
  * Acá aparecen con el mismo contrato que un bloque: qué es, por qué hoy y
  * cuánto dura, cada una con su enlace directo.
  */
-function PrescripcionesExternasCard({ prescripciones }: { prescripciones: PrescripcionExterna[] }) {
+function PrescripcionesExternasCard({
+  prescripciones,
+  titulo,
+  ayuda,
+}: {
+  prescripciones: PrescripcionExterna[];
+  titulo: string;
+  ayuda: string;
+}) {
   if (prescripciones.length === 0) return null;
   return (
     <section className="flex flex-col gap-2">
       <div>
-        <SectionHeading>{t.hoy.tambienHoyTitulo}</SectionHeading>
-        <p className="m-0 mt-1 text-xs text-secondary">{t.hoy.tambienHoyAyuda}</p>
+        <SectionHeading>{titulo}</SectionHeading>
+        <p className="m-0 mt-1 text-xs text-secondary">{ayuda}</p>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {prescripciones.map((prescripcion) => (
@@ -428,6 +458,10 @@ function PrescripcionRow({ prescripcion }: { prescripcion: PrescripcionExterna }
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-sm font-semibold text-primary">{textos.titulo}</span>
         <span className="text-xs text-secondary">{motivo}</span>
+        {/* Por qué no es de hoy: el presupuesto declarado, no un capricho. */}
+        {prescripcion.fueraDePresupuesto && (
+          <span className="text-xs text-tertiary">{t.hoy.fueraDePresupuesto}</span>
+        )}
       </span>
     </>
   );

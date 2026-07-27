@@ -7,11 +7,12 @@
 // turnos.
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, EvalGuess, PerfilDeFugas, RadarAttempt, RadarItem, RatingExterno } from '../../core/types';
+import type { CalibrationRecord, Color, EvalGuess, PerfilDeFugas, PlanSemanal, RadarAttempt, RadarItem, RatingExterno } from '../../core/types';
 import { RADAR_INITIAL_STATE, categoriaFromTipo, centroInicialDesdeDiagnostico, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
 import { lineaParaMostrar } from '../../core/radarExplicacion';
 import { perfilDeFugasDesdeIntentos } from '../../core/leakProfile';
 import { brierScore } from '../../core/calibration';
+import { isValidWeeklyPlan } from '../../core/adherence';
 import { estimarBandaElo, type ResultadoPartida } from '../../core/prescriptor';
 import { altaErrorCard } from '../../core/errorCard';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
@@ -106,6 +107,8 @@ interface DiagnosticoState {
   lineaBase: LineaBaseDiagnostico | null;
   /** Rating declarado ya guardado en esta corrida (para no repetir el pedido). */
   ratingExternoGuardado: RatingExterno | null;
+  /** Disponibilidad declarada en esta corrida; null hasta que se elija. */
+  planSemanalGuardado: PlanSemanal | null;
 
   empezarJuego1(): Promise<void>;
   registrarResultadoJuego(): Promise<void>;
@@ -116,6 +119,7 @@ interface DiagnosticoState {
   radarConfirmarConfianza(valor: number): Promise<void>;
   radarContinuar(): Promise<void>;
   guardarRatingExterno(valor: number, fuente: RatingExterno['fuente']): Promise<void>;
+  guardarPlanSemanal(plan: PlanSemanal): Promise<void>;
   pausar(): void;
   reanudar(): void;
   volver(): void;
@@ -278,6 +282,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
     bandaEstimada: null,
     lineaBase: null,
     ratingExternoGuardado: null,
+    planSemanalGuardado: null,
 
     async empezarJuego1() {
       // useGameStore es compartido con la pantalla Jugar (RF-1.3): resetearlo
@@ -305,6 +310,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
         bandaEstimada: null,
         lineaBase: null,
         ratingExternoGuardado: null,
+        planSemanalGuardado: null,
       });
       useGameStore.getState().reset();
       await useGameStore.getState().start(DIAGNOSTICO_JUEGO1_NIVEL, 'random', 'diagnostico');
@@ -473,6 +479,19 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       const actual = await profileRepo.get();
       await profileRepo.save({ ...actual, ratingsExternos: [...(actual.ratingsExternos ?? []), registro] });
       set({ ratingExternoGuardado: registro });
+    },
+
+    /**
+     * Disponibilidad declarada (RF-11.3). El diagnóstico medía habilidad y no
+     * preguntaba nunca cuánto tiempo tiene el usuario, así que la carga diaria
+     * salía de la nada: una cuenta nueva veía ~83 minutos "para hoy". Acá se
+     * captura de un toque y pasa a gobernar el presupuesto (core/duracion.ts).
+     */
+    async guardarPlanSemanal(plan) {
+      if (!isValidWeeklyPlan(plan)) return;
+      const actual = await profileRepo.get();
+      await profileRepo.save({ ...actual, planSemanal: plan });
+      set({ planSemanalGuardado: plan });
     },
 
     pausar() {
