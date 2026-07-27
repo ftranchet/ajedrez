@@ -4,6 +4,9 @@ import type { AjusteFugaCalculo } from './prescriptor';
 import type { CompromisoAttempt, GameRecord } from './types';
 
 const AHORA = new Date(2026, 6, 22, 20); // miércoles 22/07
+// Diagnóstico hace 10 días: fuera de la ventana de escalonamiento inicial,
+// para que los casos que no la prueban no la pisen.
+const DIAGNOSTICO_VIEJO = new Date(2026, 6, 12, 9).toISOString();
 const SIN_FUGA: AjusteFugaCalculo = { activa: false, fallos: 0, total: 0 };
 
 function game(overrides: Partial<GameRecord> = {}): GameRecord {
@@ -24,7 +27,7 @@ function entrada(overrides: Partial<Parameters<typeof prescripcionesExternas>[0]
   return {
     games: [],
     finalesPendientes: 0,
-    profile: {},
+    profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO },
     compromisoAttempts: [],
     fugaCalculo: SIN_FUGA,
     now: AHORA,
@@ -66,11 +69,44 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
 
     // Hecho anteayer: sigue listado, con la fecha en que vuelve.
     const enfriando = prescripcionesExternas(
-      entrada({ profile: { stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() } }),
+      entrada({ profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() } }),
     );
     const stoyko = enfriando.find((p) => p.tipo === 'stoyko')!;
     expect(stoyko.estado).toBe('en-espera');
     expect(stoyko.fecha).toBeDefined();
+    expect(stoyko.primeraVez).toBeUndefined();
+  });
+
+  it('el primer Stoyko se escalona: no se prescribe hasta 3 días después del diagnóstico', () => {
+    // Diagnóstico ayer, Stoyko nunca hecho: en espera con la fecha en que se suma.
+    const reciente = prescripcionesExternas(
+      entrada({ profile: { diagnosticoCompletadoEn: new Date(2026, 6, 21, 9).toISOString() } }),
+    );
+    const stoyko = reciente.find((p) => p.tipo === 'stoyko')!;
+    expect(stoyko.estado).toBe('en-espera');
+    expect(stoyko.primeraVez).toBe(true);
+    expect(stoyko.fecha).toBe(new Date(2026, 6, 24, 9).toISOString());
+
+    // Pasada la espera inicial, queda pendiente como siempre (caso del
+    // perfil por defecto, diagnóstico hace 10 días, cubierto arriba).
+    // Y si ya hizo alguno, manda el enfriamiento semanal, no el escalonamiento.
+    const conHistorial = prescripcionesExternas(
+      entrada({
+        profile: {
+          diagnosticoCompletadoEn: new Date(2026, 6, 21, 9).toISOString(),
+          stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString(),
+        },
+      }),
+    );
+    expect(conHistorial.find((p) => p.tipo === 'stoyko')!.primeraVez).toBeUndefined();
+  });
+
+  it('los finales se topean por día y los minutos son por final, no totales', () => {
+    const ocho = prescripcionesExternas(entrada({ finalesPendientes: 8 }));
+    expect(ocho.find((p) => p.tipo === 'finales')).toMatchObject({ cantidad: 2, minutos: 16 });
+
+    const uno = prescripcionesExternas(entrada({ finalesPendientes: 1 }));
+    expect(uno.find((p) => p.tipo === 'finales')).toMatchObject({ cantidad: 1, minutos: 8 });
   });
 
   it('el cálculo comprometido solo aparece con señal, y con el porcentaje que la explica', () => {
@@ -108,7 +144,7 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
     const lista = prescripcionesExternas(
       entrada({
         games: [game({ analizada: true })],
-        profile: { stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() },
+        profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() },
         finalesPendientes: 1,
       }),
     );

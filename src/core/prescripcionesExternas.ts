@@ -40,9 +40,13 @@ export interface PrescripcionExterna {
   /** Dato que acompaña el texto (finales pendientes, día de reaparición). */
   cantidad?: number;
   fecha?: string;
+  /** En espera porque nunca se hizo (escalonamiento inicial), no por el
+   * enfriamiento semanal: el texto del motivo es distinto. */
+  primeraVez?: boolean;
 }
 
-/** Estimaciones honestas: una partida lenta con su análisis no entra en 25 min. */
+/** Estimaciones honestas: una partida lenta con su análisis no entra en 25 min,
+ * y un final jugado entero contra el motor lleva estos minutos **cada uno**. */
 const MINUTOS = {
   'partida-lenta': 45,
   finales: 8,
@@ -50,10 +54,28 @@ const MINUTOS = {
   compromiso: 6,
 } as const satisfies Record<PrescripcionExternaTipo, number>;
 
+/**
+ * Tope diario de finales prescriptos. Sin él, una cuenta nueva veía el catálogo
+ * entero (8 técnicas no vistas) como deuda de hoy — con una estimación de 8
+ * minutos totales que en realidad eran más de 60. La deuda real sigue viva en
+ * el catálogo; lo que se prescribe para hoy es una porción hacible.
+ */
+const FINALES_POR_DIA = 2;
+
+/**
+ * El primer Stoyko no se prescribe el mismo día del diagnóstico: los primeros
+ * días ya cargan con la sesión, la partida lenta semanal y los finales. La
+ * pantalla de Cálculo queda disponible igual — esto escalona la prescripción,
+ * no bloquea el ejercicio.
+ */
+const STOYKO_ESPERA_INICIAL_DIAS = 3;
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+
 export interface EntradaPrescripciones {
   games: GameRecord[];
   finalesPendientes: number;
-  profile: Pick<Profile, 'stoykoUltimaCompletadaEn'>;
+  profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'diagnosticoCompletadoEn'>;
   compromisoAttempts: CompromisoAttempt[];
   fugaCalculo: AjusteFugaCalculo;
   now?: Date;
@@ -92,26 +114,39 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
   });
 
   if (entrada.finalesPendientes > 0) {
+    const finalesHoy = Math.min(entrada.finalesPendientes, FINALES_POR_DIA);
     prescripciones.push({
       tipo: 'finales',
       estado: 'pendiente',
-      minutos: MINUTOS.finales,
+      minutos: MINUTOS.finales * finalesHoy,
       ruta: '#/jugar/finales',
-      cantidad: entrada.finalesPendientes,
+      cantidad: finalesHoy,
     });
   }
 
+  const primerStoykoDesde = !entrada.profile.stoykoUltimaCompletadaEn && entrada.profile.diagnosticoCompletadoEn
+    ? new Date(new Date(entrada.profile.diagnosticoCompletadoEn).getTime() + STOYKO_ESPERA_INICIAL_DIAS * DIA_MS)
+    : null;
   const proximoStoyko = stoykoProximaDisponibleEn(entrada.profile, now);
   prescripciones.push(
-    stoykoDisponible(entrada.profile, now)
-      ? { tipo: 'stoyko', estado: 'pendiente', minutos: MINUTOS.stoyko, ruta: '#/calculo' }
-      : {
+    primerStoykoDesde && now.getTime() < primerStoykoDesde.getTime()
+      ? {
           tipo: 'stoyko',
           estado: 'en-espera',
           minutos: MINUTOS.stoyko,
-          ruta: '#/calculo',
-          ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
-        },
+          ruta: '#/calculo/stoyko',
+          fecha: primerStoykoDesde.toISOString(),
+          primeraVez: true,
+        }
+      : stoykoDisponible(entrada.profile, now)
+        ? { tipo: 'stoyko', estado: 'pendiente', minutos: MINUTOS.stoyko, ruta: '#/calculo/stoyko' }
+        : {
+            tipo: 'stoyko',
+            estado: 'en-espera',
+            minutos: MINUTOS.stoyko,
+            ruta: '#/calculo/stoyko',
+            ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
+          },
   );
 
   if (entrada.fugaCalculo.activa) {

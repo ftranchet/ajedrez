@@ -215,26 +215,30 @@ export const es = {
         pendiente: 'Es el ejercicio con más respaldo de todos: de acá salen tus repasos.',
         cumplida: 'Jugada y analizada esta semana. Ese es el ciclo que más te hace mejorar.',
         enEspera: '',
+        enEsperaPrimera: '',
       },
       finales: {
         titulo: 'Finales teóricos',
-        pendiente: 'Te toca demostrar {n} técnica(s). Se juegan enteras contra el motor.',
+        pendiente: 'Hoy te toca demostrar {n} técnica(s). Se juegan enteras contra el motor.',
         cumplida: 'Sin técnicas vencidas hoy.',
         enEspera: '',
+        enEsperaPrimera: '',
       },
       stoyko: {
         titulo: 'Stoyko de la semana',
         pendiente: 'Una posición rica, sin reloj: anotás todas las candidatas antes de ver al motor.',
         cumplida: 'Ya lo hiciste esta semana.',
         enEspera: 'Ya lo hiciste esta semana. Vuelve el {fecha}.',
+        enEsperaPrimera: 'Se suma a tu plan el {fecha}: los primeros días son para la sesión y tu partida lenta.',
       },
       compromiso: {
         titulo: 'Cálculo comprometido',
         pendiente: 'Fallás el {n}% de las posiciones que piden calcular una línea entera, no una jugada.',
         cumplida: 'Hecho hoy. Podés repetirlo si querés.',
         enEspera: '',
+        enEsperaPrimera: '',
       },
-    } as Record<string, { titulo: string; pendiente: string; cumplida: string; enEspera: string }>,
+    } as Record<string, { titulo: string; pendiente: string; cumplida: string; enEspera: string; enEsperaPrimera: string }>,
     constanciaTitulo: 'Tu constancia',
     constanciaTexto: 'Cumplir el plan sostiene el hábito. Una semana floja no borra lo que ya construiste.',
     cargaDetalle: 'Ordenando repasos, patrones y posiciones con tus datos locales.',
@@ -331,7 +335,7 @@ export const es = {
     titulo: 'Diagnóstico inicial',
     bienvenidaTitulo: 'Conocé tu punto de partida',
     introTexto:
-      'Dos partidas sin reloj y 20 decisiones del Radar nos permiten estimar una primera banda y preparar una sesión a tu medida.',
+      'Dos partidas sin reloj y 20 decisiones del Radar nos permiten estimar una colocación inicial provisional y dosificar tu primera sesión.',
     duracion: '20–40 min estimados',
     etapas: '3 etapas',
     pausable: 'Pausa disponible en esta pestaña',
@@ -378,9 +382,9 @@ export const es = {
     informeTitulo: 'Tu punto de partida',
     informeIntro:
       'Esto es lo que quedó medido hoy. No es una nota: es la línea base contra la que vas a comparar dentro de unas semanas para saber si el entrenamiento está funcionando.',
-    informeBandaLabel: 'Banda de arranque',
+    informeBandaLabel: 'Colocación inicial provisional',
     informeBandaAyuda:
-      'Define cuántos patrones y cuántas posiciones trae tu sesión diaria. Es un punto de partida para dosificar, no una medida de tu fuerza: tu Elo real se mide jugando.',
+      'Salió de dos partidas y veinte posiciones: una sola partida con otro resultado puede moverla una banda entera. Tomala como una colocación para dosificar, no como una medición de tu nivel — tu Elo real se mide jugando. Define cuánto trae tu sesión diaria; la dificultad del Radar sí se ajusta sola, desde el primer día, con tus respuestas.',
     informeLineaBaseTitulo: 'Tus valores de arranque',
     informeRadarLabel: 'Radar del diagnóstico',
     informeRadarValor: '{aciertos} de {total} ({porcentaje}%)',
@@ -405,10 +409,10 @@ export const es = {
     informeRecomendacionPartida:
       'Jugá y analizá una partida lenta por semana. Es el ejercicio con más respaldo de todos los que hay acá.',
     informeRecomendacionFuga:
-      'Tu sesión diaria ya va a insistir con {tipo}, que es donde hoy fallás más.',
+      'Hoy fallaste más en {tipo}: esos fallos vuelven como repasos en tu Cola. La sesión todavía no insiste con ese tipo de posición por sí sola.',
     informeMedicionTitulo: 'Cómo vas a saber si sirve',
     informeMedicionTexto:
-      'Dentro de unas siete semanas vas a resolver una batería de 30 posiciones que nunca se entrenan ni se muestran resueltas. Comparar esa toma con la siguiente es la prueba más honesta de que lo entrenado se traslada a posiciones nuevas, y no de que te aprendiste el catálogo.',
+      'La línea base es una batería de 30 posiciones que nunca se entrenan ni se muestran resueltas. Tu primera toma ya está disponible en Panel → Medición, y se repite cada siete semanas: comparar una toma con la siguiente es la prueba más honesta de que lo entrenado se traslada a posiciones nuevas, y no de que te aprendiste el catálogo.',
     informeRatingTitulo: 'Tu rating de partidas lentas (opcional)',
     informeRatingTexto:
       'La medida que más importa es cuánto sube tu Elo real por hora entrenada. Si jugás en Lichess, Chess.com o un club, anotá tu rating de partidas rápidas o clásicas para tener contra qué comparar. Podés cargarlo o cambiarlo después desde Ajustes.',

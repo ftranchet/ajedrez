@@ -23,10 +23,16 @@ async function seedProfileDiagnosticado(page: Page, extra: Record<string, unknow
   );
 }
 
+/** Fecha ISO hace `n` días, para salir de la ventana de escalonamiento inicial. */
+function haceDias(n: number): string {
+  return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+}
+
 test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
-  await seedProfileDiagnosticado(page);
+  // Diagnóstico hace 4 días: el primer Stoyko ya salió de su espera inicial.
+  await seedProfileDiagnosticado(page, { diagnosticoCompletadoEn: haceDias(4) });
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
@@ -37,11 +43,29 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await expect(page.getByRole('link', { name: /Tu partida lenta de la semana/ })).toBeVisible();
   await expect(prescripciones.first()).toContainText('Tu partida lenta de la semana');
 
-  // Stoyko deja de descubrirse solo entrando a la pestaña Cálculo.
+  // Stoyko deja de descubrirse solo entrando a la pestaña Cálculo. El enlace
+  // tiene que aterrizar en el modo Stoyko visible, no en Línea comprometida
+  // (el modo por defecto de la pantalla): comprobar solo la URL dejaba pasar
+  // ese bug.
   const stoyko = page.getByRole('link', { name: /Stoyko de la semana/ });
   await expect(stoyko).toBeVisible();
   await stoyko.click();
-  await expect(page).toHaveURL(/#\/calculo$/);
+  await expect(page).toHaveURL(/#\/calculo\/stoyko$/);
+  await expect(page.getByRole('radio', { name: 'Stoyko semanal' })).toBeChecked();
+  await expect(page.getByText('Stoyko semanal: anotás todas tus candidatas', { exact: false })).toBeVisible();
+});
+
+test('el primer Stoyko se escalona: recién diagnosticado, avisa cuándo se suma en vez de invitar', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  // Diagnóstico de hoy y ningún Stoyko hecho: dentro de la espera inicial.
+  await seedProfileDiagnosticado(page);
+  await page.reload();
+  await page.getByText('Tu sesión de hoy').waitFor();
+
+  await page.getByRole('heading', { name: 'También te toca hoy' }).waitFor();
+  await expect(page.getByText(/Se suma a tu plan el /)).toBeVisible();
+  await expect(page.getByRole('link', { name: /Stoyko de la semana/ })).toHaveCount(0);
 });
 
 test('Stoyko ya hecho esta semana sigue listado, con la fecha en que vuelve', async ({ page }) => {

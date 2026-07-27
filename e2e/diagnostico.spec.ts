@@ -113,7 +113,7 @@ test('diagnóstico inicial: dos partidas y 20 posiciones del Radar arman la prim
 
   // Informe de cierre: banda, línea base medida y perfil de fugas.
   await expect(page.getByRole('heading', { name: 'Tu punto de partida' })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('Banda de arranque')).toBeVisible();
+  await expect(page.getByText('Colocación inicial provisional')).toBeVisible();
   await expect(page.getByText('Radar del diagnóstico')).toBeVisible();
   await expect(page.getByText('20 de 20 (100%)')).toBeVisible();
   // Cinco confianzas al 50% con 100% de acierto: Brier 0,25.

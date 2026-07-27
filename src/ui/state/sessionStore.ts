@@ -165,7 +165,7 @@ interface SessionState {
   lastMove: [string, string] | null;
   check: boolean;
 
-  loadSummary(force?: boolean): Promise<void>;
+  loadSummary(force?: boolean | 'revalidar'): Promise<void>;
   start(soloBloque?: SessionBlockType): Promise<void>;
   volver(): void;
 
@@ -495,7 +495,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (summaryLoad && !force) return summaryLoad.promise;
 
       const generation = ++summaryGeneration;
-      set({ summaryStatus: 'loading' });
+      // 'revalidar' (HoyScreen al volver de otra pantalla): recarga igual que
+      // force, pero deja el resumen viejo visible hasta que llega el fresco —
+      // pasar por 'loading' haría parpadear la portada entera en cada cambio
+      // de pestaña. El force booleano (salir del diagnóstico) sí muestra el
+      // skeleton: ahí "lo viejo" es la invitación al diagnóstico, que ya no
+      // corresponde y no debe verse ni un frame.
+      if (force !== 'revalidar' || get().summaryStatus !== 'ready') set({ summaryStatus: 'loading' });
       const promise = (async () => {
         try {
           // El primer contacto solo necesita el perfil. No bloquear la

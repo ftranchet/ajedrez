@@ -135,7 +135,9 @@ describe('stoykoStore', () => {
   });
 
   it('practicar durante el enfriamiento sirve una posición y NO mide ni resetea la semana', async () => {
-    const ultima = '2026-07-20T00:00:00.000Z';
+    // Relativa a hoy: una fecha fija venció el enfriamiento (7 días) por
+    // calendario y el test empezó a fallar solo, sin cambio de código.
+    const ultima = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     await seedProfile({ stoykoUltimaCompletadaEn: ultima });
     await useStoykoStore.getState().empezar();
     expect(useStoykoStore.getState().phase).toBe('enfriamiento');

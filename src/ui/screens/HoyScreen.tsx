@@ -36,6 +36,19 @@ export function HoyScreen() {
     }
   }, [sessionPhase, summaryStatus]);
 
+  // Al montar (cada navegación a Hoy): revalidar el resumen aunque ya esté
+  // listo. Un final jugado, un Stoyko o una partida analizada en otra pantalla
+  // no tocan este store, y la portada conservaba contadores y prescripciones
+  // de la visita anterior como si nada hubiera pasado. 'revalidar' no pasa
+  // por 'loading': se ve el resumen viejo hasta que llega el fresco, sin
+  // parpadeo.
+  useEffect(() => {
+    const s = useSessionStore.getState();
+    if (s.phase === 'sinEmpezar' && s.summaryStatus === 'ready') {
+      void s.loadSummary('revalidar');
+    }
+  }, []);
+
   if (diagnosticoPhase !== 'inactivo') return <DiagnosticoScreen />;
   if (sessionPhase === 'sinEmpezar' || sessionPhase === 'cargando') return <Portada />;
   if (sessionPhase === 'fin') return <Fin />;
@@ -315,7 +328,10 @@ function PrescripcionRow({ prescripcion }: { prescripcion: PrescripcionExterna }
   const textos = t.hoy.prescripciones[prescripcion.tipo];
   const cumplida = prescripcion.estado === 'cumplida';
   const enEspera = prescripcion.estado === 'en-espera';
-  const motivo = (cumplida ? textos.cumplida : enEspera ? textos.enEspera : textos.pendiente)
+  // La espera inicial (nunca se hizo) no es el enfriamiento semanal: decir
+  // "ya lo hiciste esta semana" a una cuenta nueva sería falso.
+  const textoEnEspera = prescripcion.primeraVez ? textos.enEsperaPrimera : textos.enEspera;
+  const motivo = (cumplida ? textos.cumplida : enEspera ? textoEnEspera : textos.pendiente)
     .replace('{n}', String(prescripcion.cantidad ?? 0))
     .replace('{fecha}', prescripcion.fecha ? new Date(prescripcion.fecha).toLocaleDateString('es-AR') : '');
 

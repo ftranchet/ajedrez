@@ -18,10 +18,33 @@ import { useStoykoStore } from '../state/stoykoStore';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { t } from '../i18n/es';
 
+// La sub-ruta #/calculo/stoyko entra directo al Stoyko semanal (deep-link
+// desde la prescripción de Hoy, mismo patrón que #/jugar/finales), y elegir
+// un modo actualiza el hash para que el botón "atrás" funcione. Sin esto, la
+// tarjeta de Stoyko aterrizaba en Línea comprometida.
 type Modo = 'comprometida' | 'stoyko';
 
+function modoDesdeHash(): Modo {
+  return window.location.hash.includes('/stoyko') ? 'stoyko' : 'comprometida';
+}
+
+const RUTA_POR_MODO: Record<Modo, string> = {
+  comprometida: '#/calculo',
+  stoyko: '#/calculo/stoyko',
+};
+
 export function CalculoScreen() {
-  const [modo, setModo] = useState<Modo>('comprometida');
+  const [modo, setModo] = useState<Modo>(modoDesdeHash);
+
+  useEffect(() => {
+    const onNavigate = () => setModo(modoDesdeHash());
+    window.addEventListener('hashchange', onNavigate);
+    window.addEventListener('popstate', onNavigate);
+    return () => {
+      window.removeEventListener('hashchange', onNavigate);
+      window.removeEventListener('popstate', onNavigate);
+    };
+  }, []);
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-3">
@@ -39,7 +62,13 @@ export function CalculoScreen() {
           { value: 'comprometida', label: t.calculo.modoLineaComprometida },
           { value: 'stoyko', label: t.calculo.modoStoyko },
         ]}
-        onChange={setModo}
+        onChange={(value) => {
+          const destino = RUTA_POR_MODO[value as Modo];
+          if (window.location.hash !== destino) {
+            window.history.pushState(null, '', destino);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }
+        }}
         className="mx-auto w-full max-w-md sm:mx-0 sm:max-w-xs"
       />
 

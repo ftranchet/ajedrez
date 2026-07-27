@@ -2,7 +2,7 @@
 // y se compara con la línea del motor. La lógica (acierto, enfriamiento) ya
 // está probada en core/stoyko.test.ts y src/ui/state/stoykoStore.test.ts —
 // acá se verifica que la UI (sub-modo de "Cálculo") está bien conectada.
-import { test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { STOYKO_DATASET_VERSION } from '../src/services/puzzles/stoykoSeedData';
 
 // Mismo fixture (posición y línea) que stoykoStore.test.ts, ya verificado
@@ -62,6 +62,20 @@ test('Stoyko semanal: anotar la jugada del motor entre las candidatas acierta y 
 
   await page.getByText('La tenías entre tus candidatas').waitFor({ timeout: 10_000 });
   await page.getByText('Bc4 Bc5 O-O').waitFor();
+});
+
+test('el deep link #/calculo/stoyko aterriza en el modo Stoyko, no en Línea comprometida', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  await seedStoykoFixture(page);
+
+  await page.goto('./#/calculo/stoyko');
+  await expect(page.getByRole('radio', { name: 'Stoyko semanal' })).toBeChecked();
+  await expect(page.getByText('Stoyko semanal: anotás todas tus candidatas', { exact: false })).toBeVisible();
+
+  // La ruta sin sub-modo sigue abriendo Línea comprometida, el modo por defecto.
+  await page.goto('./#/calculo');
+  await expect(page.getByRole('radio', { name: 'Línea comprometida' })).toBeChecked();
 });
 
 test('Stoyko semanal: ya hecho esta semana, avisa el enfriamiento en vez de servir una posición', async ({ page }) => {

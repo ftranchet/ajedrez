@@ -6,12 +6,11 @@ test('Panel: plan semanal cumplido y mejora real de errores graves', async ({ pa
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await page.evaluate(() => {
-    const dayIso = (daysAgo: number) => {
-      const date = new Date();
-      date.setHours(12, 0, 0, 0);
-      date.setDate(date.getDate() - daysAgo);
-      return date.toISOString();
-    };
+    // Relativo al instante actual, no a las 12:00: la sesión de "hoy" sembrada
+    // a mediodía quedaba en el futuro en toda corrida matutina y el plan
+    // semanal la excluía (timestamp <= now) — un lunes a la mañana contaba
+    // cero sesiones y el test fallaba solo, sin cambio de código.
+    const dayIso = (daysAgo: number) => new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
     const moves = (count: number) => Array.from({ length: count }, (_, index) => ({
       ply: index,
       san: 'e4',
