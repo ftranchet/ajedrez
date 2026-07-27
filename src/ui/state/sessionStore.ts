@@ -5,7 +5,7 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, DailyAssignment, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord } from '../../core/types';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
@@ -33,7 +33,18 @@ import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
 import { clasificarRespuestaDobleSolucion, feedbackConformismo } from '../../core/dobleSolucion';
 import { abandonSessionRecord, completeSessionRecord, recordSessionItem, startSessionRecord, transitionSessionBlock } from '../../core/session';
+import {
+  bloqueAsignado,
+  buildDailyAssignment,
+  cantidadRestante,
+  completarBloqueAsignado,
+  dailyAssignmentId,
+  idsRestantes,
+  registrarItemAsignado,
+  sincronizarColaConVencidas,
+} from '../../core/dailyAssignment';
 import { altaErrorCard } from '../../core/errorCard';
+import { dailyAssignmentRepo } from '../../services/storage/dailyAssignmentRepo';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -92,6 +103,24 @@ interface SessionState {
   // Prescriptor (E11): perfil y dieta de la sesión en curso (RF-11.2).
   profile: Profile;
   dieta: DietaSesion;
+  /**
+   * Plan canónico del día (RF-11.1): se arma una vez por día local en
+   * `loadSummary` y las sesiones lo consumen. Reanudar sirve lo que falta;
+   * un bloque completado no vuelve a aparecer (antes, Patrones → Repaso
+   * volvía a servir Patrones porque cada arranque recalculaba todo).
+   */
+  assignment: DailyAssignment | null;
+  /**
+   * La corrida actual es práctica libre: el bloque elegido ya estaba
+   * completado en el plan (acción "Practicar de nuevo"). No descuenta ni
+   * infla el plan del día — el registro de sesión sí la cuenta como proceso.
+   */
+  practicaLibre: boolean;
+  /** Cuántas posiciones sirve el Radar en esta corrida (lo que falta del plan,
+   * o la dieta completa en práctica libre). */
+  radarObjetivo: number;
+  /** Ídem para el bloque de criterio. */
+  triageObjetivo: number;
   /** Cuando el usuario elige un bloque suelto (RF-11.5): al terminar ese bloque
    * la sesión termina, en vez de encadenar hacia los siguientes. Null = sesión
    * guiada completa. */
@@ -188,6 +217,8 @@ interface SessionState {
 let chess = new Chess();
 /** Serializa snapshots de una misma sesión para que un put viejo no pise uno nuevo. */
 let sessionWriteQueue: Promise<void> = Promise.resolve();
+/** Ídem para el plan del día: sus puts también deben aplicarse en orden. */
+let assignmentWriteQueue: Promise<void> = Promise.resolve();
 /** Deduplica el doble montaje de React StrictMode y permite invalidar una carga lenta al reintentar. */
 let summaryLoad: { generation: number; promise: Promise<void> } | null = null;
 let summaryGeneration = 0;
@@ -262,6 +293,36 @@ export const useSessionStore = create<SessionState>((set, get) => {
     });
   }
 
+  function persistAssignment(assignment: DailyAssignment): Promise<void> {
+    const write = assignmentWriteQueue
+      .catch(() => undefined)
+      .then(() => dailyAssignmentRepo.save(assignment));
+    assignmentWriteQueue = write.catch(() => undefined);
+    return write;
+  }
+
+  /** Descuenta un ítem resuelto del plan del día (RF-11.1). En práctica libre
+   * no hace nada: el plan ya está cumplido y repetir no lo infla. */
+  function updateTrackedAssignment(tipo: SessionBlockType, itemId?: string): void {
+    if (get().practicaLibre) return;
+    const current = get().assignment;
+    if (!current) return;
+    const next = registrarItemAsignado(current, tipo, itemId);
+    set({ assignment: next });
+    void persistAssignment(next);
+  }
+
+  /** Cierra un bloque del plan cuando su corrida llegó al final, aunque haya
+   * servido menos de lo planificado (un ítem asignado que ya no existe). */
+  function completeTrackedAssignmentBlock(tipo: SessionBlockType): void {
+    if (get().practicaLibre) return;
+    const current = get().assignment;
+    if (!current) return;
+    const next = completarBloqueAsignado(current, tipo);
+    set({ assignment: next });
+    void persistAssignment(next);
+  }
+
   async function finishTrackedSession(): Promise<void> {
     const current = get().sessionRecord;
     if (!current || current.estado !== 'en_curso') return;
@@ -286,6 +347,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
   function loadRadarItem(item: RadarItem | null) {
     if (!item) {
+      // El pool se agotó antes del objetivo: el bloque corrió hasta su final.
+      completeTrackedAssignmentBlock('radar');
       set({ phase: 'fin', radarItem: null });
       void finishTrackedSession();
       return;
@@ -332,6 +395,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     if (!card) {
       // Cola terminada: pasar al currículo (RF-11.2: repasos vencidos primero).
       completeTrackedBlock('cola');
+      completeTrackedAssignmentBlock('cola');
       void avanzarOTerminar(beginCurriculum);
       return;
     }
@@ -350,6 +414,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       // Currículo del día terminado (o sin elementos vencidos): pasar al
       // Triage si la dieta lo activó, si no directo al Radar.
       completeTrackedBlock('curriculo');
+      completeTrackedAssignmentBlock('curriculo');
       void avanzarOTerminar(beginTriage);
       return;
     }
@@ -366,6 +431,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
   function loadTriageItem(item: RadarItem | null) {
     if (!item) {
       completeTrackedBlock('triage');
+      completeTrackedAssignmentBlock('triage');
       void avanzarOTerminar(beginRadar);
       return;
     }
@@ -379,52 +445,52 @@ export const useSessionStore = create<SessionState>((set, get) => {
     });
   }
 
-  // Mismo patrón sincrónico que `beginCurriculum`: si la dieta no activó
-  // Triage (o no hay pool todavía), devuelve la promesa de `beginRadar()`
-  // en vez de dispararla sin esperar.
+  // Mismo patrón sincrónico que `beginCurriculum`: si esta corrida no trae
+  // criterio (el plan ya lo tiene completado, o la dieta no lo activó),
+  // devuelve la promesa de `beginRadar()` en vez de dispararla sin esperar.
   function beginTriage(): Promise<void> | void {
     const s = get();
-    if (!s.dieta.criterioActivo || s.radarPool.length === 0) {
+    const objetivo = Math.min(s.triageObjetivo, s.radarPool.length);
+    if (objetivo <= 0) {
       return avanzarOTerminar(beginRadar);
     }
     // Fisher-Yates parcial: sort(() => random - 0.5) no baraja uniforme.
     const pool = [...s.radarPool];
-    for (let i = 0; i < Math.min(TRIAGE_SESSION_SIZE, pool.length); i++) {
+    for (let i = 0; i < objetivo; i++) {
       const j = i + Math.floor(Math.random() * (pool.length - i));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    const queue = pool.slice(0, TRIAGE_SESSION_SIZE);
+    const queue = pool.slice(0, objetivo);
     set({ phase: 'triage', triageQueue: queue, triageIndex: 0 });
     loadTriageItem(queue[0]);
   }
 
   // El cambio de fase es sincrónico a propósito (como el arranque de
-  // `beginRadar`): el catálogo y el progreso ya están en memoria desde
-  // `start()`, así que `set({ phase: 'curriculo', ... })` corre antes de
-  // cualquier `await`. Cuando no hay elementos vencidos devuelve la promesa
-  // de `beginRadar()` en vez de dispararla sin esperar, para que `start()`
-  // pueda esperar la cadena completa (si no, `start()` resolvía antes de que
-  // `loadRadarItem` corriera y `radarItem` quedaba null un instante).
+  // `beginRadar`): la cola de patrones ya está en memoria desde `start()`,
+  // así que `set({ phase: 'curriculo', ... })` corre antes de cualquier
+  // `await`. Cuando no hay nada que servir devuelve la promesa de
+  // `beginTriage()` en vez de dispararla sin esperar, para que `start()`
+  // pueda esperar la cadena completa.
+  //
+  // La cola viene armada por `start()` desde el plan del día (lo que falta,
+  // no todo lo vencido): recalcular acá era el fallo Patrones → Repaso →
+  // Patrones — cada arranque volvía a servir lo ya hecho.
   function beginCurriculum(): Promise<void> | void {
-    const s = get();
-    // Los finales (RF-6.2) son partidas completas contra Stockfish y viven
-    // en Jugar → Finales; este bloque conserva la interacción breve de
-    // patrón, una jugada y feedback.
-    const due = interleaveByPattern(
-      dueCurriculumItems(s.curriculumItemsAll, s.curriculumProgressById).filter((item) => item.tipo === 'patron'),
-    );
-    // Interlevar y recién ahí topar preserva la mezcla de patrones dentro
-    // del cupo de la dieta (RF-6.1), en vez de topar antes y arriesgar un
-    // cupo monotemático.
-    const queue = due.slice(0, s.dieta.curriculumMax);
+    const queue = get().curriculumQueue;
     if (queue.length === 0) {
       return avanzarOTerminar(beginTriage);
     }
-    set({ phase: 'curriculo', curriculumQueue: queue, curriculumIndex: 0 });
+    set({ phase: 'curriculo', curriculumIndex: 0 });
     loadCurriculumItem(queue[0]);
   }
 
   async function beginRadar() {
+    // Sin objetivo (el plan ya tiene el Radar completado y no es práctica):
+    // la corrida termina acá en vez de servir posiciones extra.
+    if (get().radarObjetivo <= 0) {
+      set({ phase: 'fin', radarItem: null });
+      return finishTrackedSession();
+    }
     const selState = get().radarSelState;
     const item = selectRadarItemForCurrentPosition(selState);
     const nextSelState = item ? recordServed(selState, item) : selState;
@@ -443,6 +509,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
     prescripcionesExternas: null,
     profile: DEFAULT_PROFILE,
     dieta: dietaPorBanda(DEFAULT_PROFILE.bandaElo, []),
+    assignment: null,
+    practicaLibre: false,
+    radarObjetivo: 0,
+    triageObjetivo: 0,
     soloBloque: null,
     sessionRecord: null,
     sessions: null,
@@ -513,6 +583,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             set({
               profile,
               dieta: dietaPorBanda(profile.bandaElo, []),
+              assignment: null,
               dueCount: 0,
               curriculumDueCount: 0,
               finalesPendientes: 0,
@@ -523,7 +594,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             return;
           }
 
-          await curriculumItemRepo.ensureSeeded();
+          await Promise.all([curriculumItemRepo.ensureSeeded(), radarItemRepo.ensureSeeded()]);
           const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts, compromisoAttempts] =
             await Promise.all([
               errorCardRepo.list(),
@@ -539,6 +610,32 @@ export const useSessionStore = create<SessionState>((set, get) => {
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
           const due = dueCurriculumItems(curriculumItems, progressById);
           const finalesPendientes = due.filter((item) => item.tipo === 'final').length;
+          const dieta = dietaPorBanda(profile.bandaElo, allCards);
+
+          // Plan del día (RF-11.1): se arma UNA vez por día local, acá — el
+          // primer vistazo a Hoy fija qué toca. Las sesiones después solo lo
+          // consumen. La única parte viva es la Cola: los repasos que venzan
+          // durante el día (un análisis de la tarde) se suman mientras el
+          // bloque no esté completado; el resto queda congelado.
+          const hoyId = dailyAssignmentId();
+          const existente = (await dailyAssignmentRepo.get(hoyId)) ?? null;
+          const curriculumDia = interleaveByPattern(due.filter((item) => item.tipo === 'patron'))
+            .slice(0, dieta.curriculumMax);
+          const base =
+            existente ??
+            buildDailyAssignment(
+              {
+                colaIds: dueErrorCards(allCards).map((card) => card.id),
+                curriculumIds: curriculumDia.map((item) => item.id),
+                triageCount: dieta.criterioActivo ? Math.min(TRIAGE_SESSION_SIZE, radarItems.length) : 0,
+                radarCount: radarItems.length > 0 ? dieta.radarCount : 0,
+              },
+              sessions,
+            );
+          const assignment = sincronizarColaConVencidas(base, dueErrorCards(allCards).map((card) => card.id));
+          if (assignment !== existente) await dailyAssignmentRepo.save(assignment);
+          if (generation !== summaryGeneration) return;
+
           set({
             dueCount: dueErrorCards(allCards).length,
             curriculumDueCount: due.filter((item) => item.tipo === 'patron').length,
@@ -551,7 +648,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
               fugaCalculo: detectarFugaCalculo(radarAttempts, radarItems),
             }),
             profile,
-            dieta: dietaPorBanda(profile.bandaElo, allCards),
+            dieta,
+            assignment,
             sessions,
             summaryStatus: 'ready',
           });
@@ -569,6 +667,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       set({ phase: 'cargando', startError: false });
       try {
         await sessionWriteQueue;
+        await assignmentWriteQueue;
         await sessionRepo.abandonInProgress();
         await Promise.all([radarItemRepo.ensureSeeded(), curriculumItemRepo.ensureSeeded()]);
         const [allCards, pool, progress, curriculumItems, curriculumProgressList, profile] = await Promise.all([
@@ -581,21 +680,97 @@ export const useSessionStore = create<SessionState>((set, get) => {
         ]);
         const due = dueErrorCards(allCards);
         const dieta = dietaPorBanda(profile.bandaElo, allCards);
+        const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
+        // Interlevar y recién ahí topar preserva la mezcla de patrones dentro
+        // del cupo de la dieta (RF-6.1), en vez de topar antes y arriesgar un
+        // cupo monotemático. Los finales (RF-6.2) viven en Jugar → Finales.
+        const curriculumDue = interleaveByPattern(
+          dueCurriculumItems(curriculumItems, progressById).filter((item) => item.tipo === 'patron'),
+        ).slice(0, dieta.curriculumMax);
+
+        // Plan del día (RF-11.1): loadSummary lo crea al abrir Hoy; si falta
+        // (falló esa carga, o el día cambió con la app abierta), se arma acá
+        // con los mismos datos. Las sesiones se leen del repo, no del estado
+        // en memoria, que puede ser viejo.
+        const hoyId = dailyAssignmentId();
+        let assignment: DailyAssignment =
+          (await dailyAssignmentRepo.get(hoyId)) ??
+          buildDailyAssignment(
+            {
+              colaIds: due.map((card) => card.id),
+              curriculumIds: curriculumDue.map((item) => item.id),
+              triageCount: dieta.criterioActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0,
+              radarCount: pool.length > 0 ? dieta.radarCount : 0,
+            },
+            await sessionRepo.list(),
+          );
+        // Los repasos vencidos después de armar el plan se suman a la Cola
+        // (mientras no esté completada): son el bloque sensible al tiempo.
+        assignment = sincronizarColaConVencidas(assignment, due.map((card) => card.id));
+
+        // Práctica libre ("Practicar de nuevo"): el bloque elegido ya no está
+        // pendiente en el plan. Se sirve contenido fresco y no descuenta nada.
+        const bloqueElegido = soloBloque ? bloqueAsignado(assignment, soloBloque) : null;
+        const practicaLibre = soloBloque !== undefined && (bloqueElegido === null || bloqueElegido.estado === 'completado');
+
+        // Las corridas del plan sirven lo que FALTA de cada bloque, no todo lo
+        // vencido: reanudar no repite lo ya hecho hoy.
+        const cardsById = new Map(allCards.map((card) => [card.id, card] as const));
+        const itemsById = new Map(curriculumItems.map((item) => [item.id, item] as const));
+        const pendiente = (tipo: SessionBlockType) => {
+          const bloque = bloqueAsignado(assignment, tipo);
+          return bloque && bloque.estado === 'pendiente' ? bloque : null;
+        };
+        const colaPendiente = pendiente('cola');
+        const curriculoPendiente = pendiente('curriculo');
+        const colaCards = practicaLibre
+          ? due
+          : colaPendiente
+            ? idsRestantes(colaPendiente)
+                .map((id) => cardsById.get(id))
+                .filter((card): card is ErrorCard => card !== undefined)
+            : [];
+        const curriculumQueue = practicaLibre
+          ? curriculumDue
+          : curriculoPendiente
+            ? idsRestantes(curriculoPendiente)
+                .map((id) => itemsById.get(id))
+                .filter((item): item is CurriculumItem => item !== undefined)
+            : [];
+        // Un bloque pendiente cuyos ítems ya no existen (datos borrados) se
+        // cierra acá; si no, quedaría pendiente para siempre sirviendo vacío.
+        if (!practicaLibre) {
+          if (colaPendiente && colaCards.length === 0) assignment = completarBloqueAsignado(assignment, 'cola');
+          if (curriculoPendiente && curriculumQueue.length === 0) assignment = completarBloqueAsignado(assignment, 'curriculo');
+        }
+        await persistAssignment(assignment);
+
+        const triageAsignado = bloqueAsignado(assignment, 'triage');
+        const triageObjetivo = practicaLibre
+          ? (dieta.criterioActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0)
+          : triageAsignado
+            ? Math.min(cantidadRestante(triageAsignado), pool.length)
+            : 0;
+        const radarAsignado = bloqueAsignado(assignment, 'radar');
+        const radarObjetivo = practicaLibre
+          ? (pool.length > 0 ? dieta.radarCount : 0)
+          : radarAsignado && pool.length > 0
+            ? cantidadRestante(radarAsignado)
+            : 0;
+
         // La Cola vencida conserva prioridad absoluta. Solo las tarjetas de
         // partidas propias que no se sirvieron ahí pueden reaparecer en Radar.
         const ownErrorItems = ownErrorRadarItems(allCards, due.map((card) => card.id));
-        const ownErrorSlots = scheduleOwnErrorRadarSlots(dieta.radarCount, ownErrorItems.length, Math.random);
-        const curriculumDue = interleaveByPattern(
-          dueCurriculumItems(curriculumItems, new Map(curriculumProgressList.map((p) => [p.id, p] as const)))
-            .filter((item) => item.tipo === 'patron'),
-        ).slice(0, dieta.curriculumMax).length;
+        const ownErrorSlots = scheduleOwnErrorRadarSlots(radarObjetivo, ownErrorItems.length, Math.random);
+
         // En una sesión de bloque suelto (RF-11.5) el registro cuenta solo ese
-        // bloque; en la guiada, los cuatro.
+        // bloque; en la guiada, los cuatro. Registra lo que esta corrida va a
+        // servir de verdad (lo restante del plan, o lo fresco en práctica).
         const bloquesRecord = [
-          { tipo: 'cola' as const, planificados: due.length },
-          { tipo: 'curriculo' as const, planificados: curriculumDue },
-          { tipo: 'triage' as const, planificados: dieta.criterioActivo ? Math.min(TRIAGE_SESSION_SIZE, pool.length) : 0 },
-          { tipo: 'radar' as const, planificados: pool.length > 0 ? dieta.radarCount : 0 },
+          { tipo: 'cola' as const, planificados: colaCards.length },
+          { tipo: 'curriculo' as const, planificados: curriculumQueue.length },
+          { tipo: 'triage' as const, planificados: triageObjetivo },
+          { tipo: 'radar' as const, planificados: radarObjetivo },
         ];
         const sessionRecord = startSessionRecord(
           soloBloque ? bloquesRecord.filter((b) => b.tipo === soloBloque) : bloquesRecord,
@@ -604,19 +779,25 @@ export const useSessionStore = create<SessionState>((set, get) => {
         set({
           profile,
           dieta,
+          assignment,
+          practicaLibre,
+          radarObjetivo,
+          triageObjetivo,
           soloBloque: soloBloque ?? null,
           sessionRecord,
           radarPool: pool,
           radarOwnErrorItems: ownErrorItems,
           radarOwnErrorSlots: ownErrorSlots,
-          colaCards: due,
+          colaCards,
           colaIndex: 0,
           dueCount: due.length,
+          curriculumQueue,
+          curriculumIndex: 0,
           radarSelState: selectionFromProgress(progress),
           radarAciertosRecientes: progress?.aciertosRecientes ?? [],
           radarServidos: 0,
           curriculumItemsAll: curriculumItems,
-          curriculumProgressById: new Map(curriculumProgressList.map((p) => [p.id, p] as const)),
+          curriculumProgressById: progressById,
         });
         // Arranque: al bloque elegido (o al primero con contenido en la guiada).
         if (soloBloque === 'radar') {
@@ -626,16 +807,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
         } else if (soloBloque === 'curriculo') {
           await beginCurriculum();
         } else if (soloBloque === 'cola') {
-          if (due.length > 0) {
+          if (colaCards.length > 0) {
             set({ phase: 'cola' });
-            loadColaCard(due[0]);
+            loadColaCard(colaCards[0]);
           } else {
             set({ phase: 'fin', radarItem: null });
             await finishTrackedSession();
           }
-        } else if (due.length > 0) {
+        } else if (colaCards.length > 0) {
           set({ phase: 'cola' });
-          loadColaCard(due[0]);
+          loadColaCard(colaCards[0]);
         } else {
           await beginCurriculum();
         }
@@ -651,6 +832,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
       set({
         phase: 'sinEmpezar',
         soloBloque: null,
+        practicaLibre: false,
+        radarObjetivo: 0,
+        triageObjetivo: 0,
         summaryStatus: 'idle',
         startError: false,
         // null para que HoyScreen vuelva a pedirlo: un fallo del Radar o de
@@ -697,6 +881,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const revisada = reviewErrorCard(card, acierto);
       await errorCardRepo.save(revisada);
       updateTrackedSession((record) => recordSessionItem(record, 'cola'));
+      updateTrackedAssignment('cola', card.id);
       const nuevasCards = [...s.colaCards];
       nuevasCards[s.colaIndex] = revisada;
 
@@ -736,6 +921,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia);
       await curriculumProgressRepo.save(progresoNuevo);
       updateTrackedSession((record) => recordSessionItem(record, 'curriculo'));
+      updateTrackedAssignment('curriculo', item.id);
       const nuevoMapa = new Map(s.curriculumProgressById);
       nuevoMapa.set(item.id, progresoNuevo);
 
@@ -762,6 +948,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const item = s.triageQueue[s.triageIndex];
       const correcta = decisionCorrecta(item.tipo);
       updateTrackedSession((record) => recordSessionItem(record, 'triage'));
+      updateTrackedAssignment('triage');
       set({ triageSubPhase: 'feedback', triageUltimaCorrecta: decision === correcta, triageDecisionCorrecta: correcta });
       // Persistir la decisión y si fue correcta (RF-9.2): antes se evaluaba en
       // memoria y no quedaba registro. No se cronometra: el ejercicio mide
@@ -854,10 +1041,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
         ? s.radarSelState
         : adjustDifficulty(s.radarSelState, s.radarUltimoAcierto ?? false, tasaAciertoReciente(s.radarAciertosRecientes));
       const servidos = s.radarServidos;
-      if (servidos >= s.dieta.radarCount) {
+      if (servidos >= s.radarObjetivo) {
         // El ajuste de dificultad de esta última respuesta también se
         // persiste, aunque la sesión termine acá: si no, la banda 60–80%
         // (RF-5.5) pierde el incremento de la última posición de cada sesión.
+        completeTrackedAssignmentBlock('radar');
         set({ phase: 'fin', radarItem: null, radarSelState: selState });
         await radarProgressRepo.save(progressFromState(selState, get().radarAciertosRecientes));
         await finishTrackedSession();
@@ -886,6 +1074,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         : [...s.radarAciertosRecientes, acierto].slice(-VENTANA_TASA_ACIERTO),
     }));
     updateTrackedSession((record) => recordSessionItem(record, 'radar'));
+    updateTrackedAssignment('radar');
     const state = get();
     await radarProgressRepo.save(progressFromState(state.radarSelState, state.radarAciertosRecientes));
     await radarAttemptRepo.save({

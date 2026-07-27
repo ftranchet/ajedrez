@@ -4,8 +4,10 @@
 // banda de Elo del perfil y el ajuste por fugas (RF-11.2, RF-11.3).
 import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
-import type { SessionBlockType } from '../../core/types';
+import type { DailyAssignment, SessionBlockType } from '../../core/types';
 import { bloquesHechosHoy } from '../../core/session';
+import { planEmpezado } from '../../core/dailyAssignment';
+import type { DietaSesion } from '../../core/prescriptor';
 import type { PrescripcionExterna } from '../../core/prescripcionesExternas';
 import { Board, type BoardFeedback } from '../components/Board';
 import { EvalPicker } from '../components/EvalPicker';
@@ -89,12 +91,14 @@ function MinBadge({ minutos }: { minutos: number }) {
 }
 
 // Una fila del acordeón: cerrada (compacta, tocable) o abierta (recuadro accent
-// con explicación + botón de empezar). Los bloques hechos hoy quedan marcados y
-// siguen siendo repetibles.
+// con explicación + botón). Un bloque hecho hoy queda cerrado para el plan —
+// la sesión guiada no lo vuelve a servir— y ofrece "Practicar de nuevo" como
+// acción secundaria explícita que no cuenta para el plan.
 function BloqueAccordion({
   bloque,
-  esPrimero,
+  esSiguiente,
   hecho,
+  accionLabel,
   abierto,
   cargando,
   startError,
@@ -102,8 +106,9 @@ function BloqueAccordion({
   onEmpezar,
 }: {
   bloque: Bloque;
-  esPrimero: boolean;
+  esSiguiente: boolean;
   hecho: boolean;
+  accionLabel: string;
   abierto: boolean;
   cargando: boolean;
   startError: boolean;
@@ -143,7 +148,7 @@ function BloqueAccordion({
     <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-5">
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-xs tracking-wider text-accent uppercase">
-          {esPrimero ? `${t.sesion.siguiente} · ` : ''}{t.sesion.minutos.replace('{n}', String(bloque.minutos))}
+          {esSiguiente ? `${t.sesion.siguiente} · ` : ''}{t.sesion.minutos.replace('{n}', String(bloque.minutos))}
         </span>
         {hecho && (
           <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-success">
@@ -159,11 +164,59 @@ function BloqueAccordion({
       <p className="m-0 text-sm text-secondary">{bloque.explicacion}</p>
       {hecho && <p className="m-0 text-xs text-tertiary">{t.sesion.hechoHoyRepetir}</p>}
       {startError && <p role="alert" className="m-0 text-sm text-error-text">{t.hoy.inicioError}</p>}
-      <button onClick={onEmpezar} disabled={cargando} className="btn-primary">
-        {cargando ? t.sesion.cargando : esPrimero ? t.sesion.empezar : t.sesion.empezarBloque}
+      <button onClick={onEmpezar} disabled={cargando} className={hecho ? 'btn-secondary' : 'btn-primary'}>
+        {cargando ? t.sesion.cargando : accionLabel}
       </button>
     </div>
   );
+}
+
+/**
+ * Bloques de la portada leídos del plan del día (RF-11.1): un bloque pendiente
+ * muestra lo que FALTA (reanudar no repite), y uno completado muestra lo que
+ * fue, marcado como hecho. `bloquesDeLaSesion` queda como respaldo para el
+ * instante en que el resumen todavía no trajo el plan.
+ */
+function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion): Bloque[] {
+  return assignment.bloques.map((bloque) => {
+    const n = bloque.estado === 'completado'
+      ? bloque.planificados
+      : Math.max(1, bloque.planificados - bloque.completados);
+    switch (bloque.tipo) {
+      case 'cola':
+        return {
+          tipo: 'cola' as const,
+          texto: n === 1 ? t.sesion.bloqueColaUno : t.sesion.bloqueColaOtro.replace('{n}', String(n)),
+          porque: t.sesion.bloqueColaPorque,
+          explicacion: t.sesion.bloqueColaExplica,
+          minutos: Math.max(1, Math.round(n * MIN_POR_COLA)),
+        };
+      case 'curriculo':
+        return {
+          tipo: 'curriculo' as const,
+          texto: t.sesion.bloqueCurriculo.replace('{n}', String(n)),
+          porque: t.sesion.bloqueCurriculoPorque,
+          explicacion: t.sesion.bloqueCurriculoExplica,
+          minutos: Math.max(1, Math.round(n * MIN_POR_CURRICULO)),
+        };
+      case 'triage':
+        return {
+          tipo: 'triage' as const,
+          texto: t.sesion.bloqueTriage.replace('{n}', String(n)),
+          porque: t.sesion.bloqueTriagePorque,
+          explicacion: t.sesion.bloqueTriageExplica,
+          minutos: Math.max(1, Math.round(n * MIN_POR_TRIAGE)),
+        };
+      case 'radar':
+        return {
+          tipo: 'radar' as const,
+          texto: t.sesion.bloqueRadar.replace('{n}', String(n)),
+          porque: dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque,
+          explicacion: t.sesion.bloqueRadarExplica,
+          minutos: Math.max(1, Math.round(n * MIN_POR_RADAR)),
+        };
+    }
+  });
 }
 
 function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloque[] {
@@ -233,13 +286,22 @@ function Portada() {
 
   if (!s.profile.diagnosticoCompletadoEn) return <DiagnosticoPrompt />;
 
-  const bloques = bloquesDeLaSesion(s);
-  const duracionMin = Math.max(DURACION_MINIMA_MIN, bloques.reduce((total, b) => total + b.minutos, 0));
-  const hechos = bloquesHechosHoy(s.sessions ?? []);
-  // Por defecto se abre el primer bloque no hecho hoy (el siguiente a hacer);
+  // El plan del día manda (RF-11.1): bloques con lo que falta, hechos con lo
+  // que fue. `bloquesDeLaSesion` es el respaldo si el plan no llegó todavía.
+  const bloques = s.assignment ? bloquesDelPlan(s.assignment, s.dieta) : bloquesDeLaSesion(s);
+  const hechos = s.assignment
+    ? new Set<SessionBlockType>(s.assignment.bloques.filter((b) => b.estado === 'completado').map((b) => b.tipo))
+    : bloquesHechosHoy(s.sessions ?? []);
+  const pendientes = bloques.filter((b) => !hechos.has(b.tipo));
+  // La duración estimada es lo que queda por hacer hoy, no el plan entero.
+  const duracionMin = pendientes.length > 0
+    ? Math.max(DURACION_MINIMA_MIN, pendientes.reduce((total, b) => total + b.minutos, 0))
+    : 0;
+  // Por defecto se abre el primer bloque pendiente (el siguiente a hacer);
   // si están todos hechos, el primero. El usuario puede abrir otro.
-  const primerPendiente = bloques.find((b) => !hechos.has(b.tipo))?.tipo ?? bloques[0].tipo;
-  const abiertoEfectivo = abierto ?? primerPendiente;
+  const primerPendiente = pendientes[0]?.tipo ?? null;
+  const abiertoEfectivo = abierto ?? primerPendiente ?? bloques[0]?.tipo ?? null;
+  const empezado = s.assignment ? planEmpezado(s.assignment) : false;
   const sonido = normalizeSensoryPreferences(s.profile.preferenciasSensoriales).sonido;
 
   // Escritorio (design system §1.4, "tablero + panel contextual, nunca tres
@@ -254,28 +316,42 @@ function Portada() {
           <span className="font-mono text-xs tracking-wider text-tertiary uppercase">{fechaDeHoy()}</span>
           <div className="flex items-baseline justify-between">
             <h1 className="m-0 font-display text-3xl font-medium">{t.hoy.titulo}</h1>
-            <span className="font-mono text-sm text-secondary">{t.sesion.minutos.replace('{n}', String(duracionMin))}</span>
+            {duracionMin > 0 && (
+              <span className="font-mono text-sm text-secondary">{t.sesion.minutos.replace('{n}', String(duracionMin))}</span>
+            )}
           </div>
         </div>
 
         {/* Acordeón de bloques (design system §4.1): el abierto toma el recuadro
-            accent con su explicación y el botón de empezar; el resto queda
-            compacto y tocable. Los hechos hoy quedan marcados (RF-11.5). El
-            primero abierto hace la sesión completa; otro abierto, solo ese. */}
+            accent con su explicación y el botón; el resto queda compacto y
+            tocable. El primer bloque pendiente empieza (o continúa) la sesión
+            guiada, que sirve solo lo que falta del plan; otro pendiente, solo
+            ese bloque. Un bloque hecho queda cerrado y ofrece "Practicar de
+            nuevo", que no cuenta para el plan (RF-11.1/11.5). */}
         <div className="flex flex-col gap-2">
-          {bloques.map((b, i) => (
-            <BloqueAccordion
-              key={b.tipo}
-              bloque={b}
-              esPrimero={i === 0}
-              hecho={hechos.has(b.tipo)}
-              abierto={b.tipo === abiertoEfectivo}
-              cargando={s.phase === 'cargando'}
-              startError={s.startError}
-              onAbrir={() => setAbierto(b.tipo)}
-              onEmpezar={() => iniciarSesion(sonido, i === 0 ? undefined : b.tipo)}
-            />
-          ))}
+          {bloques.map((b) => {
+            const hecho = hechos.has(b.tipo);
+            const esSiguiente = !hecho && b.tipo === primerPendiente;
+            const accionLabel = hecho
+              ? t.sesion.practicarDeNuevo
+              : esSiguiente
+                ? (empezado ? t.sesion.continuar : t.sesion.empezar)
+                : t.sesion.empezarBloque;
+            return (
+              <BloqueAccordion
+                key={b.tipo}
+                bloque={b}
+                esSiguiente={esSiguiente}
+                hecho={hecho}
+                accionLabel={accionLabel}
+                abierto={b.tipo === abiertoEfectivo}
+                cargando={s.phase === 'cargando'}
+                startError={s.startError}
+                onAbrir={() => setAbierto(b.tipo)}
+                onEmpezar={() => iniciarSesion(sonido, esSiguiente ? undefined : b.tipo)}
+              />
+            );
+          })}
         </div>
       </div>
 

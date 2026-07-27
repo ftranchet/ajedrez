@@ -35,6 +35,7 @@ beforeEach(async () => {
   await db.curriculumProgress.clear();
   await db.triageAttempts.clear();
   await db.sessions.clear();
+  await db.dailyAssignments.clear();
   await db.profile.clear();
   // Este archivo prueba Cola y Radar; el bloque de currículo (Fase 3) tiene
   // sus propios tests en sessionStore.curriculum.test.ts. Marcarlo
@@ -621,7 +622,7 @@ describe('sessionStore — Triage (E9)', () => {
       radarOwnErrorSlots: [],
       radarServidos: 0,
       radarUltimoAcierto: true,
-      dieta: { ...useSessionStore.getState().dieta, radarCount: 50 },
+      radarObjetivo: 50,
     });
 
     // Varias veces: ninguna debería caer en la ya vista.
@@ -650,7 +651,7 @@ describe('sessionStore — Triage (E9)', () => {
       radarOwnErrorSlots: [],
       radarServidos: 0,
       radarUltimoAcierto: true,
-      dieta: { ...useSessionStore.getState().dieta, radarCount: 50 },
+      radarObjetivo: 50,
     });
 
     await useSessionStore.getState().radarContinuar();

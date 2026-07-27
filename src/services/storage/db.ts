@@ -9,6 +9,7 @@ import type {
   CurriculumDatasetMeta,
   CurriculumItem,
   CurriculumProgress,
+  DailyAssignment,
   DobleSolucionAttempt,
   ErrorCard,
   GameRecord,
@@ -62,6 +63,7 @@ export class ElomaxDB extends Dexie {
   sessions!: Table<SessionRecord, string>;
   transferMeasurements!: Table<TransferMeasurement, string>;
   n1Experiments!: Table<N1Experiment, string>;
+  dailyAssignments!: Table<DailyAssignment, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -466,6 +468,37 @@ export class ElomaxDB extends Dexie {
             }
           });
       });
+
+    // v17 — plan diario persistente (RF-11.1): la asignación del día deja de
+    // recalcularse en cada arranque de sesión. Un plan por día local (la clave
+    // es 'YYYY-MM-DD'), con los ítems concretos asignados y su progreso, para
+    // reanudar sin repetir bloques hechos. Tabla personal nueva, puramente
+    // aditiva; los usuarios que ya entrenaron hoy arrancan con el plan sembrado
+    // desde sus sesiones registradas (ver core/dailyAssignment.ts).
+    this.version(17).stores({
+      games: 'id, fecha, fuente, contexto',
+      errorCards: 'id, fsrs.due, origen, categoria',
+      radarItems: 'id, tipo, rating',
+      calibrationRecords: 'id, contexto, fecha',
+      radarProgress: 'id, updatedAt',
+      radarDatasetMeta: 'id',
+      radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada, origenContenido',
+      curriculumItems: 'id, tipo, patternKey',
+      curriculumDatasetMeta: 'id',
+      curriculumProgress: 'id, fsrs.due, updatedAt',
+      profile: 'id',
+      candidataAttempts: 'id, itemId, fecha',
+      compromisoAttempts: 'id, itemId, fecha',
+      dobleSolucionAttempts: 'id, itemId, fecha',
+      stoykoItems: 'id',
+      stoykoDatasetMeta: 'id',
+      stoykoAttempts: 'id, itemId, fecha',
+      triageAttempts: 'id, itemId, fecha',
+      sessions: 'id, fechaInicio, estado',
+      transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+      n1Experiments: 'id, creadoEn, estado',
+      dailyAssignments: 'id, creadoEn',
+    });
   }
 }
 

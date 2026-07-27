@@ -6,6 +6,7 @@ import type {
   CandidataAttempt,
   CompromisoAttempt,
   CurriculumProgress,
+  DailyAssignment,
   DobleSolucionAttempt,
   ErrorCard,
   GameRecord,
@@ -47,6 +48,7 @@ export interface ExportBundle {
   sessions: SessionRecord[];
   transferMeasurements: TransferMeasurement[];
   n1Experiments: N1Experiment[];
+  dailyAssignments: DailyAssignment[];
 }
 
 export interface ExportSourceData {
@@ -65,6 +67,7 @@ export interface ExportSourceData {
   sessions: SessionRecord[];
   transferMeasurements: TransferMeasurement[];
   n1Experiments: N1Experiment[];
+  dailyAssignments: DailyAssignment[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -86,6 +89,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     sessions: data.sessions,
     transferMeasurements: data.transferMeasurements,
     n1Experiments: data.n1Experiments,
+    dailyAssignments: data.dailyAssignments,
   };
 }
 
@@ -163,6 +167,28 @@ function esSessionRecordValido(x: unknown): boolean {
         typeof block.planificados === 'number' &&
         typeof block.completados === 'number' &&
         blockStatuses.includes(String(block.estado)),
+    )
+  );
+}
+
+function esDailyAssignmentValida(x: unknown): boolean {
+  if (!isObj(x)) return false;
+  const blockTypes = ['cola', 'curriculo', 'triage', 'radar'];
+  const sonIds = (ids: unknown): boolean =>
+    ids === undefined || (Array.isArray(ids) && ids.every((id) => typeof id === 'string'));
+  return (
+    typeof x.id === 'string' &&
+    typeof x.creadoEn === 'string' &&
+    Array.isArray(x.bloques) &&
+    x.bloques.every(
+      (bloque) =>
+        isObj(bloque) &&
+        blockTypes.includes(String(bloque.tipo)) &&
+        typeof bloque.planificados === 'number' &&
+        typeof bloque.completados === 'number' &&
+        (bloque.estado === 'pendiente' || bloque.estado === 'completado') &&
+        sonIds(bloque.itemIds) &&
+        sonIds(bloque.completadosIds),
     )
   );
 }
@@ -345,6 +371,10 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.n1Experiments !== undefined && !Array.isArray(obj.n1Experiments)) {
     return { ok: false, error: 'Los experimentos n=1 no tienen la forma esperada.' };
   }
+  // Los respaldos anteriores al plan diario persistente (esquema v17) no lo traen.
+  if (obj.dailyAssignments !== undefined && !Array.isArray(obj.dailyAssignments)) {
+    return { ok: false, error: 'Los planes diarios no tienen la forma esperada.' };
+  }
   // Validación por-registro de las entidades críticas (RF-14.2): como la
   // restauración reemplaza el estado local entero, un solo registro corrupto
   // rechaza el paquete en vez de escribirse sobre datos buenos.
@@ -366,6 +396,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (!((obj.n1Experiments ?? []) as unknown[]).every(esN1ExperimentValido)) {
     return { ok: false, error: 'Algún experimento n=1 del respaldo está corrupto o incompleto.' };
   }
+  if (!((obj.dailyAssignments ?? []) as unknown[]).every(esDailyAssignmentValida)) {
+    return { ok: false, error: 'Algún plan diario del respaldo está corrupto o incompleto.' };
+  }
   return {
     ok: true,
     bundle: {
@@ -385,6 +418,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       sessions: (obj.sessions ?? []) as SessionRecord[],
       transferMeasurements: (obj.transferMeasurements ?? []) as TransferMeasurement[],
       n1Experiments: (obj.n1Experiments ?? []) as N1Experiment[],
+      dailyAssignments: (obj.dailyAssignments ?? []) as DailyAssignment[],
     },
   };
 }

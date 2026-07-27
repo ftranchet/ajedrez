@@ -19,6 +19,7 @@ const empty = {
   sessions: [],
   transferMeasurements: [],
   n1Experiments: [],
+  dailyAssignments: [],
 };
 
 describe('buildExportBundle', () => {
@@ -165,6 +166,7 @@ describe('la exportación no transporta credenciales', () => {
       stoykoAttempts: [],
       triageAttempts: [],
       sessions: [],
+      dailyAssignments: [],
       transferMeasurements: [],
       n1Experiments: [],
     });

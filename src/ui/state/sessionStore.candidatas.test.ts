@@ -23,6 +23,7 @@ beforeEach(async () => {
   await db.profile.clear();
   await db.candidataAttempts.clear();
   await db.sessions.clear();
+  await db.dailyAssignments.clear();
   // Currículo automatizado, como en sessionStore.test.ts: estos tests solo prueban el Radar.
   await db.curriculumProgress.bulkPut(
     seedCurriculumItems.map((item) => ({ ...newCurriculumProgress(item.id), demostracionesLimpias: 3 })),

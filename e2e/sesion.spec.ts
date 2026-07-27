@@ -649,11 +649,61 @@ test.describe('elegir bloque (RF-11.5)', () => {
     );
     await page.reload();
 
-    // La Cola aparece cerrada con la marca "Hecho hoy".
+    // La Cola aparece cerrada con la marca "Hecho hoy", y el plan continúa en
+    // el siguiente bloque pendiente (el Radar): ya no dice "Empezar sesión".
     await page.getByText('Hecho hoy').first().waitFor();
-    // Y sigue siendo repetible: al abrirla vuelve el botón de empezar.
+    await expect(page.getByRole('button', { name: 'Continuar la sesión' })).toBeVisible();
+    // El bloque hecho ofrece práctica explícita, que no cuenta para el plan.
     await page.locator('button', { hasText: 'Repaso de errores —' }).click();
-    await expect(page.getByText('Ya lo hiciste hoy. Podés repetirlo cuando quieras.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Empezar sesión' })).toBeVisible();
+    await expect(page.getByText('Practicarlo de nuevo no cuenta para el plan', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Practicar de nuevo' })).toBeVisible();
+  });
+
+  test('Patrones → Repaso no vuelve a servir Patrones: la sesión guiada omite lo hecho', async ({ page }) => {
+    await page.goto('./');
+    await page.getByText('Tu sesión de hoy').waitFor();
+    await seedDueCard(page);
+    await seedRadarFixture(page);
+    // A diferencia de los otros tests, el currículo NO está automatizado: hay
+    // un patrón vencido de verdad... pero ya hecho hoy.
+    await seedProfileDiagnosticado(page);
+    await page.evaluate(() =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('elomax');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('sessions', 'readwrite');
+          tx.objectStore('sessions').put({
+            id: 'e2e-hecho-curriculo',
+            fechaInicio: new Date().toISOString(),
+            fechaFin: new Date().toISOString(),
+            estado: 'abandonada',
+            bloques: [{ tipo: 'curriculo', planificados: 2, completados: 2, estado: 'completado' }],
+            duracionMs: 60000,
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    );
+    await page.reload();
+
+    // Patrones figura hecho; el plan arranca por el Repaso pendiente.
+    await page.getByText('Hecho hoy').first().waitFor();
+    await page.getByRole('button', { name: 'Continuar la sesión' }).click();
+
+    // Sirve el repaso vencido…
+    await page.getByText('Jugá la respuesta correcta en el tablero.').waitFor({ timeout: 15_000 });
+    const board = page.locator('cg-board');
+    await board.waitFor();
+    await clickSquare(page, board, 'e', 7);
+    await clickSquare(page, board, 'e', 5);
+    await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Siguiente' }).click();
+
+    // …y encadena DIRECTO al Radar: los patrones hechos hoy no reaparecen
+    // (antes, cada arranque recalculaba el plan y volvía a servirlos).
+    await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 15_000 });
+    await expect(page.getByText('Resolvé el patrón en el tablero.')).toHaveCount(0);
   });
 });

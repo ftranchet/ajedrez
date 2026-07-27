@@ -18,6 +18,7 @@ import { triageAttemptRepo } from '../storage/triageAttemptRepo';
 import { sessionRepo } from '../storage/sessionRepo';
 import { transferMeasurementRepo } from '../storage/transferMeasurementRepo';
 import { n1ExperimentRepo } from '../storage/n1ExperimentRepo';
+import { dailyAssignmentRepo } from '../storage/dailyAssignmentRepo';
 import { db } from '../storage/db';
 
 function pgnFileName(gameId: string): string {
@@ -44,6 +45,7 @@ function userDataTables() {
     db.sessions,
     db.transferMeasurements,
     db.n1Experiments,
+    db.dailyAssignments,
   ];
 }
 
@@ -76,6 +78,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     sessions: await sessionRepo.list(),
     transferMeasurements: await transferMeasurementRepo.list(),
     n1Experiments: await n1ExperimentRepo.list(),
+    dailyAssignments: await dailyAssignmentRepo.list(),
   };
   const bundle = buildExportBundle(data);
 
@@ -96,6 +99,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     'sessions.json': strToU8(JSON.stringify(bundle.sessions, null, 2)),
     'transferMeasurements.json': strToU8(JSON.stringify(bundle.transferMeasurements, null, 2)),
     'n1Experiments.json': strToU8(JSON.stringify(bundle.n1Experiments, null, 2)),
+    'dailyAssignments.json': strToU8(JSON.stringify(bundle.dailyAssignments, null, 2)),
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
@@ -148,6 +152,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const sessionsRaw = unzipped['sessions.json'];
   const transferMeasurementsRaw = unzipped['transferMeasurements.json'];
   const n1ExperimentsRaw = unzipped['n1Experiments.json'];
+  const dailyAssignmentsRaw = unzipped['dailyAssignments.json'];
   if (!manifestRaw || !gamesRaw || !errorCardsRaw || !calibrationRaw) {
     return { ok: false, error: 'Faltan archivos dentro del .zip (¿es una exportación de ELOmax?).' };
   }
@@ -178,6 +183,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       sessions: sessionsRaw ? JSON.parse(strFromU8(sessionsRaw)) : [],
       transferMeasurements: transferMeasurementsRaw ? JSON.parse(strFromU8(transferMeasurementsRaw)) : [],
       n1Experiments: n1ExperimentsRaw ? JSON.parse(strFromU8(n1ExperimentsRaw)) : [],
+      // Los respaldos anteriores al plan diario persistente (esquema v17) no lo traen.
+      dailyAssignments: dailyAssignmentsRaw ? JSON.parse(strFromU8(dailyAssignmentsRaw)) : [],
     };
   } catch {
     return { ok: false, error: 'Algún archivo dentro del .zip no es JSON válido.' };
@@ -215,6 +222,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       if (bundle.sessions.length > 0) await db.sessions.bulkPut(bundle.sessions);
       if (bundle.transferMeasurements.length > 0) await db.transferMeasurements.bulkPut(bundle.transferMeasurements);
       if (bundle.n1Experiments.length > 0) await db.n1Experiments.bulkPut(bundle.n1Experiments);
+      if (bundle.dailyAssignments.length > 0) await db.dailyAssignments.bulkPut(bundle.dailyAssignments);
     },
   );
 

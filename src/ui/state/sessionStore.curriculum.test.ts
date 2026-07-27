@@ -9,6 +9,7 @@ import { useSessionStore } from './sessionStore';
 import { db } from '../../services/storage/db';
 import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
 import { dietaPorBanda } from '../../core/prescriptor';
+import { dailyAssignmentId } from '../../core/dailyAssignment';
 import { DEFAULT_PROFILE } from '../../services/storage/profileRepo';
 
 // Perfil por defecto (sin diagnóstico): fija cuántos elementos del
@@ -27,6 +28,7 @@ beforeEach(async () => {
   await db.curriculumDatasetMeta.clear();
   await db.curriculumProgress.clear();
   await db.sessions.clear();
+  await db.dailyAssignments.clear();
   await db.profile.clear();
 });
 
@@ -133,5 +135,78 @@ describe('sessionStore — bloque de currículo', () => {
     expect(s.curriculumQueue.find((i) => i.id === automatizado.id)).toBeUndefined();
     // Quedan 7 patrones vencidos (8 menos el automatizado), pero la dieta topa a CURRICULUM_MAX.
     expect(s.curriculumQueue).toHaveLength(CURRICULUM_MAX);
+  });
+});
+
+// El fallo que motivó el plan diario (RF-11.1): completar Patrones, volver a
+// Hoy y arrancar de nuevo volvía a servir Patrones, porque cada arranque
+// recalculaba el contenido desde cero.
+describe('sessionStore — plan diario persistente (RF-11.1)', () => {
+  async function completarCurriculo() {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    let s = useSessionStore.getState();
+    let guard = 0;
+    while (s.phase === 'curriculo' && guard < seedCurriculumItems.length + 1) {
+      const item = s.curriculumQueue[s.curriculumIndex];
+      const [from, to] = [item.solucion[0].slice(0, 2), item.solucion[0].slice(2, 4)];
+      await s.curriculumUserMove(from as never, to as never);
+      s = useSessionStore.getState();
+      s.curriculumContinuar();
+      s = useSessionStore.getState();
+      guard++;
+    }
+    vi.restoreAllMocks();
+    return s;
+  }
+
+  it('reanudar la sesión guiada omite un bloque ya completado en el plan del día', async () => {
+    await useSessionStore.getState().start();
+    const s = await completarCurriculo();
+    expect(s.phase).toBe('radar'); // el currículo del plan quedó completado
+
+    // Salir y volver a empezar el mismo día: la guiada no repite Patrones.
+    useSessionStore.getState().volver();
+    await useSessionStore.getState().start();
+    const reanudada = useSessionStore.getState();
+    expect(reanudada.phase).toBe('radar');
+    expect(reanudada.curriculumQueue).toHaveLength(0);
+    expect(reanudada.practicaLibre).toBe(false);
+  });
+
+  it('empezar un bloque pendiente suelto descuenta del plan del día', async () => {
+    await useSessionStore.getState().start('curriculo');
+    const s = useSessionStore.getState();
+    expect(s.practicaLibre).toBe(false);
+    const item = s.curriculumQueue[0];
+    const [from, to] = [item.solucion[0].slice(0, 2), item.solucion[0].slice(2, 4)];
+    await s.curriculumUserMove(from as never, to as never);
+
+    await new Promise((r) => setTimeout(r, 0));
+    const plan = await db.dailyAssignments.get(dailyAssignmentId());
+    const bloque = plan!.bloques.find((b) => b.tipo === 'curriculo')!;
+    expect(bloque.completados).toBe(1);
+    expect(bloque.completadosIds).toContain(item.id);
+  });
+
+  it('practicar de nuevo un bloque hecho sirve contenido fresco sin tocar el plan', async () => {
+    await useSessionStore.getState().start();
+    await completarCurriculo();
+    useSessionStore.getState().volver();
+
+    // El bloque está completado en el plan: volver a elegirlo es práctica.
+    await useSessionStore.getState().start('curriculo');
+    const s = useSessionStore.getState();
+    expect(s.practicaLibre).toBe(true);
+    expect(s.phase).toBe('curriculo');
+    expect(s.curriculumQueue.length).toBeGreaterThan(0);
+
+    const antes = await db.dailyAssignments.get(dailyAssignmentId());
+    const item = s.curriculumQueue[0];
+    const [from, to] = [item.solucion[0].slice(0, 2), item.solucion[0].slice(2, 4)];
+    await s.curriculumUserMove(from as never, to as never);
+
+    await new Promise((r) => setTimeout(r, 0));
+    const despues = await db.dailyAssignments.get(dailyAssignmentId());
+    expect(despues).toEqual(antes);
   });
 });

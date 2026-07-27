@@ -422,6 +422,45 @@ export interface SessionRecord {
 }
 
 /**
+ * Un bloque del plan del día (RF-11.1). A diferencia de `SessionBlockRecord`
+ * —que registra una corrida—, esto es la asignación: qué le toca hoy al
+ * usuario y cuánto de eso ya hizo, sobreviviendo a cerrar y reabrir sesiones.
+ */
+export interface DailyAssignmentBlock {
+  tipo: SessionBlockType;
+  /** Cuántos ítems se asignaron al armar el plan del día. */
+  planificados: number;
+  /** Cuántos ya se resolvieron hoy dentro del plan (con tope en planificados). */
+  completados: number;
+  /**
+   * Ids concretos asignados, en el orden en que se sirven (cola:
+   * `ErrorCard.id`; curriculo: `CurriculumItem.id`). Ausente en los bloques
+   * que se sirven por cantidad con contenido sorteado (triage, radar).
+   */
+  itemIds?: string[];
+  /** Ids ya resueltos hoy, para reanudar sin repetir. */
+  completadosIds?: string[];
+  /**
+   * `completado` es pegajoso: una vez que el bloque se terminó, practicarlo
+   * de nuevo no lo reabre ni lo vuelve a contar.
+   */
+  estado: 'pendiente' | 'completado';
+}
+
+/**
+ * El plan canónico de un día (RF-11.1): se arma una sola vez por día local y
+ * después solo se consume. Reanudar una sesión sirve lo que falta de este
+ * plan; no se recalcula nada, así que un bloque hecho no puede volver a
+ * aparecer como pendiente (el fallo Patrones → Repaso → Patrones).
+ */
+export interface DailyAssignment {
+  /** Día local 'YYYY-MM-DD': la clave natural — un plan por día. */
+  id: string;
+  creadoEn: string; // ISO 8601
+  bloques: DailyAssignmentBlock[];
+}
+
+/**
  * Banda de Elo estimada por el diagnóstico inicial (RF-11.4). Coincide con
  * los 5 niveles del motor local (config/engine-levels.json) para poder
  * fundamentar la dieta del Prescriptor (RF-11.2) sin inventar una escala
