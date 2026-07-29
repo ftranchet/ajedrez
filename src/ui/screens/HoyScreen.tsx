@@ -434,10 +434,7 @@ function PrescripcionRow({ prescripcion }: { prescripcion: PrescripcionExterna }
   const textos = t.hoy.prescripciones[prescripcion.tipo];
   const cumplida = prescripcion.estado === 'cumplida';
   const enEspera = prescripcion.estado === 'en-espera';
-  // La espera inicial (nunca se hizo) no es el enfriamiento semanal: decir
-  // "ya lo hiciste esta semana" a una cuenta nueva sería falso.
-  const textoEnEspera = prescripcion.primeraVez ? textos.enEsperaPrimera : textos.enEspera;
-  const motivo = (cumplida ? textos.cumplida : enEspera ? textoEnEspera : textos.pendiente)
+  const motivo = (cumplida ? textos.cumplida : enEspera ? textos.enEspera : textos.pendiente)
     .replace('{n}', String(prescripcion.cantidad ?? 0))
     .replace('{fecha}', prescripcion.fecha ? new Date(prescripcion.fecha).toLocaleDateString('es-AR') : '');
 

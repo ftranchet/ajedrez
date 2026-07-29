@@ -23,16 +23,10 @@ async function seedProfileDiagnosticado(page: Page, extra: Record<string, unknow
   );
 }
 
-/** Fecha ISO hace `n` días, para salir de la ventana de escalonamiento inicial. */
-function haceDias(n: number): string {
-  return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
-}
-
 test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
-  // Diagnóstico hace 4 días: el primer Stoyko ya salió de su espera inicial.
-  await seedProfileDiagnosticado(page, { diagnosticoCompletadoEn: haceDias(4) });
+  await seedProfileDiagnosticado(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
@@ -69,17 +63,21 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await expect(page.getByText('Stoyko semanal: anotás todas tus candidatas', { exact: false })).toBeVisible();
 });
 
-test('el primer Stoyko se escalona: recién diagnosticado, avisa cuándo se suma en vez de invitar', async ({ page }) => {
+// El primer Stoyko se escalonaba tres días desde el diagnóstico y la tarjeta
+// solo mostraba una fecha. Como la espera se medía contra el instante exacto
+// del diagnóstico y el texto anuncia el día, el día anunciado seguía en espera
+// hasta esa hora (reporte de uso 2026-07-29). Se prescribe desde el día uno.
+test('el primer Stoyko se ofrece desde el día uno, no escalonado', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
-  // Diagnóstico de hoy y ningún Stoyko hecho: dentro de la espera inicial.
+  // Diagnóstico de hoy mismo y ningún Stoyko hecho.
   await seedProfileDiagnosticado(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
   await page.getByRole('heading', { name: 'Esta semana' }).waitFor();
-  await expect(page.getByText(/Se suma a tu plan el /)).toBeVisible();
-  await expect(page.getByRole('link', { name: /Stoyko de la semana/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Stoyko de la semana/ })).toBeVisible();
+  await expect(page.getByText(/Se suma a tu plan el /)).toHaveCount(0);
 });
 
 test('el plan semanal gobierna la carga: con poco tiempo declarado, los finales pasan a la semana', async ({ page }) => {
@@ -87,10 +85,7 @@ test('el plan semanal gobierna la carga: con poco tiempo declarado, los finales 
   await page.getByText('Tu sesión de hoy').waitFor();
   // Plan mínimo: 2 sesiones de ~8 minutos. La sesión del día ya se los come,
   // así que ninguna técnica de final entra hoy.
-  await seedProfileDiagnosticado(page, {
-    diagnosticoCompletadoEn: haceDias(4),
-    planSemanal: { sesionesObjetivo: 2, minutosObjetivo: 16 },
-  });
+  await seedProfileDiagnosticado(page, { planSemanal: { sesionesObjetivo: 2, minutosObjetivo: 16 } });
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 

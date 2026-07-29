@@ -4,9 +4,6 @@ import type { AjusteFugaCalculo } from './prescriptor';
 import type { CompromisoAttempt, GameRecord } from './types';
 
 const AHORA = new Date(2026, 6, 22, 20); // miércoles 22/07
-// Diagnóstico hace 10 días: fuera de la ventana de escalonamiento inicial,
-// para que los casos que no la prueban no la pisen.
-const DIAGNOSTICO_VIEJO = new Date(2026, 6, 12, 9).toISOString();
 const SIN_FUGA: AjusteFugaCalculo = { activa: false, fallos: 0, total: 0 };
 
 function game(overrides: Partial<GameRecord> = {}): GameRecord {
@@ -27,7 +24,7 @@ function entrada(overrides: Partial<Parameters<typeof prescripcionesExternas>[0]
   return {
     games: [],
     finalesPendientes: 0,
-    profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO },
+    profile: {},
     compromisoAttempts: [],
     fugaCalculo: SIN_FUGA,
     now: AHORA,
@@ -91,36 +88,25 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
 
     // Hecho anteayer: sigue listado, con la fecha en que vuelve.
     const enfriando = prescripcionesExternas(
-      entrada({ profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() } }),
+      entrada({ profile: { stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() } }),
     );
     const stoyko = enfriando.find((p) => p.tipo === 'stoyko')!;
     expect(stoyko.estado).toBe('en-espera');
     expect(stoyko.fecha).toBeDefined();
-    expect(stoyko.primeraVez).toBeUndefined();
   });
 
-  it('el primer Stoyko se escalona: no se prescribe hasta 3 días después del diagnóstico', () => {
-    // Diagnóstico ayer, Stoyko nunca hecho: en espera con la fecha en que se suma.
-    const reciente = prescripcionesExternas(
-      entrada({ profile: { diagnosticoCompletadoEn: new Date(2026, 6, 21, 9).toISOString() } }),
-    );
-    const stoyko = reciente.find((p) => p.tipo === 'stoyko')!;
-    expect(stoyko.estado).toBe('en-espera');
-    expect(stoyko.primeraVez).toBe(true);
-    expect(stoyko.fecha).toBe(new Date(2026, 6, 24, 9).toISOString());
-
-    // Pasada la espera inicial, queda pendiente como siempre (caso del
-    // perfil por defecto, diagnóstico hace 10 días, cubierto arriba).
-    // Y si ya hizo alguno, manda el enfriamiento semanal, no el escalonamiento.
-    const conHistorial = prescripcionesExternas(
-      entrada({
-        profile: {
-          diagnosticoCompletadoEn: new Date(2026, 6, 21, 9).toISOString(),
-          stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString(),
-        },
-      }),
-    );
-    expect(conHistorial.find((p) => p.tipo === 'stoyko')!.primeraVez).toBeUndefined();
+  // El primer Stoyko se escalonaba tres días desde el diagnóstico, y la única
+  // señal de esa espera era una fecha en la tarjeta. Como la comparación era
+  // contra el instante exacto del diagnóstico y el texto anuncia el día, la
+  // tarjeta decía "se suma a tu plan el 29/7" **el 29/7**, sin activarse
+  // (reporte de uso 2026-07-29). Se prescribe desde el primer día: la cadencia
+  // semanal ya deja hacerlo cuando el usuario quiera, sin cargar ningún día.
+  it('el primer Stoyko se prescribe desde el día uno, sin escalonamiento', () => {
+    const reciénDiagnosticado = prescripcionesExternas(entrada({ now: new Date(2026, 6, 22, 9) }));
+    const stoyko = reciénDiagnosticado.find((p) => p.tipo === 'stoyko')!;
+    expect(stoyko.estado).toBe('pendiente');
+    expect(stoyko.cadencia).toBe('esta-semana');
+    expect(stoyko.fecha).toBeUndefined();
   });
 
   it('los finales se topean por día y los minutos son por final, no totales', () => {
@@ -166,7 +152,7 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
     const lista = prescripcionesExternas(
       entrada({
         games: [game({ analizada: true })],
-        profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() },
+        profile: { stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() },
         finalesPendientes: 1,
       }),
     );
@@ -213,14 +199,14 @@ describe('cadencia y presupuesto (RF-11.3)', () => {
       entrada({
         finalesPendientes: 8,
         minutosSesion: 20,
-        profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, planSemanal: { sesionesObjetivo: 3, minutosObjetivo: 90 } },
+        profile: { planSemanal: { sesionesObjetivo: 3, minutosObjetivo: 90 } },
       }),
     );
     const conPlanGrande = prescripcionesExternas(
       entrada({
         finalesPendientes: 8,
         minutosSesion: 20,
-        profile: { diagnosticoCompletadoEn: DIAGNOSTICO_VIEJO, planSemanal: { sesionesObjetivo: 3, minutosObjetivo: 180 } },
+        profile: { planSemanal: { sesionesObjetivo: 3, minutosObjetivo: 180 } },
       }),
     );
     expect(conPlanChico.find((p) => p.tipo === 'finales')!.cantidad).toBe(1);

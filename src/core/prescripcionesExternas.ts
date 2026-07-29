@@ -53,9 +53,6 @@ export interface PrescripcionExterna {
    * está cumplida—, porcentaje de fallos en cálculo, día de reaparición. */
   cantidad?: number;
   fecha?: string;
-  /** En espera porque nunca se hizo (escalonamiento inicial), no por el
-   * enfriamiento semanal: el texto del motivo es distinto. */
-  primeraVez?: boolean;
   /** Se movió a "esta semana" porque hoy no entra en el presupuesto declarado. */
   fueraDePresupuesto?: boolean;
 }
@@ -77,22 +74,12 @@ const MINUTOS = {
  */
 const FINALES_POR_DIA = 2;
 
-/**
- * El primer Stoyko no se prescribe el mismo día del diagnóstico: los primeros
- * días ya cargan con la sesión, la partida lenta semanal y los finales. La
- * pantalla de Cálculo queda disponible igual — esto escalona la prescripción,
- * no bloquea el ejercicio.
- */
-const STOYKO_ESPERA_INICIAL_DIAS = 3;
-
-const DIA_MS = 24 * 60 * 60 * 1000;
-
 export interface EntradaPrescripciones {
   games: GameRecord[];
   finalesPendientes: number;
   /** Finales que ya se jugaron hoy contando para el plan (`finalesJugadosHoy`). */
   finalesHechosHoy?: number;
-  profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'diagnosticoCompletadoEn' | 'planSemanal'>;
+  profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'planSemanal'>;
   compromisoAttempts: CompromisoAttempt[];
   fugaCalculo: AjusteFugaCalculo;
   /** Minutos que ya ocupa la sesión del día; se descuentan del presupuesto. */
@@ -164,32 +151,28 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
     });
   }
 
-  const primerStoykoDesde = !entrada.profile.stoykoUltimaCompletadaEn && entrada.profile.diagnosticoCompletadoEn
-    ? new Date(new Date(entrada.profile.diagnosticoCompletadoEn).getTime() + STOYKO_ESPERA_INICIAL_DIAS * DIA_MS)
-    : null;
   const proximoStoyko = stoykoProximaDisponibleEn(entrada.profile, now);
-  // Stoyko también es semanal por definición ("Stoyko de la semana").
+  // Stoyko es semanal por definición ("Stoyko de la semana") y está disponible
+  // desde el primer día: se hace cuando el usuario quiera dentro de la semana.
+  //
+  // Antes el primero se escalonaba tres días después del diagnóstico, para no
+  // cargar los primeros días. Eso quedó resuelto por la separación entre "hoy"
+  // y "esta semana" —Stoyko nunca infló la lista de hoy—, y el escalonamiento
+  // se volvió una promesa que la interfaz no podía cumplir: la tarjeta anuncia
+  // el día ("se suma a tu plan el 29/7") pero la comparación era contra el
+  // instante exacto del diagnóstico, así que ese mismo día seguía en espera
+  // hasta la hora en que se había completado (bug reportado 2026-07-29).
   prescripciones.push(
-    primerStoykoDesde && now.getTime() < primerStoykoDesde.getTime()
-      ? {
+    stoykoDisponible(entrada.profile, now)
+      ? { tipo: 'stoyko', estado: 'pendiente', cadencia: 'esta-semana', minutos: MINUTOS.stoyko, ruta: '#/calculo/stoyko' }
+      : {
           tipo: 'stoyko',
           estado: 'en-espera',
           cadencia: 'esta-semana',
           minutos: MINUTOS.stoyko,
           ruta: '#/calculo/stoyko',
-          fecha: primerStoykoDesde.toISOString(),
-          primeraVez: true,
-        }
-      : stoykoDisponible(entrada.profile, now)
-        ? { tipo: 'stoyko', estado: 'pendiente', cadencia: 'esta-semana', minutos: MINUTOS.stoyko, ruta: '#/calculo/stoyko' }
-        : {
-            tipo: 'stoyko',
-            estado: 'en-espera',
-            cadencia: 'esta-semana',
-            minutos: MINUTOS.stoyko,
-            ruta: '#/calculo/stoyko',
-            ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
-          },
+          ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
+        },
   );
 
   if (entrada.fugaCalculo.activa) {
