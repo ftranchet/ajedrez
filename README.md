@@ -22,7 +22,7 @@ La mayoría de las apps de ajedrez optimizan el enganche: rachas, puntos, cofres
 4. **La sesión diaria** mezcla esos repasos con patrones del currículo, el Radar (posiciones mezcladas, sin avisarte si hay táctica) y, según tus fugas, un bloque de criterio de cálculo.
 5. **Se mide aparte.** Una batería de 30 posiciones reservadas, que nunca se entrenan ni se muestran resueltas, se repite cada siete semanas para ver si lo entrenado transfiere a contenido nuevo.
 
-Todo el contenido es local y verificado programáticamente: 128 posiciones de Radar, 20 patrones, 16 finales teóricos, 8 posiciones de Stoyko y 30 de la batería de transferencia. Ninguna se escribió "de memoria": los scripts de `scripts/` las validan con chess.js y Stockfish, y CI vuelve a verificarlas en cada push.
+Todo el contenido es local y verificado programáticamente: 141 posiciones de Radar, 20 patrones, 16 finales teóricos, 8 posiciones de Stoyko y 30 de la batería de transferencia. Ninguna se escribió "de memoria": los scripts de `scripts/` las validan con chess.js y Stockfish, y CI vuelve a verificarlas en cada push.
 
 ## Documentación
 

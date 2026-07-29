@@ -4,7 +4,7 @@ Este documento describe cómo se genera el catálogo offline del Radar de ELOmax
 
 ## Lote publicado
 
-El catálogo vigente contiene 132 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 32 generadas por autojuego (8 de doble solución y 24 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 25 de oferta envenenada.
+El catálogo vigente contiene 141 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 41 generadas por autojuego (8 de doble solución y 33 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 34 de oferta envenenada.
 
 Los exports de base de datos de Lichess son CC0 y su formato oficial explica que el FEN del puzzle es anterior a la jugada de armado; por eso el pipeline aplica la primera UCI antes de guardar la posición que ve el usuario. Fuente: [Lichess open database](https://database.lichess.org/).
 
@@ -173,22 +173,22 @@ Y con las 12 envenenadas nuevas (catálogo de 128), que además engordan el pool
 | avanzado | 57 | 4 días | 67/128 |
 | experto | 31 | 2 días | 39/128 |
 
-Con las 4 de la ronda de 2026-07-29 (catálogo de 132) las bandas medias ganan otro día entero de separación, con cuatro posiciones: es lo que hay que tener en cuenta al juzgar si vale la pena el cómputo.
+Con las 13 de la ronda de 2026-07-29 (catálogo de 141, envenenadas 21 → 34) las bandas medias ganan **dos días** de separación y el pool efectivo pasa de 56–57 a 69–70:
 
 | Banda | Pool efectivo | Repite a los | Visto en 30 días |
 |---|---:|---:|---:|
-| principiante | 30 | 3 días | 36/132 |
-| elemental | 60 | **5 días** | 67/132 |
-| intermedio | 61 | **5 días** | 71/132 |
-| avanzado | 61 | 4 días | 71/132 |
-| experto | 31 | 2 días | 39/132 |
+| principiante | 30 | 3 días | 36/141 |
+| elemental | 69 | **6 días** | 77/141 |
+| intermedio | 70 | **5 días** | 81/141 |
+| avanzado | 70 | 4 días | 81/141 |
+| experto | 31 | 2 días | 39/141 |
 
 Los extremos (principiante y experto) no se movieron, y ese es justo el punto del párrafo siguiente: el contenido de autojuego entra todo en el percentil 50.
 
-**El límite que queda es el tamaño del catálogo, y es real.** Con 132 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
+**El límite que queda es el tamaño del catálogo, y es real.** Con 141 posiciones y 8–10 por sesión, las bandas medias ya aguantan 5–6 días pero los extremos siguen repitiendo a los 2–3. Las dos vías para agrandarlo:
 
 - **Puzzles CC0 de Lichess** — la vía buena, y la única que agranda los extremos de dificultad, porque traen rating calibrado por la comunidad. Requiere descargar el export oficial (ver "Generación reproducible"); el entorno de desarrollo donde se hizo esta ronda no tiene salida a `database.lichess.org`, así que quedó pendiente de correrse en una máquina con red.
-- **Autojuego local** — funciona, pero es caro y solo engorda el medio de la escala. En la ronda de 2026-07-27 se minaron **12 envenenadas nuevas** (de 9 a 21 en total, el tipo más escaso del catálogo) revisando 871 posiciones de autojuego: **1 candidata cada ~73 revisadas**, unas dos horas de cómputo. La de 2026-07-29 sumó **4 más** (21 → 25) con 414 revisadas, misma tasa. Receta completa, en tres pasos:
+- **Autojuego local** — funciona, pero es caro y solo engorda el medio de la escala. En la ronda de 2026-07-27 se minaron **12 envenenadas nuevas** (de 9 a 21 en total, el tipo más escaso del catálogo) revisando 871 posiciones de autojuego: **1 candidata cada ~73 revisadas**, unas dos horas de cómputo. La de 2026-07-29 sumó **13 más** (21 → 34) revisando 915 posiciones —1 cada ~70, unos 45 minutos de autojuego más 10 de marcado de carnadas—. Receta completa, en tres pasos:
 
   ```sh
   node scripts/mine-envenenada.mjs --target 12 --checkpoint ruta.json
