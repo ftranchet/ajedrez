@@ -86,13 +86,30 @@ export class StockfishEngine {
   }
 
   async analyseMultiPv(fen, count, depth) {
+    return this.search(fen, Math.max(2, count), depth);
+  }
+
+  /**
+   * Una sola línea. No es `analyseMultiPv(fen, 1, …)` porque ese piso de dos
+   * líneas es deliberado para los scripts que comparan candidatas, pero en un
+   * final elemental sale caro: pedir la segunda mejor en una posición de tres
+   * piezas obliga al motor a resolver **dos** mates largos, y a profundidad 22
+   * la distribución WASM se cuelga por más de diez minutos donde con una sola
+   * línea tarda un segundo.
+   */
+  async analyseBest(fen, depth, timeoutMs) {
+    const [best] = await this.search(fen, 1, depth, timeoutMs);
+    return best;
+  }
+
+  async search(fen, multipv, depth, timeoutMs) {
     this.multipv.clear();
-    this.send(`setoption name MultiPV value ${Math.max(2, count)}`);
+    this.send(`setoption name MultiPV value ${multipv}`);
     this.send('isready');
     await this.waitFor(/^readyok$/);
     this.send(`position fen ${fen}`);
     this.send(`go depth ${depth}`);
-    await this.waitFor(/^bestmove\s+/);
+    await this.waitFor(/^bestmove\s+/, timeoutMs);
     return [...this.multipv.values()].sort((left, right) => right.score - left.score);
   }
 

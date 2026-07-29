@@ -13,8 +13,9 @@
 // Este módulo las devuelve como prescripciones de primera clase, con el mismo
 // contrato que un bloque: qué es, por qué aparece hoy y cuánto dura. Cada una
 // sabe además si ya está cumplida, con la señal que le es propia (la semana
-// para la partida lenta y Stoyko, el vencimiento para los finales, la fecha del
-// último intento para Cálculo), así que no hace falta persistir nada nuevo.
+// para la partida lenta y Stoyko, los finales jugados hoy según el
+// planificador, la fecha del último intento para Cálculo), así que no hace
+// falta persistir nada nuevo.
 import type { CompromisoAttempt, GameRecord, Profile } from './types';
 import { partidaLentaSemanal } from './slowGame';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from './stoyko';
@@ -48,7 +49,8 @@ export interface PrescripcionExterna {
   minutos: number;
   /** Ruta hash a la pantalla donde se hace. */
   ruta: string;
-  /** Dato que acompaña el texto (finales pendientes, día de reaparición). */
+  /** Dato que acompaña el texto: finales que faltan hoy —o los ya hechos, si
+   * está cumplida—, porcentaje de fallos en cálculo, día de reaparición. */
   cantidad?: number;
   fecha?: string;
   /** En espera porque nunca se hizo (escalonamiento inicial), no por el
@@ -88,6 +90,8 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 export interface EntradaPrescripciones {
   games: GameRecord[];
   finalesPendientes: number;
+  /** Finales que ya se jugaron hoy contando para el plan (`finalesJugadosHoy`). */
+  finalesHechosHoy?: number;
   profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'diagnosticoCompletadoEn' | 'planSemanal'>;
   compromisoAttempts: CompromisoAttempt[];
   fugaCalculo: AjusteFugaCalculo;
@@ -136,18 +140,24 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
     ruta: partidaLenta === 'sin-analizar' ? '#/panel/partidas' : '#/jugar',
   });
 
-  if (entrada.finalesPendientes > 0) {
+  const finalesHechosHoy = entrada.finalesHechosHoy ?? 0;
+  if (entrada.finalesPendientes > 0 || finalesHechosHoy > 0) {
     // Los finales sí vencen día a día (FSRS), así que son la carga diaria que
     // el presupuesto tiene que acotar: entran los que quepan, y si no entra
     // ninguno la técnica no desaparece — pasa a la semana, dicho como tal.
     const cabenHoy = Math.floor(presupuesto / MINUTOS.finales);
-    const finalesHoy = Math.min(entrada.finalesPendientes, FINALES_POR_DIA, Math.max(0, cabenHoy));
-    const cantidad = Math.max(1, finalesHoy);
+    const objetivoHoy = Math.min(entrada.finalesPendientes + finalesHechosHoy, FINALES_POR_DIA, Math.max(0, cabenHoy));
+    // Lo que falta, no lo que había: haber jugado uno de los dos que tocaban
+    // tiene que verse como "queda uno", y haberlos jugado todos, como hecho.
+    const restantes = Math.min(entrada.finalesPendientes, Math.max(0, objetivoHoy - finalesHechosHoy));
+    const cumplida = finalesHechosHoy > 0 && restantes === 0;
+    const cantidad = cumplida ? finalesHechosHoy : Math.max(1, restantes);
+    const entraHoy = cumplida || restantes > 0;
     prescripciones.push({
       tipo: 'finales',
-      estado: 'pendiente',
-      cadencia: finalesHoy > 0 ? 'hoy' : 'esta-semana',
-      ...(finalesHoy > 0 ? {} : { fueraDePresupuesto: true }),
+      estado: cumplida ? 'cumplida' : 'pendiente',
+      cadencia: entraHoy ? 'hoy' : 'esta-semana',
+      ...(entraHoy ? {} : { fueraDePresupuesto: true }),
       minutos: MINUTOS.finales * cantidad,
       ruta: '#/jugar/finales',
       cantidad,

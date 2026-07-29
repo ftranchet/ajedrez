@@ -25,7 +25,8 @@ import {
   type RadarSelectionState,
 } from '../../core/radar';
 import { lineaParaMostrar } from '../../core/radarExplicacion';
-import { dueCurriculumItems, esDemostracionLimpia, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
+import { revisionDelError, type RevisionDelError } from '../../core/revision';
+import { dueCurriculumItems, esDemostracionLimpia, finalesJugadosHoy, interleaveByPattern, newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
 import { DEFAULT_PROFILE, detectarFugaCalculo, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { prescripcionesExternas, type PrescripcionExterna } from '../../core/prescripcionesExternas';
 import { gameRepo } from '../../services/storage/gameRepo';
@@ -59,16 +60,7 @@ import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
-import { computeDests, sanDeLinea } from './chessBoardUtils';
-
-/** SAN de una jugada UCI para mostrar en el feedback (design system §5,
- * MoveList: "font-mono" pero notación legible, no UCI crudo); `fen` es la
- * posición antes de la jugada. Cae a UCI si la línea resultara ilegal
- * (no debería pasar: `jugadaUci` sale de `item.solucion`/`card.jugadaCorrecta`,
- * ya verificados por el pipeline o por el motor). */
-function sanDeJugada(fen: string, jugadaUci: string): string {
-  return sanDeLinea(fen, [jugadaUci])[0] ?? jugadaUci;
-}
+import { computeDests, sanDeJugada } from './chessBoardUtils';
 
 /** Ventana para la tasa de acierto reciente que ajusta la dificultad (RF-5.5). */
 const VENTANA_TASA_ACIERTO = 8;
@@ -203,6 +195,14 @@ interface SessionState {
   dests: Map<string, string[]>;
   lastMove: [string, string] | null;
   check: boolean;
+  /**
+   * Con qué se revela un error en el tablero (RF-5.3): la posición en la que
+   * se decidió, la jugada del usuario y la correcta. Una sola por sesión —
+   * nunca hay dos bloques resolviendo a la vez— y se limpia al cargar la
+   * posición siguiente. Decir "la jugada correcta era Th5" sin mostrarla deja
+   * el trabajo de ubicarla justo en el peor momento para hacerlo.
+   */
+  revision: RevisionDelError | null;
 
   loadSummary(force?: boolean | 'revalidar'): Promise<void>;
   start(soloBloque?: SessionBlockType): Promise<void>;
@@ -243,9 +243,10 @@ function boardSnapshot() {
 }
 
 /** Snapshot al CARGAR una posición: además fija la orientación al lado que
- * resuelve (el que mueve ahora), para que el tablero no gire tras la jugada. */
+ * resuelve (el que mueve ahora), para que el tablero no gire tras la jugada, y
+ * limpia la revelación del error anterior. */
 function loadSnapshot() {
-  return { ...boardSnapshot(), boardOrientation: chess.turn() as Color };
+  return { ...boardSnapshot(), boardOrientation: chess.turn() as Color, revision: null };
 }
 
 function tasaAciertoReciente(historial: boolean[]): number {
@@ -575,6 +576,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     dests: new Map(),
     lastMove: null,
     check: false,
+    revision: null,
 
     async loadSummary(force = false) {
       if (summaryLoad && !force) return summaryLoad.promise;
@@ -625,6 +627,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
           const due = dueCurriculumItems(curriculumItems, progressById);
           const finalesPendientes = due.filter((item) => item.tipo === 'final').length;
+          // Un final jugado en Jugar → Finales no pasa por esta sesión, así que
+          // su cumplimiento se lee del planificador (RF-11.3a).
+          const finalesHechosHoy = finalesJugadosHoy(curriculumItems, progressById);
           const dieta = dietaPorBanda(profile.bandaElo, allCards);
 
           // Plan del día (RF-11.1): se arma UNA vez por día local, acá — el
@@ -658,6 +663,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             prescripcionesExternas: prescripcionesExternas({
               games,
               finalesPendientes,
+              finalesHechosHoy,
               profile,
               compromisoAttempts,
               fugaCalculo: detectarFugaCalculo(radarAttempts, radarItems),
@@ -921,6 +927,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         colaSubPhase: 'feedback',
         colaUltimoAcierto: acierto,
         colaJugadaCorrecta: sanDeJugada(card.fen, card.jugadaCorrecta),
+        revision: acierto ? null : revisionDelError(card.fen, jugadaUsuario, card.jugadaCorrecta),
         ...boardSnapshot(),
         lastMove: [from, to],
       });
@@ -961,6 +968,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         curriculumSubPhase: 'feedback',
         curriculumUltimaLimpia: limpia,
         curriculumJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
+        revision: limpia ? null : revisionDelError(item.fen, jugadaUsuario, item.solucion[0]),
         ...boardSnapshot(),
         lastMove: [from, to],
       });
@@ -1154,6 +1162,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       lastMove,
       radarUltimoAcierto: acierto,
       radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
+      revision: acierto ? null : revisionDelError(item.fen, jugadaUsuario, item.solucion[0]),
       radarLinea: lineaParaMostrar(item),
       radarJugadaUsuario: jugadaUsuario,
       radarFeedbackTexto: isOwnErrorRadarItem(item)

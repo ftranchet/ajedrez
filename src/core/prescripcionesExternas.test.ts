@@ -57,10 +57,32 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
     expect(lista.find((p) => p.tipo === 'partida-lenta')!.estado).toBe('cumplida');
   });
 
-  it('los finales solo aparecen cuando hay técnicas vencidas', () => {
+  it('los finales solo aparecen cuando hay técnicas vencidas o jugadas hoy', () => {
     expect(tipos(prescripcionesExternas(entrada()))).not.toContain('finales');
     const conFinales = prescripcionesExternas(entrada({ finalesPendientes: 2 }));
     expect(conFinales.find((p) => p.tipo === 'finales')).toMatchObject({ estado: 'pendiente', cantidad: 2 });
+  });
+
+  // El final jugado en otra pantalla no movía nada en Hoy: la prescripción
+  // seguía diciendo "hoy te toca demostrar 2 técnicas" con las dos ya jugadas,
+  // porque su estado era 'pendiente' escrito a mano y solo desaparecía cuando
+  // el catálogo entero dejaba de estar vencido.
+  it('un final jugado hoy descuenta de la carga del día, y completarla la marca cumplida', () => {
+    const unoHecho = prescripcionesExternas(entrada({ finalesPendientes: 7, finalesHechosHoy: 1 }));
+    expect(unoHecho.find((p) => p.tipo === 'finales')).toMatchObject({ estado: 'pendiente', cantidad: 1, minutos: 8 });
+
+    const dosHechos = prescripcionesExternas(entrada({ finalesPendientes: 6, finalesHechosHoy: 2 }));
+    expect(dosHechos.find((p) => p.tipo === 'finales')).toMatchObject({ estado: 'cumplida', cadencia: 'hoy', cantidad: 2 });
+  });
+
+  it('haber terminado el catálogo hoy se muestra cumplido, no desaparecido', () => {
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 0, finalesHechosHoy: 1 }));
+    expect(lista.find((p) => p.tipo === 'finales')).toMatchObject({ estado: 'cumplida', cantidad: 1 });
+  });
+
+  it('los finales de hoy dejan de contar como pendientes una vez hechos', () => {
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 6, finalesHechosHoy: 2 }));
+    expect(lista.filter((p) => p.estado === 'pendiente').map((p) => p.tipo)).not.toContain('finales');
   });
 
   it('Stoyko aparece disponible o en enfriamiento, nunca oculto', () => {

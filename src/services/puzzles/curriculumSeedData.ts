@@ -8,7 +8,7 @@
 import type { CurriculumItem } from '../../core/types';
 import finalesCatalogo from '../../config/finales-catalogo.json' with { type: 'json' };
 
-export const CURRICULUM_DATASET_VERSION = 'curriculo-patrones-finales-v3';
+export const CURRICULUM_DATASET_VERSION = 'curriculo-patrones-finales-v4';
 
 export const seedCurriculumItems: CurriculumItem[] = [
   // Mate de pasillo (back-rank): la torre/dama entra por la última fila con

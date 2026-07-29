@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CurriculumItem, CurriculumProgress } from './types';
-import { dueCurriculumItems, esDemostracionLimpia, interleaveByPattern, isAutomatizado, newCurriculumProgress, nivelCiegas, reviewCurriculumProgress } from './curriculum';
+import { dueCurriculumItems, esDemostracionLimpia, finalesJugadosHoy, interleaveByPattern, isAutomatizado, newCurriculumProgress, nivelCiegas, reviewCurriculumProgress } from './curriculum';
 
 function item(id: string, patternKey: CurriculumItem['patternKey'] = 'clavada'): CurriculumItem {
   return { id, tipo: 'patron', patternKey, nombre: id, fen: 'startpos', solucion: ['e2e4'] };
@@ -168,5 +168,34 @@ describe('interleaveByPattern', () => {
 
   it('lista vacía devuelve lista vacía', () => {
     expect(interleaveByPattern([])).toEqual([]);
+  });
+});
+
+describe('finalesJugadosHoy', () => {
+  const now = new Date(2026, 6, 22, 18, 0);
+  const finales: CurriculumItem[] = [
+    { id: 'f1', tipo: 'final', patternKey: 'final-torre', nombre: 'Torre', fen: 'x', solucion: [], resultadoEsperado: 'gana', ladoUsuario: 'w' },
+    { id: 'f2', tipo: 'final', patternKey: 'final-dama', nombre: 'Dama', fen: 'x', solucion: [], resultadoEsperado: 'gana', ladoUsuario: 'w' },
+  ];
+  const progreso = (id: string, fecha: Date): CurriculumProgress => ({
+    ...newCurriculumProgress(id, fecha),
+    updatedAt: fecha.toISOString(),
+  });
+
+  it('cuenta los finales cuyo progreso se movió hoy, no los de ayer', () => {
+    const progressById = new Map([
+      ['f1', progreso('f1', new Date(2026, 6, 22, 9))],
+      ['f2', progreso('f2', new Date(2026, 6, 21, 23))],
+    ]);
+    expect(finalesJugadosHoy(finales, progressById, now)).toBe(1);
+  });
+
+  it('ignora los patrones: la prescripción que mide es la de finales', () => {
+    const progressById = new Map([['p1', progreso('p1', new Date(2026, 6, 22, 9))]]);
+    expect(finalesJugadosHoy([...finales, item('p1')], progressById, now)).toBe(0);
+  });
+
+  it('un final nunca jugado no cuenta', () => {
+    expect(finalesJugadosHoy(finales, new Map(), now)).toBe(0);
   });
 });

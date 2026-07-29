@@ -340,7 +340,16 @@ export type PatternKey =
   | 'final-philidor'
   | 'final-cuadrado'
   | 'final-torre'
-  | 'final-dama';
+  | 'final-dama'
+  | 'final-peon-torre';
+
+/**
+ * Qué hay que lograr en un final que se gana para darlo por demostrado
+ * (RF-6.2). Es contenido, no interfaz: en los mates elementales la técnica
+ * **es** el mate, y en los finales de peón termina al coronar sin tirar la
+ * ventaja. Ver `core/finales.ts`.
+ */
+export type ObjetivoFinal = 'mate' | 'coronar';
 
 /**
  * Elemento del catálogo del currículo base (E6): un patrón táctico/mate para
@@ -360,6 +369,12 @@ export interface CurriculumItem {
   resultadoEsperado?: 'gana' | 'tablas';
   /** Solo en finales: bando que demuestra la técnica; puede no ser quien mueve primero. */
   ladoUsuario?: Color;
+  /**
+   * Solo en finales ganados: cómo se cierra la demostración. Ausente en los
+   * ítems sembrados antes de que existiera el campo, donde se deduce de la
+   * posición (`objetivoDeFinal`).
+   */
+  objetivo?: ObjetivoFinal;
 }
 
 /** Versión del catálogo de currículo embebido (mismo patrón que `RadarDatasetMeta`). */

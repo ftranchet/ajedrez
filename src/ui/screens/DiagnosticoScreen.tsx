@@ -240,7 +240,7 @@ function RadarDiagnostico() {
               s.radarSubPhase === 'feedback'
                 ? s.radarUltimoAcierto
                   ? { kind: 'success', move: s.lastMove }
-                  : { kind: 'error', move: null }
+                  : { kind: 'error', move: null, revision: s.revision }
                 : null
             }
           />

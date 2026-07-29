@@ -531,6 +531,53 @@ describe('sessionStore — bloque Cola', () => {
     expect(after.colaJugadaCorrecta).toBe('Bc5');
     expect(after.colaJugadaCorrecta).not.toBe('f8c5');
   });
+
+  // Decir "la jugada correcta era Ac5" y dejar al usuario buscándola en el
+  // tablero es la mitad del feedback: la revisión es lo que alimenta la flecha
+  // (RF-5.3), y va sobre la posición en la que se decidió, no sobre la de
+  // después de la jugada equivocada.
+  it('un fallo deja la revisión para dibujar la jugada correcta en el tablero', async () => {
+    const fen = 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3';
+    const vencida = buildErrorCard({
+      fen,
+      ladoAMover: 'b',
+      jugadaUsuario: 'g8f6',
+      jugadaCorrecta: 'f8c5',
+      categoria: 'tactico',
+      origen: 'partida',
+    });
+    await db.errorCards.put(vencida);
+    await useSessionStore.getState().start();
+
+    await useSessionStore.getState().colaUserMove('g8' as never, 'f6' as never);
+    expect(useSessionStore.getState().revision).toEqual({
+      fen,
+      jugada: ['g8', 'f6'],
+      correcta: ['f8', 'c5'],
+      jaque: false,
+    });
+
+    // Y no sobrevive a la posición siguiente.
+    useSessionStore.getState().colaContinuar();
+    expect(useSessionStore.getState().revision).toBeNull();
+  });
+
+  it('un acierto no revela nada: no hay error que mostrar', async () => {
+    const vencida = buildErrorCard({
+      fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+      ladoAMover: 'b',
+      jugadaUsuario: 'e7e6',
+      jugadaCorrecta: 'e7e5',
+      categoria: 'tactico',
+      origen: 'partida',
+    });
+    await db.errorCards.put(vencida);
+    await useSessionStore.getState().start();
+
+    await useSessionStore.getState().colaUserMove('e7' as never, 'e5' as never);
+    expect(useSessionStore.getState().colaUltimoAcierto).toBe(true);
+    expect(useSessionStore.getState().revision).toBeNull();
+  });
 });
 
 describe('sessionStore — volver()', () => {

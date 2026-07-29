@@ -10,6 +10,7 @@ import { Chess, type Square } from 'chess.js';
 import type { CalibrationRecord, Color, EvalGuess, PerfilDeFugas, PlanSemanal, RadarAttempt, RadarItem, RatingExterno } from '../../core/types';
 import { RADAR_INITIAL_STATE, categoriaFromTipo, centroInicialDesdeDiagnostico, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
 import { lineaParaMostrar } from '../../core/radarExplicacion';
+import { revisionDelError, type RevisionDelError } from '../../core/revision';
 import { perfilDeFugasDesdeIntentos } from '../../core/leakProfile';
 import { brierScore } from '../../core/calibration';
 import { isValidWeeklyPlan } from '../../core/adherence';
@@ -22,12 +23,7 @@ import { RADAR_PROGRESS_ID, radarProgressRepo } from '../../services/storage/rad
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { useGameStore } from './gameStore';
-import { computeDests, sanDeLinea } from './chessBoardUtils';
-
-/** Mismo motivo que sessionStore.ts#sanDeJugada: mostrar SAN, no UCI crudo, en el feedback. */
-function sanDeJugada(fen: string, jugadaUci: string): string {
-  return sanDeLinea(fen, [jugadaUci])[0] ?? jugadaUci;
-}
+import { computeDests, sanDeJugada } from './chessBoardUtils';
 
 export const DIAGNOSTICO_JUEGO1_NIVEL = 'nivel-2';
 export const DIAGNOSTICO_JUEGO2_NIVEL = 'nivel-4';
@@ -101,6 +97,9 @@ interface DiagnosticoState {
   dests: Map<string, string[]>;
   lastMove: [string, string] | null;
   check: boolean;
+  /** Revelación del error en el tablero (ver sessionStore): posición, jugada
+   * jugada y jugada correcta. */
+  revision: RevisionDelError | null;
 
   bandaEstimada: ReturnType<typeof estimarBandaElo> | null;
   /** Medición de cierre; se llena junto con la banda al terminar. */
@@ -166,6 +165,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       radarJugadaCorrecta: null,
       radarLinea: null,
       radarJugadaUsuario: null,
+      revision: null,
       ...boardSnapshot(),
       boardOrientation: chess.turn() as Color,
       lastMove: null,
@@ -278,6 +278,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
     dests: new Map(),
     lastMove: null,
     check: false,
+    revision: null,
 
     bandaEstimada: null,
     lineaBase: null,
@@ -400,6 +401,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
         radarUltimoAcierto: acierto,
         radarJugadaUsuario: jugadaUsuario,
         radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
+        revision: acierto ? null : revisionDelError(item.fen, jugadaUsuario, item.solucion[0]),
         radarLinea: lineaParaMostrar(item),
         radarFeedbackTexto: explainFeedback(item, acierto),
         radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
