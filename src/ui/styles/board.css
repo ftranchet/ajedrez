@@ -68,16 +68,19 @@ cg-board {
   animation: board-error-settle 180ms ease-out both;
 }
 
-/* La flecha automática sigue la jugada que efectivamente fue aceptada. Es una
-   sola flecha; el halo de contraste contra el tablero lo da un drop-shadow en
-   color base (antes era una segunda flecha superpuesta que dibujaba una
-   segunda punta y se veía mal). */
-.cg-wrap[data-feedback='success'] .cg-shapes {
+/* Flechas de la revelación: la jugada aceptada cuando se acierta; la jugada
+   correcta (verde) junto a la equivocada (roja, más fina) cuando se falla. Una
+   flecha por jugada; el halo de contraste contra el tablero lo da un
+   drop-shadow en color base (antes era una segunda flecha superpuesta que
+   dibujaba una segunda punta y se veía mal). */
+.cg-wrap[data-feedback='success'] .cg-shapes,
+.cg-wrap[data-feedback='error'] .cg-shapes {
   opacity: 1;
   filter: drop-shadow(0 0 2px var(--color-base)) drop-shadow(0 0 1px var(--color-base));
 }
 
-.cg-wrap[data-feedback='success'] .cg-shapes line {
+.cg-wrap[data-feedback='success'] .cg-shapes line,
+.cg-wrap[data-feedback='error'] .cg-shapes line {
   stroke-dasharray: 12;
   animation: board-success-reveal 180ms ease-out both;
 }

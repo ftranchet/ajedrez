@@ -53,6 +53,30 @@ export function dueCurriculumItems(
   });
 }
 
+/**
+ * Finales jugados hoy contando para el plan (RF-11.3a). Es la señal propia de
+ * la prescripción de finales: la fecha del último repaso del planificador, que
+ * solo se mueve cuando la demostración cuenta —la práctica libre no toca el
+ * progreso, y por eso tampoco marca la prescripción como cumplida—.
+ *
+ * Cuenta el final jugado, salga bien o mal: la tarea del día es demostrar la
+ * técnica contra el motor, y perderla es haberla trabajado igual (vuelve
+ * antes, que es lo que corresponde). Sin esto, Hoy mostraba "te toca demostrar
+ * 2 técnicas" para siempre, aunque las acabaras de jugar.
+ */
+export function finalesJugadosHoy(
+  items: CurriculumItem[],
+  progressById: Map<string, CurriculumProgress>,
+  now: Date = new Date(),
+): number {
+  const inicioDelDia = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return items.filter((item) => {
+    if (item.tipo !== 'final') return false;
+    const updatedAt = new Date(progressById.get(item.id)?.updatedAt ?? '').getTime();
+    return Number.isFinite(updatedAt) && updatedAt >= inicioDelDia && updatedAt <= now.getTime();
+  }).length;
+}
+
 const UMBRAL_CIEGAS = 0.8;
 // No activar el modificador con una racha corta y casual: unas pocas
 // repeticiones alcanzan para que el 80% de acierto signifique algo.

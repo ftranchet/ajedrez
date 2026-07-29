@@ -118,6 +118,7 @@ Coordenadas: `font-mono` 10–11 px, peso 600, en una franja fina **fuera** del 
 | Jaque | velo radial `error`: 85% centro → transparente al 82% del radio | gradiente radial, solo bajo el rey |
 | Flecha de análisis | `accent` al 85%, grosor 3% del tablero, punta triangular | — |
 | Flecha de jugada correcta | una sola flecha `success` plena, con halo `base` por `drop-shadow` (revelación post-respuesta) | contorno oscuro + texto de acierto en el panel |
+| Flecha de jugada equivocada | flecha `error`, más fina que la correcta (6 contra 8), solo al revelar un fallo | va siempre acompañada de la flecha `success` + texto de fallo en el panel |
 | Casilla de error | velo `error` al 34%, pulso de opacidad 180 ms bajo el rey del lado que resolvió | doble borde interior claro/oscuro + texto de fallo en el panel |
 
 ### 3.4 Reglas
@@ -148,7 +149,7 @@ Para un perfil nuevo, el diagnóstico ocupa ese mismo lugar prioritario con una 
 1. Evaluación rápida (EvalPicker) con el tablero en solo lectura — "¿Cómo está la posición?".
 2. Jugada por toque-toque con destinos legales marcados.
 3. (Muestreo 1 de 4–5) ConfidenceSlider antes de revelar.
-4. FeedbackPanel con porqué obligatorio + nota de Cola si hubo fallo; un acierto dibuja una flecha `success` sobre la jugada efectivamente aceptada (también si fue la familiar de una doble solución) y un fallo asienta el velo `error` bajo el rey. Nunca se revela durante ConfidenceSlider.
+4. FeedbackPanel con porqué obligatorio + nota de Cola si hubo fallo; un acierto dibuja una flecha `success` sobre la jugada efectivamente aceptada (también si fue la familiar de una doble solución). Un fallo asienta el velo `error` bajo el rey y **rebobina el tablero a la posición en la que se decidió**, con dos flechas: la correcta en `success` y la propia en `error` (RF-5.3d) — sobre la posición posterior a la jugada equivocada, la flecha saldría de una casilla que la pieza ya dejó. Nunca se revela durante ConfidenceSlider.
 5. Cierre de bloque: resumen sobrio en `font-display`, sin confeti.
 
 ### 4.3 Panel

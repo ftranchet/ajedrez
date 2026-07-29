@@ -244,7 +244,7 @@ test.describe('sesión simple: Radar', () => {
     await expect(page.getByText('Posición 2 de')).toBeVisible();
   });
 
-  test('un fallo pulsa bajo el rey sin shake ni flecha de acierto', async ({ page }) => {
+  test('un fallo pulsa bajo el rey y señala la jugada correcta con una flecha', async ({ page }) => {
     await page.addInitScript(() => {
       Math.random = () => 0.99;
     });
@@ -270,7 +270,14 @@ test.describe('sesión simple: Radar', () => {
     const errorOutline = await veil.evaluate((element) => getComputedStyle(element).boxShadow);
     expect(errorOutline).toContain('rgb(236, 229, 218)');
     expect(errorOutline).toContain('rgb(23, 19, 16)');
-    await expect(page.locator('.cg-shapes line')).toHaveCount(0);
+
+    // Decir "la jugada correcta era Dh5" no alcanza: el tablero vuelve a la
+    // posición en la que se decidió y la dibuja, junto con la jugada propia.
+    await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback-correcta', 'd5-h5');
+    await expect(page.locator('.cg-shapes line')).toHaveCount(2);
+    // Rebobinado: la jugada equivocada ya no está en el tablero, así que
+    // tampoco queda su resaltado de última jugada.
+    await expect(page.locator('square.last-move')).toHaveCount(0);
   });
 
   test('movimiento reducido mantiene las señales estáticas y actualiza en vivo', async ({ page }) => {

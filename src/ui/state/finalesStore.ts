@@ -6,13 +6,15 @@ import { create } from 'zustand';
 import type { EngineEvaluation, EnginePort } from '../../core/ports';
 import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { evaluateFinalTechnique } from '../../core/finales';
+import type { RevisionDelError } from '../../core/revision';
+import { revisionDelError } from '../../core/revision';
 import { newCurriculumProgress, reviewCurriculumProgress } from '../../core/curriculum';
 import { altaErrorCard } from '../../core/errorCard';
 import { engine } from '../../services/engine/stockfishEngine';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
-import { computeDests } from './chessBoardUtils';
+import { computeDests, sanDeJugada } from './chessBoardUtils';
 
 const FINAL_ENGINE_DEPTH = 18;
 
@@ -34,6 +36,16 @@ export interface FinalesState {
   userMoves: number;
   limpia: boolean | null;
   engineError: boolean;
+  /**
+   * Punto crítico de una técnica perdida: la posición anterior a la última
+   * jugada propia, con esa jugada y la que el motor prefería. Alimenta la
+   * flecha del tablero y el texto del feedback (RF-5.3) — antes el final se
+   * cerraba con "la técnica se perdió" y nada más, que es justo cuando hace
+   * falta ver la alternativa.
+   */
+  revision: RevisionDelError | null;
+  /** Jugada correcta en el punto crítico, en SAN, para el panel. */
+  jugadaCorrecta: string | null;
   /**
    * La demostración en curso es práctica libre: no toca el progreso espaciado.
    * RF-6.3 pide "3 demostraciones **espaciadas** sin error" y la lista dejaba
@@ -102,25 +114,34 @@ export function createFinalesStore(deps: FinalesDeps) {
         progressById.set(item.id, next);
       }
 
+      let revision: RevisionDelError | null = null;
+      let jugadaCorrecta: string | null = null;
       if (!limpia && lastUserFen && lastUserMove) {
         try {
           const best = await deps.enginePort.evaluate(lastUserFen, FINAL_ENGINE_DEPTH);
-          const cards = await deps.errors.list();
-          const alta = altaErrorCard(cards, {
-            fen: lastUserFen,
-            ladoAMover: item.ladoUsuario ?? 'w',
-            jugadaUsuario: lastUserMove,
-            jugadaCorrecta: best.move,
-            categoria: 'posicional',
-            origen: 'final',
-          });
-          if (alta.accion !== 'omitir') await deps.errors.save(alta.card);
+          revision = revisionDelError(lastUserFen, lastUserMove, best.move);
+          jugadaCorrecta = sanDeJugada(lastUserFen, best.move);
+          // Si la última jugada propia era la mejor, el final no se perdió ahí
+          // (típico al no llegar al mate en 50 jugadas): guardarla como error a
+          // repasar enseñaría a no repetir la jugada correcta.
+          if (best.move !== lastUserMove) {
+            const cards = await deps.errors.list();
+            const alta = altaErrorCard(cards, {
+              fen: lastUserFen,
+              ladoAMover: item.ladoUsuario ?? 'w',
+              jugadaUsuario: lastUserMove,
+              jugadaCorrecta: best.move,
+              categoria: 'posicional',
+              origen: 'final',
+            });
+            if (alta.accion !== 'omitir') await deps.errors.save(alta.card);
+          }
         } catch {
           // El progreso del final ya quedó guardado; una falla secundaria del
           // motor no debe impedir mostrar el resultado de la demostración.
         }
       }
-      snapshot({ phase: 'feedback', limpia, thinking: false, progressById, pendingPromotion: null });
+      snapshot({ phase: 'feedback', limpia, thinking: false, progressById, pendingPromotion: null, revision, jugadaCorrecta });
     }
 
     async function engineTurn() {
@@ -134,7 +155,10 @@ export function createFinalesStore(deps: FinalesDeps) {
         const promotion = evaluation.move.slice(4, 5) || undefined;
         chess.move({ from, to, promotion });
         if (chess.isGameOver()) {
-          const verdict = evaluateFinalTechnique(item, positionState(Boolean(promotion)), null);
+          // `promoted` describe la coronación **del usuario**: pasar acá la del
+          // motor daba por demostrada la técnica cuando quien coronaba era el
+          // rival.
+          const verdict = evaluateFinalTechnique(item, positionState(false), null);
           await finish(verdict === 'demostrado');
           return;
         }
@@ -161,6 +185,8 @@ export function createFinalesStore(deps: FinalesDeps) {
       limpia: null,
       engineError: false,
       practica: false,
+      revision: null,
+      jugadaCorrecta: null,
 
       async load() {
         await deps.items.ensureSeeded();
@@ -181,6 +207,7 @@ export function createFinalesStore(deps: FinalesDeps) {
         set({
           phase: 'cargando', item, playerColor: item.ladoUsuario, userMoves: 0,
           limpia: null, engineError: false, pendingPromotion: null, lastMove: null, practica,
+          revision: null, jugadaCorrecta: null,
         });
         try {
           await deps.enginePort.init();
@@ -207,11 +234,12 @@ export function createFinalesStore(deps: FinalesDeps) {
 
         lastUserFen = chess.fen();
         lastUserMove = from + to + (promotion ?? '');
+        const corono = Boolean(candidate.promotion);
         chess.move({ from, to, promotion });
         set({ userMoves: s.userMoves + 1, pendingPromotion: null });
         snapshot({ lastMove: [from, to], thinking: true });
 
-        const terminal = evaluateFinalTechnique(s.item, positionState(Boolean(candidate.promotion)), null);
+        const terminal = evaluateFinalTechnique(s.item, positionState(corono), null);
         if (terminal === 'demostrado' || terminal === 'perdido') {
           await finish(terminal === 'demostrado');
           return;
@@ -223,7 +251,9 @@ export function createFinalesStore(deps: FinalesDeps) {
           snapshot({ thinking: false, engineError: true });
           return;
         }
-        const verdict = evaluateFinalTechnique(s.item, positionState(), evaluation);
+        // La coronación viaja hasta acá: es la evaluación posterior la que dice
+        // si coronar convirtió de verdad o si la dama se cae en la próxima.
+        const verdict = evaluateFinalTechnique(s.item, positionState(corono), evaluation);
         if (verdict !== 'continuar') {
           await finish(verdict === 'demostrado');
           return;
@@ -246,7 +276,10 @@ export function createFinalesStore(deps: FinalesDeps) {
 
       volver() {
         chess = new Chess();
-        set({ phase: 'lista', item: null, limpia: null, thinking: false, pendingPromotion: null, practica: false });
+        set({
+          phase: 'lista', item: null, limpia: null, thinking: false, pendingPromotion: null,
+          practica: false, revision: null, jugadaCorrecta: null,
+        });
       },
     };
   });

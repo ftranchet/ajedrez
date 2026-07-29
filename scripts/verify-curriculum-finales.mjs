@@ -23,7 +23,28 @@ try {
     assert(pieces <= 7, `${item.nombre}: excede siete piezas y deja de ser un final elemental acotado`);
     assert(item.ladoUsuario === 'w' || item.ladoUsuario === 'b', `${item.nombre}: falta ladoUsuario`);
 
-    const [best] = await engine.analyseMultiPv(item.fen, 2, 22);
+    // El objetivo declarado es lo que la app exige para dar la técnica por
+    // demostrada (core/finales.ts): 'coronar' solo tiene sentido con peón
+    // propio, y 'mate' solo si no lo hay — si no, el final se cerraría con un
+    // criterio que la posición no puede cumplir.
+    const tienePeonPropio = chess
+      .board()
+      .flat()
+      .some((sq) => sq && sq.type === 'p' && sq.color === item.ladoUsuario);
+    if (item.resultadoEsperado === 'gana') {
+      assert(item.objetivo === 'mate' || item.objetivo === 'coronar', `${item.nombre}: falta objetivo ('mate' o 'coronar')`);
+      assert(
+        item.objetivo === 'coronar' ? tienePeonPropio : !tienePeonPropio,
+        `${item.nombre}: objetivo '${item.objetivo}' incompatible con la posición`,
+      );
+    } else {
+      assert(item.objetivo === undefined, `${item.nombre}: un final de tablas no declara objetivo`);
+    }
+
+    // Una sola línea (ver `analyseBest`): acá alcanza con la mejor jugada del
+    // bando que mueve, y pedir dos en posiciones de tres piezas hace que la
+    // búsqueda a profundidad 22 se vuelva impracticable.
+    const best = await engine.analyseBest(item.fen, 22, 120_000);
     assert(best, `${item.nombre}: Stockfish no devolvió evaluación`);
     const sideToMove = item.fen.split(' ')[1];
     const userScore = sideToMove === item.ladoUsuario ? best.score : -best.score;
@@ -32,7 +53,7 @@ try {
     } else {
       assert(Math.abs(userScore) <= 50, `${item.nombre}: no sostiene tablas (${userScore} cp)`);
     }
-    console.log(`OK  ${item.nombre}: ${item.resultadoEsperado}, ${userScore} cp, ${best.move}`);
+    console.log(`OK  ${item.nombre}: ${item.resultadoEsperado}${item.objetivo ? ` (${item.objetivo})` : ''}, ${userScore} cp, ${best.move}`);
   }
   console.log(`\n${items.length} finales verificados con Stockfish 18.`);
 } finally {

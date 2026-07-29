@@ -695,13 +695,15 @@ function feedbackForSession(s: ReturnType<typeof useSessionStore.getState>): Boa
   if (s.phase === 'cola' && s.colaSubPhase === 'feedback') {
     return s.colaUltimoAcierto
       ? { kind: 'success', move: s.lastMove }
-      : { kind: 'error', move: null };
+      : { kind: 'error', move: null, revision: s.revision };
   }
   if (s.phase === 'curriculo' && s.curriculumSubPhase === 'feedback') {
     return s.curriculumUltimaLimpia
       ? { kind: 'success', move: s.lastMove }
-      : { kind: 'error', move: null };
+      : { kind: 'error', move: null, revision: s.revision };
   }
+  // El criterio de cálculo se responde con un botón, no en el tablero: no hay
+  // jugada correcta que señalar.
   if (s.phase === 'triage' && s.triageSubPhase === 'feedback') {
     return s.triageUltimaCorrecta
       ? { kind: 'success', move: null }
@@ -712,7 +714,7 @@ function feedbackForSession(s: ReturnType<typeof useSessionStore.getState>): Boa
   if (s.phase === 'radar' && s.radarSubPhase === 'feedback') {
     return s.radarUltimoAcierto
       ? { kind: 'success', move: s.lastMove }
-      : { kind: 'error', move: null };
+      : { kind: 'error', move: null, revision: s.revision };
   }
   return null;
 }

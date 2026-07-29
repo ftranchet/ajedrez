@@ -7,7 +7,8 @@
     "fen": "8/4k3/8/4K3/4P3/8/8/8 b - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
   },
   {
     "id": "final-oposicion-2",
@@ -17,7 +18,29 @@
     "fen": "3k4/8/3K4/3P4/8/8/8/8 w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
+  },
+  {
+    "id": "final-oposicion-3",
+    "tipo": "final",
+    "patternKey": "final-rey-peon",
+    "nombre": "Oposición: con el peón todavía atrás",
+    "fen": "8/8/8/4k3/8/4K3/4P3/8 b - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
+  },
+  {
+    "id": "final-oposicion-defensa-1",
+    "tipo": "final",
+    "patternKey": "final-rey-peon",
+    "nombre": "Oposición: defender las tablas",
+    "fen": "8/8/8/3k4/8/3K4/3P4/8 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "tablas",
+    "ladoUsuario": "b"
   },
   {
     "id": "final-cuadrado-1",
@@ -27,7 +50,8 @@
     "fen": "7k/8/8/8/2P5/8/8/4K3 w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
   },
   {
     "id": "final-cuadrado-2",
@@ -37,7 +61,28 @@
     "fen": "7k/8/8/8/P7/8/8/1K6 w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
+  },
+  {
+    "id": "final-cuadrado-3",
+    "tipo": "final",
+    "patternKey": "final-cuadrado",
+    "nombre": "Regla del cuadrado: alcanzar el peón a tiempo",
+    "fen": "8/8/8/8/P3k3/8/8/6K1 b - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "tablas",
+    "ladoUsuario": "b"
+  },
+  {
+    "id": "final-peon-torre-1",
+    "tipo": "final",
+    "patternKey": "final-peon-torre",
+    "nombre": "Peón de torre: llegar a la esquina",
+    "fen": "8/8/4k3/6KP/8/8/8/8 b - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "tablas",
+    "ladoUsuario": "b"
   },
   {
     "id": "final-lucena-1",
@@ -47,7 +92,19 @@
     "fen": "2K5/k1P5/8/8/8/8/5r2/3R4 w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
+  },
+  {
+    "id": "final-lucena-2",
+    "tipo": "final",
+    "patternKey": "final-lucena",
+    "nombre": "Lucena: el puente con el peón de rey",
+    "fen": "4K3/2k1P3/8/8/8/8/6r1/3R4 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w",
+    "objetivo": "coronar"
   },
   {
     "id": "final-philidor-1",
@@ -60,6 +117,16 @@
     "ladoUsuario": "b"
   },
   {
+    "id": "final-philidor-2",
+    "tipo": "final",
+    "patternKey": "final-philidor",
+    "nombre": "Philidor: la defensa con el peón de dama",
+    "fen": "8/3k4/r7/3K4/3P4/8/8/7R b - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "tablas",
+    "ladoUsuario": "b"
+  },
+  {
     "id": "final-torre-1",
     "tipo": "final",
     "patternKey": "final-torre",
@@ -67,7 +134,19 @@
     "fen": "8/8/8/4k3/8/8/8/4K2R w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "mate"
+  },
+  {
+    "id": "final-torre-2",
+    "tipo": "final",
+    "patternKey": "final-torre",
+    "nombre": "Rey y torre: empujar al rey hasta el borde",
+    "fen": "8/8/3k4/8/8/8/6K1/R7 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w",
+    "objetivo": "mate"
   },
   {
     "id": "final-dama-1",
@@ -77,6 +156,18 @@
     "fen": "8/8/8/4k3/8/8/8/3QK3 w - - 0 1",
     "solucion": [],
     "resultadoEsperado": "gana",
-    "ladoUsuario": "w"
+    "ladoUsuario": "w",
+    "objetivo": "mate"
+  },
+  {
+    "id": "final-dama-2",
+    "tipo": "final",
+    "patternKey": "final-dama",
+    "nombre": "Rey y dama: dar mate sin ahogar",
+    "fen": "8/8/8/2k5/8/8/8/Q3K3 w - - 0 1",
+    "solucion": [],
+    "resultadoEsperado": "gana",
+    "ladoUsuario": "w",
+    "objetivo": "mate"
   }
 ]

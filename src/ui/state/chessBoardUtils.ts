@@ -39,3 +39,13 @@ export function sanDeLinea(fen: string, uciMoves: string[]): string[] {
   }
   return san;
 }
+
+/**
+ * SAN de una jugada suelta para mostrarla en el feedback (design system §5,
+ * MoveList: "font-mono" pero notación legible, no UCI crudo); `fen` es la
+ * posición **antes** de la jugada. Cae a UCI si resultara ilegal — no debería
+ * pasar: sale de la solución del ítem, de la tarjeta o del motor.
+ */
+export function sanDeJugada(fen: string, jugadaUci: string): string {
+  return sanDeLinea(fen, [jugadaUci])[0] ?? jugadaUci;
+}

@@ -15,6 +15,7 @@ import { useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
+import { FINAL_DRAW_HOLD_MOVES, objetivoDeFinal } from '../../core/finales';
 import { isDue } from '../../core/scheduler';
 import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
@@ -326,6 +327,13 @@ function Setup() {
   );
 }
 
+/** Qué se le pide al usuario en este final, en los mismos términos con los que
+ * `core/finales.ts` juzga la demostración. */
+function objetivoTexto(item: CurriculumItem): string {
+  if (item.resultadoEsperado !== 'gana') return t.finales.objetivoTablas;
+  return objetivoDeFinal(item) === 'mate' ? t.finales.objetivoMate : t.finales.objetivoCoronar;
+}
+
 /**
  * Una técnica de final en la lista. Los tres estados posibles son distintos y
  * conviene que se vean distintos: vencida (la que toca hoy y suma a la racha),
@@ -421,6 +429,11 @@ function FinalesScreen() {
           dests={s.dests}
           movableColor={s.phase === 'jugando' && !s.thinking && s.turn === s.playerColor ? s.playerColor : null}
           onMove={(from, to) => void s.userMove(from as Square, to as Square)}
+          feedback={
+            s.phase === 'feedback' && s.limpia === false
+              ? { kind: 'error', move: null, revision: s.revision }
+              : null
+          }
         />
         {s.pendingPromotion && (
           <PromotionDialog
@@ -433,9 +446,21 @@ function FinalesScreen() {
       <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
         <div className="rounded-lg border border-subtle bg-surface p-4">
           <p className="m-0 font-display text-xl">{item.nombre}</p>
-          <p className="m-0 mt-2 text-sm text-secondary">
-            {item.resultadoEsperado === 'gana' ? t.finales.objetivoGana : t.finales.objetivoTablas}
-          </p>
+          {/* El objetivo se dice tal como se juzga (RF-6.2): en un mate
+              elemental hay que dar el mate, y en uno de peón hay que coronar
+              sin tirar la ventaja. Antes decía "coronar o ganar" para todos, y
+              la app cerraba el ejercicio con otro criterio. */}
+          <p className="m-0 mt-2 text-sm text-secondary">{objetivoTexto(item)}</p>
+          {/* Cuánto falta de la defensa: sostener doce jugadas propias es el
+              criterio real, y sin contador no había forma de saber dónde
+              estabas parado. */}
+          {item.resultadoEsperado === 'tablas' && s.phase === 'jugando' && (
+            <p className="m-0 mt-2 font-mono text-xs text-tertiary">
+              {t.finales.sostenidas
+                .replace('{n}', String(Math.min(s.userMoves, FINAL_DRAW_HOLD_MOVES)))
+                .replace('{total}', String(FINAL_DRAW_HOLD_MOVES))}
+            </p>
+          )}
         </div>
         {s.engineError && (
           <div className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
@@ -461,6 +486,13 @@ function FinalesScreen() {
                 ? s.limpia ? t.finales.demostradoPractica : t.finales.perdidoPractica
                 : s.limpia ? t.finales.demostradoTexto : t.finales.perdidoTexto}
             </p>
+            {/* El punto crítico, dicho y mostrado: el tablero vuelve a esa
+                posición con la flecha de lo que el motor prefería. */}
+            {s.jugadaCorrecta && (
+              <p className="m-0 font-mono text-xs text-secondary">
+                {t.radar.jugadaCorrecta}: {s.jugadaCorrecta}
+              </p>
+            )}
             <button className="btn-primary" onClick={() => s.volver()}>{t.finales.volver}</button>
           </div>
         )}
