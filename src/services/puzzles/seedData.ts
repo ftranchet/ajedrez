@@ -1,10 +1,10 @@
 // GENERADO por scripts/build-radar-dataset.mjs — no editar a mano.
-// Lote radar-009a3563237b: puzzles de Lichess (CC0) y posiciones tranquilas de
+// Lote radar-e57f5664425f: puzzles de Lichess (CC0) y posiciones tranquilas de
 // partidas reales verificadas por Stockfish. Ver docs/radar-dataset.md,
 // ADR-0005 y RF-5.6 para reproducirlo.
 import type { RadarItem } from '../../core/types';
 
-export const RADAR_DATASET_VERSION = "radar-009a3563237b";
+export const RADAR_DATASET_VERSION = "radar-e57f5664425f";
 
 export const seedRadarItems: RadarItem[] = [
   {
@@ -2819,6 +2819,110 @@ export const seedRadarItems: RadarItem[] = [
         "gxf5"
       ],
       "costoCp": 111,
+      "profundidad": 17
+    }
+  },
+  {
+    "id": "enven-21",
+    "fen": "rnb2rk1/pp1p1ppp/1q2pn2/8/4P3/P1N2N2/1PPBKbPP/R2Q1B1R b - - 1 9",
+    "tipo": "envenenada",
+    "temas": [
+      "envenenada",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "d7d5"
+    ],
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Qxb2",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Kxf2",
+        "d5",
+        "Bd3",
+        "dxe4"
+      ],
+      "costoCp": 442,
+      "profundidad": 17
+    }
+  },
+  {
+    "id": "enven-22",
+    "fen": "r1bqkb1r/pp4pp/1n2pn2/2ppNp2/3PPN2/2P5/PP3PPP/R1BQKB1R b KQkq - 0 8",
+    "tipo": "envenenada",
+    "temas": [
+      "envenenada",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "a7a6"
+    ],
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Nxe4",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Qh5+",
+        "g6",
+        "Nfxg6",
+        "Nf6"
+      ],
+      "costoCp": 231,
+      "profundidad": 17
+    }
+  },
+  {
+    "id": "enven-23",
+    "fen": "rnb2rk1/2pp1pp1/pp2pq1p/3PP3/8/8/PPP1QbPP/RN1K1BNR b - - 0 10",
+    "tipo": "envenenada",
+    "temas": [
+      "envenenada",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "f6f4"
+    ],
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "exd5",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "exf6",
+        "Bd4",
+        "fxg7",
+        "Bxg7"
+      ],
+      "costoCp": 732,
+      "profundidad": 17
+    }
+  },
+  {
+    "id": "enven-24",
+    "fen": "r2qk2r/pp1b1ppp/2nb1n2/3p4/3P4/1Q1B1N2/PP3PPP/RNB1K2R w KQkq - 2 10",
+    "tipo": "envenenada",
+    "temas": [
+      "envenenada",
+      "autojuego-verificado"
+    ],
+    "rating": 1500,
+    "solucion": [
+      "e1g1"
+    ],
+    "fuente": "pipeline-envenenada",
+    "carnada": {
+      "san": "Qxb7",
+      "ganaPeones": 1,
+      "refutacionSan": [
+        "Rb8",
+        "Qa6",
+        "Qe7+",
+        "Be3"
+      ],
+      "costoCp": 381,
       "profundidad": 17
     }
   }

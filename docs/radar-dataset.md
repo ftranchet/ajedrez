@@ -4,7 +4,7 @@ Este documento describe cómo se genera el catálogo offline del Radar de ELOmax
 
 ## Lote publicado
 
-El catálogo vigente contiene 128 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 28 generadas por autojuego (8 de doble solución y 20 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 21 de oferta envenenada.
+El catálogo vigente contiene 132 posiciones: 80 puzzles del export oficial de Lichess, 20 tranquilas extraídas de partidas estándar reales y 32 generadas por autojuego (8 de doble solución y 24 de oferta envenenada). Todo el contenido no proveniente del export fue verificado con Stockfish 18. Tras reclasificar por evidencia del motor, la distribución semántica actual es 45 ofensivas, 20 defensivas, 20 tranquilas, 22 de oferta genuina y 25 de oferta envenenada.
 
 Los exports de base de datos de Lichess son CC0 y su formato oficial explica que el FEN del puzzle es anterior a la jugada de armado; por eso el pipeline aplica la primera UCI antes de guardar la posición que ve el usuario. Fuente: [Lichess open database](https://database.lichess.org/).
 
@@ -173,12 +173,30 @@ Y con las 12 envenenadas nuevas (catálogo de 128), que además engordan el pool
 | avanzado | 57 | 4 días | 67/128 |
 | experto | 31 | 2 días | 39/128 |
 
+Con las 4 de la ronda de 2026-07-29 (catálogo de 132) las bandas medias ganan otro día entero de separación, con cuatro posiciones: es lo que hay que tener en cuenta al juzgar si vale la pena el cómputo.
+
+| Banda | Pool efectivo | Repite a los | Visto en 30 días |
+|---|---:|---:|---:|
+| principiante | 30 | 3 días | 36/132 |
+| elemental | 60 | **5 días** | 67/132 |
+| intermedio | 61 | **5 días** | 71/132 |
+| avanzado | 61 | 4 días | 71/132 |
+| experto | 31 | 2 días | 39/132 |
+
 Los extremos (principiante y experto) no se movieron, y ese es justo el punto del párrafo siguiente: el contenido de autojuego entra todo en el percentil 50.
 
-**El límite que queda es el tamaño del catálogo, y es real.** Con 128 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
+**El límite que queda es el tamaño del catálogo, y es real.** Con 132 posiciones y 8–10 por sesión no hay reparto que evite repetir en una semana. Las dos vías para agrandarlo:
 
 - **Puzzles CC0 de Lichess** — la vía buena, y la única que agranda los extremos de dificultad, porque traen rating calibrado por la comunidad. Requiere descargar el export oficial (ver "Generación reproducible"); el entorno de desarrollo donde se hizo esta ronda no tiene salida a `database.lichess.org`, así que quedó pendiente de correrse en una máquina con red.
-- **Autojuego local** — funciona, pero es caro y solo engorda el medio de la escala. En esta ronda se minaron **12 envenenadas nuevas** (de 9 a 21 en total, el tipo más escaso del catálogo) revisando 871 posiciones de autojuego: **1 candidata cada ~73 revisadas**, unas dos horas de cómputo. Reproducible con `node scripts/mine-envenenada.mjs --target N --checkpoint ruta.json` y `node scripts/finalize-envenenada.mjs --checkpoint ruta.json --conservar` (sin `--conservar` reemplaza el lote entero en vez de sumar).
+- **Autojuego local** — funciona, pero es caro y solo engorda el medio de la escala. En la ronda de 2026-07-27 se minaron **12 envenenadas nuevas** (de 9 a 21 en total, el tipo más escaso del catálogo) revisando 871 posiciones de autojuego: **1 candidata cada ~73 revisadas**, unas dos horas de cómputo. La de 2026-07-29 sumó **4 más** (21 → 25) con 414 revisadas, misma tasa. Receta completa, en tres pasos:
+
+  ```sh
+  node scripts/mine-envenenada.mjs --target 12 --checkpoint ruta.json
+  node scripts/finalize-envenenada.mjs --checkpoint ruta.json --conservar
+  npm run build:carnadas && npm test && npm run measure:radar
+  ```
+
+  El minador guarda checkpoint después de cada partida de autojuego, así que se puede cortar y retomar. Sin `--conservar`, `finalize` **reemplaza** el lote entero en vez de sumar. El tercer paso no es opcional y un test lo hace cumplir: cada envenenada necesita su carnada marcada por el motor (RF-5.3), y sin eso `radarExplicacion.test.ts` falla con "enven-NN sin carnada".
 
 **Y ojo con una interacción:** todo el contenido de autojuego lleva rating fijo 1500 y, por ADR-0007, una cohorte constante queda en el percentil 50. Sumar más posiciones generadas **no ayuda a un usuario cuyo centro adaptativo esté lejos del medio**: sigue siendo invisible salvo por el rescate por tipo descrito abajo. Darles una dificultad medida (por ejemplo, a qué profundidad se estabiliza la mejor jugada del motor) sería una decisión de diseño nueva, no un ajuste.
 
