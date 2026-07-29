@@ -47,7 +47,7 @@ npm run add:puzzles -- --puzzles lichess_db_puzzle.csv.zst --target 400
 npm test && npm run measure:radar
 ```
 
-Eso es todo. Requiere `zstd` instalado (o descomprimir a mano y pasar el `.csv`). Opciones:
+Eso es todo. El `.zst` se descomprime con el zstd que Node trae de fábrica (22.15+); en un Node anterior hace falta el binario `zstd` instalado, o descomprimir a mano y pasar el `.csv`. Opciones:
 
 | Opción | Por defecto | Para qué |
 |---|---|---|
@@ -69,7 +69,7 @@ Medido con datos sintéticos de prueba, sumar 154 posiciones llevó el catálogo
 
 ## Generación reproducible (lote completo, desde cero)
 
-Requisitos: Node 20+, `zstd`, y `script` (util-linux; da un pseudo-terminal al binario WASM de Stockfish). Los archivos de entrada no se versionan en este repositorio.
+Requisitos: Node 20+ y `script` (util-linux; da un pseudo-terminal al binario WASM de Stockfish). Los `.zst` los abre el zstd de Node (22.15+); con un Node anterior, instalar el binario `zstd`. Los archivos de entrada no se versionan en este repositorio.
 
 ```sh
 wget -c https://database.lichess.org/lichess_db_puzzle.csv.zst

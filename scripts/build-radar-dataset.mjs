@@ -1,10 +1,9 @@
 // Construye el lote offline del Radar a partir de los exports oficiales de
 // Lichess. Requiere los archivos CSV/PGN (planos o .zst) ya descargados;
 // nunca accede a red en runtime. Ver docs/radar-dataset.md.
-import { createReadStream, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { basename, resolve } from 'node:path';
-import { spawn } from 'node:child_process';
 import {
   PUZZLE_DATASET_TYPES,
   datasetVersion,
@@ -16,6 +15,7 @@ import {
 } from './lib/radarDataset.mjs';
 import { DEFAULT_QUIET_CONFIG, quietCandidatesFromPgn, verifyQuietCandidate } from './lib/quietPositions.mjs';
 import { StockfishEngine } from './lib/stockfish.mjs';
+import { openTextStream } from './lib/textStream.mjs';
 
 function parseArgs(argv) {
   const options = {};
@@ -47,18 +47,6 @@ function numberOption(options, name, fallback) {
   const value = options[name] === undefined ? fallback : Number(options[name]);
   if (!Number.isInteger(value) || value <= 0) throw new Error(`--${name} debe ser un entero positivo.`);
   return value;
-}
-
-function openTextStream(file) {
-  if (!file.endsWith('.zst')) return { stream: createReadStream(file), stop() {} };
-  const decoder = spawn('zstd', ['-dc', '--', file]);
-  decoder.stderr.pipe(process.stderr);
-  return {
-    stream: decoder.stdout,
-    stop() {
-      decoder.kill();
-    },
-  };
 }
 
 async function collectPuzzles(file, perType) {

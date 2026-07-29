@@ -25,9 +25,8 @@
 //   node scripts/add-lichess-puzzles.mjs --puzzles lichess_db_puzzle.csv.zst
 //   node scripts/add-lichess-puzzles.mjs --puzzles ... --target 600 --rating-min 500 --rating-max 2600
 //   node scripts/add-lichess-puzzles.mjs --puzzles ... --dry-run
-import { createReadStream, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Chess } from 'chess.js';
@@ -43,6 +42,7 @@ import {
   validateRadarDataset,
 } from './lib/radarDataset.mjs';
 import { StockfishEngine } from './lib/stockfish.mjs';
+import { openTextStream } from './lib/textStream.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const SEED_PATH = join(scriptDir, '..', 'src', 'services', 'puzzles', 'seedData.ts');
@@ -64,16 +64,6 @@ function entero(nombre, porDefecto) {
   const valor = Number(arg(nombre, String(porDefecto)));
   if (!Number.isInteger(valor) || valor <= 0) throw new Error(`--${nombre} debe ser un entero positivo.`);
   return valor;
-}
-
-function abrirTexto(archivo) {
-  if (!archivo.endsWith('.zst')) return { stream: createReadStream(archivo), stop() {} };
-  const decoder = spawn('zstd', ['-dc', '--', archivo]);
-  decoder.stderr.pipe(process.stderr);
-  decoder.on('error', () => {
-    console.error('No se pudo ejecutar `zstd`. Instalalo, o descomprimí el archivo a mano y pasá el .csv.');
-  });
-  return { stream: decoder.stdout, stop: () => decoder.kill() };
 }
 
 function cargarCatalogo() {
@@ -157,7 +147,7 @@ async function main() {
   const ocupado = (tramo) => porTramo[tramo].length + pendientesPorTramo[tramo];
   const maxMotor = entero('max-motor', 300);
 
-  const entrada = abrirTexto(archivo);
+  const entrada = openTextStream(archivo);
   const lector = createInterface({ input: entrada.stream, crlfDelay: Infinity });
   let filas = 0;
   let primera = true;
