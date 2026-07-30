@@ -81,6 +81,14 @@ export function CalculoScreen() {
         <p className="m-0 mt-2 text-sm text-secondary">
           {modo === 'comprometida' ? t.calculo.explicacionComprometida : t.calculo.explicacionStoyko}
         </p>
+        {/* Qué parte del ejercicio original implementa esta versión. El código
+            documentaba la simplificación (una jugada por candidata, en vez de
+            la línea entera) y la pantalla la presentaba como si fuera el
+            ejercicio completo: quien lo conoce se da cuenta, y quien no,
+            aprende una versión recortada creyendo que es la de Stoyko. */}
+        {modo === 'stoyko' && (
+          <p className="m-0 mt-2 text-sm text-tertiary">{t.calculo.explicacionStoykoAlcance}</p>
+        )}
       </details>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start">

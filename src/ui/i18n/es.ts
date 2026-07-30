@@ -512,7 +512,8 @@ export const es = {
     modosLabel: 'Modo de cálculo',
     queEsTitulo: '¿Qué es y para qué?',
     explicacionComprometida: 'Declarás la línea forzada completa —tu jugada, la respuesta que esperás, tu continuación— por escrito y antes de tocar el tablero, que no se mueve mientras pensás. Entrena el cálculo íntegro: ver la secuencia entera en la cabeza en vez de “mover y ver qué pasa”.',
-    explicacionStoyko: 'Método del MI Alexander Stoyko (un apellido, no estoicismo): sin reloj, anotás todas las jugadas candidatas que considerarías, cada una con tu evaluación, y recién ahí comparás con la línea del motor. Acertás si tuviste su mejor jugada entre las tuyas. Entrena la amplitud —no quedarte con la primera idea— y el juicio. Una vez por semana.',
+    explicacionStoyko: 'Método del MF Steve Stoyko (un apellido, no estoicismo), difundido por el entrenador Dan Heisman: sin reloj, anotás todas las jugadas candidatas que considerarías, cada una con tu evaluación, y recién ahí comparás con la línea del motor. Acertás si tuviste su mejor jugada entre las tuyas. Entrena la amplitud —no quedarte con la primera idea— y el juicio. Una vez por semana.',
+    explicacionStoykoAlcance: 'El ejercicio original va más lejos: por cada candidata se anotan también las líneas que calculás —tu jugada, la respuesta del rival, tu continuación— y la evaluación va al final de cada línea, no a la jugada suelta. Esta versión registra la primera jugada de cada candidata; las ramas están pendientes.',
   },
   stoyko: {
     cargando: 'Buscando una posición…',
