@@ -767,6 +767,8 @@ export const es = {
     calculoStoykoFallo: 'no la tenías entre tus candidatas',
     calculoStoykoNunca: 'Stoyko: todavía no hiciste ninguno.',
     calculoStoykoTiempo: 'Le dedicaste {duracion} de análisis.',
+    calculoBrecha: 'Tu evaluación quedó a {pasos} paso(s) de la del motor en la escala.',
+    calculoBrechaMedia: 'Media de tus tomas medidas: {media}.',
     triageInformeTitulo: '¿Calcular o ya alcanza?',
     triageInformePeriodo: 'Últimos 30 días.',
     triageInformeSinDatos: 'Acá vas a ver qué tan bien reconocés cuándo una posición pide cálculo profundo y cuándo alcanza con una jugada sólida. El ejercicio aparece en tu sesión cuando tus errores recientes son sobre todo tácticos.',

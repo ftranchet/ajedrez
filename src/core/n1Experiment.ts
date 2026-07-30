@@ -1,7 +1,7 @@
 // Experimento n=1 (RF-12.4): diseño ABAB fijo, línea base, dosis observada y
 // comparación descriptiva. Dominio puro; la persistencia vive en services/.
 import type {
-  CompromisoAttempt,
+  CalculoAttempt,
   GameRecord,
   N1Experiment,
   N1ExperimentPhase,
@@ -9,7 +9,6 @@ import type {
   N1OutcomeSnapshot,
   N1PhaseSnapshot,
   SessionRecord,
-  StoykoAttempt,
 } from './types';
 import { erroresGravesUsuario } from './panel';
 
@@ -21,8 +20,9 @@ export const N1_MIN_GAMES_PER_CONDITION = 3;
 export interface N1ExperimentData {
   games: GameRecord[];
   sessions: SessionRecord[];
-  compromisoAttempts: CompromisoAttempt[];
-  stoykoAttempts: StoykoAttempt[];
+  /** Intentos del ejercicio de cálculo, un solo formato desde ADR-0015: la
+   * modalidad `calculo` siempre trató a los dos presets como un tratamiento. */
+  calculoAttempts: CalculoAttempt[];
 }
 
 export interface StartN1ExperimentArgs {
@@ -81,8 +81,7 @@ export function n1DoseForWindow(
       );
   }
   if (modalidad === 'calculo') {
-    return data.compromisoAttempts.filter((attempt) => timestampInRange(attempt.fecha, startMs, endMs)).length +
-      data.stoykoAttempts.filter((attempt) => timestampInRange(attempt.fecha, startMs, endMs)).length;
+    return data.calculoAttempts.filter((attempt) => timestampInRange(attempt.fecha, startMs, endMs)).length;
   }
   return data.games.filter(
     (game) => game.analisis?.analizadaEn && timestampInRange(game.analisis.analizadaEn, startMs, endMs),

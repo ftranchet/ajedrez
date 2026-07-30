@@ -4,9 +4,9 @@
 import { create } from 'zustand';
 import { Chess } from 'chess.js';
 import type { RadarItem } from '../../core/types';
-import { evaluarLinea, itemsParaCompromiso, type ResultadoCompromiso } from '../../core/compromiso';
+import { evaluarForzado, itemsParaForzado, type ResultadoForzado } from '../../core/calculo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
-import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
+import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { sanDeLinea } from './chessBoardUtils';
 import { t } from '../i18n/es';
 
@@ -36,7 +36,7 @@ interface CompromisoState {
   lineaSolucionSan: string[];
   inputActual: string;
   inputError: string | null;
-  resultado: ResultadoCompromiso | null;
+  resultado: ResultadoForzado | null;
   /** Marca de tiempo al servir el ítem, para el cronómetro silencioso (RF-7.3: nunca visible). */
   inicioMs: number | null;
 
@@ -92,7 +92,7 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
           await radarItemRepo.ensureSeeded();
           const todos = await radarItemRepo.list();
           if (generation !== loadGeneration) return;
-          const pool = itemsParaCompromiso(todos);
+          const pool = itemsParaForzado(todos);
           set({ pool });
           elegirItem();
         } catch {
@@ -132,14 +132,18 @@ export const useCompromisoStore = create<CompromisoState>((set, get) => {
 
       // Línea completa: recién ahora se revela y se puntúa entera (RF-7.1).
       const item = s.item;
-      const resultado = evaluarLinea(item, lineaIngresada);
+      const resultado = evaluarForzado(item, { linea: lineaIngresada });
       const lineaUsuarioSan = sanDeLinea(item.fen, lineaIngresada);
       const lineaSolucionSan = sanDeLinea(item.fen, item.solucion);
       set({ phase: 'feedback', resultado, lineaUsuarioSan, lineaSolucionSan });
-      void compromisoAttemptRepo.save({
+      // Un intento del preset forzado en el formato unificado (ADR-0015): una
+      // sola rama con la línea declarada tal como se escribió, incluidos los
+      // plies equivocados —que el formato viejo no guardaba—.
+      void calculoAttemptRepo.save({
         id: crypto.randomUUID(),
+        preset: 'forzado',
         itemId: item.id,
-        profundidad: item.solucion.length,
+        ramas: [{ linea: lineaIngresada }],
         correcta: resultado.correcta,
         primerErrorEn: resultado.primerErrorEn,
         tiempoMs: s.inicioMs !== null ? Date.now() - s.inicioMs : undefined,

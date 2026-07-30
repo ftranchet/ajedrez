@@ -11,9 +11,10 @@
 import { create } from 'zustand';
 import { Chess } from 'chess.js';
 import type { EvalSymbol, StoykoItem } from '../../core/types';
-import { stoykoAcierto, stoykoDisponible, stoykoProximaDisponibleEn, type Candidata } from '../../core/stoyko';
+import { stoykoDisponible, stoykoProximaDisponibleEn, type Candidata } from '../../core/stoyko';
+import { evaluarAbierto, type ResultadoAbierto } from '../../core/calculo';
 import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
-import { stoykoAttemptRepo } from '../../services/storage/stoykoAttemptRepo';
+import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
@@ -34,7 +35,16 @@ interface StoykoState {
   inputError: string | null;
   confianza: number | null;
   acierto: boolean | null;
+  /**
+   * Las tres varas del preset abierto (ADR-0015): cobertura, profundidad vista
+   * y brecha de evaluación. La brecha es lo que antes se recogía y se
+   * descartaba: el usuario declaraba una evaluación por candidata y nadie la
+   * comparaba con `evaluacionMotor`, que el catálogo ya traía.
+   */
+  resultado: ResultadoAbierto | null;
   lineaMotorSan: string[];
+  /** Evaluación del motor de la posición, para poder contrastarla en pantalla. */
+  evaluacionMotor: EvalSymbol | null;
   inicioMs: number | null;
   /** Repetición libre durante el enfriamiento: no mide ni resetea la semana. */
   practica: boolean;
@@ -63,7 +73,9 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   inputError: null,
   confianza: null,
   acierto: null,
+  resultado: null,
   lineaMotorSan: [],
+  evaluacionMotor: null,
   inicioMs: null,
   practica: false,
 
@@ -196,9 +208,21 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     const s = get();
     if (s.phase !== 'confianza' || !s.item) return;
     const item = s.item;
-    const acierto = stoykoAcierto(item, s.candidatas);
+    // Una candidata de un ply es una rama de un ply: el mismo criterio del
+    // preset abierto, ya en el formato unificado (ADR-0015). Cuando la entrada
+    // de ramas exista, esto no cambia.
+    const ramas = s.candidatas.map((candidata) => ({ linea: [candidata.jugada], evaluacion: candidata.evaluacion }));
+    const resultado = evaluarAbierto({ lineaMotor: item.mejorLinea, evaluacionMotor: item.evaluacionMotor }, ramas);
+    const acierto = resultado.cobertura;
     const lineaMotorSan = sanDeLinea(item.fen, item.mejorLinea);
-    set({ phase: 'revelado', confianza: valor, acierto, lineaMotorSan });
+    set({
+      phase: 'revelado',
+      confianza: valor,
+      acierto,
+      resultado,
+      lineaMotorSan,
+      evaluacionMotor: item.evaluacionMotor,
+    });
 
     // Práctica libre: se muestra la línea del motor, pero no se mide ni se
     // resetea el enfriamiento semanal (RF-7.2).
@@ -212,15 +236,17 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
       acierto,
       fecha: ahora,
     });
-    // Persistir el intento entero (RF-7.2/7.3): las candidatas con su
-    // evaluación, el tiempo (cronómetro silencioso, `inicioMs` que antes se
-    // seteaba y nunca se usaba) y la confianza. Antes solo quedaba el acierto
-    // en calibración; el resto se perdía.
-    await stoykoAttemptRepo.save({
+    // Persistir el intento entero (RF-7.2/7.3) en el formato unificado: las
+    // ramas con su evaluación, las tres varas del preset abierto, el tiempo
+    // (cronómetro silencioso) y la confianza.
+    await calculoAttemptRepo.save({
       id: crypto.randomUUID(),
+      preset: 'abierto',
       itemId: item.id,
-      candidatas: s.candidatas,
-      acierto,
+      ramas,
+      cobertura: resultado.cobertura,
+      profundidadVista: resultado.profundidadVista,
+      brechaEvaluacion: resultado.brechaEvaluacion,
       confianzaDeclarada: valor,
       tiempoMs: s.inicioMs !== null ? Date.now() - s.inicioMs : 0,
       fecha: ahora,

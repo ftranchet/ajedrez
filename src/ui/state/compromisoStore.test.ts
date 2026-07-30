@@ -22,7 +22,7 @@ beforeEach(async () => {
   vi.restoreAllMocks();
   await db.radarItems.clear();
   await db.radarDatasetMeta.clear();
-  await db.compromisoAttempts.clear();
+  await db.calculoAttempts.clear();
   await db.radarItems.put(item);
   await db.radarDatasetMeta.put({ id: 'catalogo', version: RADAR_DATASET_VERSION, seededAt: new Date().toISOString() });
 });
@@ -53,7 +53,7 @@ describe('compromisoStore', () => {
     let s = useCompromisoStore.getState();
     expect(s.phase).toBe('jugando'); // todavía faltan 2 plies
     expect(s.lineaIngresada).toEqual(['f1c4']);
-    expect(await db.compromisoAttempts.count()).toBe(0);
+    expect(await db.calculoAttempts.count()).toBe(0);
 
     useCompromisoStore.getState().setInputActual('f8c5');
     useCompromisoStore.getState().agregarJugada();
@@ -72,9 +72,12 @@ describe('compromisoStore', () => {
     expect(s.resultado).toEqual({ correcta: true, primerErrorEn: null });
     expect(s.lineaUsuarioSan).toEqual(s.lineaSolucionSan);
 
-    const attempts = await db.compromisoAttempts.toArray();
+    const attempts = await db.calculoAttempts.toArray();
     expect(attempts).toHaveLength(1);
-    expect(attempts[0]).toMatchObject({ itemId: item.id, profundidad: 3, correcta: true, primerErrorEn: null });
+    // Formato unificado (ADR-0015): una rama con la línea declarada tal como
+    // se escribió — el formato viejo no guardaba la línea, solo el veredicto.
+    expect(attempts[0]).toMatchObject({ preset: 'forzado', itemId: item.id, correcta: true, primerErrorEn: null });
+    expect(attempts[0].ramas).toEqual([{ linea: item.solucion }]);
   });
 
   it('registra el tiempo en silencio (RF-7.3: sin cronómetro visible)', async () => {
@@ -83,7 +86,7 @@ describe('compromisoStore', () => {
       useCompromisoStore.getState().setInputActual(jugada);
       useCompromisoStore.getState().agregarJugada();
     }
-    const attempts = await db.compromisoAttempts.toArray();
+    const attempts = await db.calculoAttempts.toArray();
     expect(typeof attempts[0].tiempoMs).toBe('number');
     expect(attempts[0].tiempoMs).toBeGreaterThanOrEqual(0);
   });
@@ -101,8 +104,10 @@ describe('compromisoStore', () => {
     expect(s.phase).toBe('feedback');
     expect(s.resultado).toEqual({ correcta: false, primerErrorEn: 1 });
 
-    const attempts = await db.compromisoAttempts.toArray();
-    expect(attempts[0]).toMatchObject({ correcta: false, primerErrorEn: 1 });
+    const attempts = await db.calculoAttempts.toArray();
+    expect(attempts[0]).toMatchObject({ preset: 'forzado', correcta: false, primerErrorEn: 1 });
+    // La línea equivocada también queda registrada, incluido el ply del error.
+    expect(attempts[0].ramas[0].linea).toEqual(['f1c4', 'g8f6', 'e1g1']);
   });
 
   it('rechaza un formato de jugada inválido sin agregarla a la línea', async () => {

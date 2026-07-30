@@ -1,10 +1,9 @@
-// Ejercicio de Stoyko semanal (E7, RF-7.2): ante una posición rica y sin
-// reloj, el usuario anota todas las jugadas candidatas que consideraría,
-// cada una con su evaluación, antes de comparar con el motor. A diferencia
-// del Radar o de Cálculo comprometido (RF-7.1), acá no hay una única
-// "solución": el acierto es haber tenido la mejor jugada del motor entre las
-// candidatas, no haberla elegido como la primera o la única.
-import type { EvalSymbol, Profile, StoykoItem } from './types';
+// Cadencia del preset abierto del cálculo declarado (E7, RF-7.2): una vez por
+// semana. El criterio de aprobación del ejercicio vive en `core/calculo.ts`
+// desde ADR-0015 —acá quedó lo que es propio de la cadencia—, porque el
+// enfriamiento semanal es lo único que distingue a este preset del corto en
+// términos de planificación.
+import type { EvalSymbol, Profile } from './types';
 
 /** Enfriamiento semanal: 7 días desde la última vez que se completó (RF-7.2). */
 const ENFRIAMIENTO_DIAS = 7;
@@ -32,11 +31,3 @@ export function stoykoProximaDisponibleEn(
   return new Date(new Date(ultima).getTime() + ENFRIAMIENTO_DIAS * 24 * 60 * 60 * 1000).toISOString();
 }
 
-/**
- * Acierto de Stoyko: alguna de las candidatas que el usuario escribió
- * coincide con la primera jugada de la variante principal del motor. No
- * importa el orden en que las anotó ni cuántas otras candidatas haya escrito.
- */
-export function stoykoAcierto(item: StoykoItem, candidatas: Candidata[]): boolean {
-  return candidatas.some((c) => c.jugada === item.mejorLinea[0]);
-}

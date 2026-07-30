@@ -16,7 +16,7 @@
 // para la partida lenta y Stoyko, los finales jugados hoy según el
 // planificador, la fecha del último intento para Cálculo), así que no hace
 // falta persistir nada nuevo.
-import type { CompromisoAttempt, GameRecord, Profile } from './types';
+import type { CalculoAttempt, GameRecord, Profile } from './types';
 import { partidaLentaSemanal } from './slowGame';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from './stoyko';
 import { presupuestoPorSesion } from './duracion';
@@ -80,17 +80,20 @@ export interface EntradaPrescripciones {
   /** Finales que ya se jugaron hoy contando para el plan (`finalesJugadosHoy`). */
   finalesHechosHoy?: number;
   profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'planSemanal'>;
-  compromisoAttempts: CompromisoAttempt[];
+  /** Intentos del ejercicio de cálculo (ADR-0015). El preset corto es el que
+   * se prescribe para hoy, así que es el que declara su cumplimiento. */
+  calculoAttempts: Pick<CalculoAttempt, 'preset' | 'fecha'>[];
   fugaCalculo: AjusteFugaCalculo;
   /** Minutos que ya ocupa la sesión del día; se descuentan del presupuesto. */
   minutosSesion?: number;
   now?: Date;
 }
 
-/** ¿Se hizo hoy algún ejercicio de línea comprometida? */
-function compromisoHechoHoy(attempts: CompromisoAttempt[], now: Date): boolean {
+/** ¿Se hizo hoy el ejercicio corto de cálculo (preset forzado)? */
+function compromisoHechoHoy(attempts: Pick<CalculoAttempt, 'preset' | 'fecha'>[], now: Date): boolean {
   const inicioDelDia = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   return attempts.some((attempt) => {
+    if (attempt.preset !== 'forzado') return false;
     const t = new Date(attempt.fecha).getTime();
     return Number.isFinite(t) && t >= inicioDelDia && t <= now.getTime();
   });
@@ -181,7 +184,7 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
     const entraHoy = presupuesto >= MINUTOS.compromiso;
     prescripciones.push({
       tipo: 'compromiso',
-      estado: compromisoHechoHoy(entrada.compromisoAttempts, now) ? 'cumplida' : 'pendiente',
+      estado: compromisoHechoHoy(entrada.calculoAttempts, now) ? 'cumplida' : 'pendiente',
       cadencia: entraHoy ? 'hoy' : 'esta-semana',
       ...(entraHoy ? {} : { fueraDePresupuesto: true }),
       minutos: MINUTOS.compromiso,

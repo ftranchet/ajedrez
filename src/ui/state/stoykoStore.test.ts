@@ -26,7 +26,7 @@ beforeEach(async () => {
   await db.stoykoItems.clear();
   await db.stoykoDatasetMeta.clear();
   await db.calibrationRecords.clear();
-  await db.stoykoAttempts.clear();
+  await db.calculoAttempts.clear();
   await db.profile.clear();
   await db.stoykoItems.put(item);
   await db.stoykoDatasetMeta.put({ id: 'catalogo', version: STOYKO_DATASET_VERSION, seededAt: new Date().toISOString() });
@@ -125,11 +125,20 @@ describe('stoykoStore', () => {
 
     // Persiste el intento entero (RF-7.2/7.3): candidatas con evaluación,
     // confianza y tiempo (cronómetro silencioso), no solo el acierto.
-    const attempts = await db.stoykoAttempts.toArray();
+    const attempts = await db.calculoAttempts.toArray();
     expect(attempts).toHaveLength(1);
-    expect(attempts[0]).toMatchObject({ itemId: item.id, acierto: true, confianzaDeclarada: 80 });
-    expect(attempts[0].candidatas.map((c) => c.jugada)).toEqual(['d2d4', 'f1c4']);
-    expect(attempts[0].candidatas[1].evaluacion).toBe('±');
+    // Formato unificado (ADR-0015): preset abierto, una rama por candidata y
+    // las tres varas medidas por separado. La brecha de evaluación es la que
+    // antes se recogía y se descartaba.
+    expect(attempts[0]).toMatchObject({
+      preset: 'abierto',
+      itemId: item.id,
+      cobertura: true,
+      confianzaDeclarada: 80,
+    });
+    expect(attempts[0].ramas.map((rama) => rama.linea[0])).toEqual(['d2d4', 'f1c4']);
+    expect(attempts[0].ramas[1].evaluacion).toBe('±');
+    expect(typeof attempts[0].brechaEvaluacion).toBe('number');
     expect(typeof attempts[0].tiempoMs).toBe('number');
     expect(attempts[0].tiempoMs).toBeGreaterThanOrEqual(0);
   });
@@ -158,7 +167,7 @@ describe('stoykoStore', () => {
 
     // Pero nada se persiste: sin calibración, sin intento, y el enfriamiento intacto.
     expect(await db.calibrationRecords.toArray()).toHaveLength(0);
-    expect(await db.stoykoAttempts.toArray()).toHaveLength(0);
+    expect(await db.calculoAttempts.toArray()).toHaveLength(0);
     const profile = await db.profile.get('principal');
     expect(profile?.stoykoUltimaCompletadaEn).toBe(ultima);
   });

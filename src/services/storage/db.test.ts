@@ -830,6 +830,89 @@ describe('migración de esquema Dexie', () => {
     current.close();
   });
 
+  // ADR-0015: los dos formatos de intento de cálculo se unifican en
+  // `calculoAttempts`. La migración tiene que convertir lo ya guardado —si no,
+  // el Panel y el experimento n=1 ven un historial vacío— sin descartar campos
+  // y sin inventar los que el formato viejo no tenía.
+  it('migra de v17 a v18 convirtiendo los intentos de cálculo a un solo formato', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v17 = new Dexie(name);
+    v17.version(17).stores({
+      radarItems: 'id, tipo, rating',
+      compromisoAttempts: 'id, itemId, fecha',
+      stoykoAttempts: 'id, itemId, fecha',
+      calculoAttempts: 'id, preset, itemId, fecha',
+    });
+    await v17.open();
+    await v17.table('radarItems').add({
+      id: 'r1', fen: 'startpos', tipo: 'ofensiva', temas: [], rating: 1500,
+      solucion: ['d5c6', 'b7c6', 'd1f3'], fuente: 'seed-dev',
+    });
+    await v17.table('compromisoAttempts').bulkAdd([
+      { id: 'c-ok', itemId: 'r1', profundidad: 3, correcta: true, primerErrorEn: null, tiempoMs: 200_000, fecha: '2026-07-20T10:00:00.000Z' },
+      { id: 'c-fallo', itemId: 'r1', profundidad: 3, correcta: false, primerErrorEn: 1, fecha: '2026-07-20T11:00:00.000Z' },
+      // De un ítem que ya no está en el catálogo: no se puede reconstruir la línea.
+      { id: 'c-huerfano', itemId: 'borrado', profundidad: 3, correcta: false, primerErrorEn: 0, fecha: '2026-07-20T12:00:00.000Z' },
+    ]);
+    await v17.table('stoykoAttempts').add({
+      id: 's1',
+      itemId: 'stoyko-01',
+      candidatas: [{ jugada: 'd5c6', evaluacion: '±' }, { jugada: 'g1f3', evaluacion: '=' }],
+      acierto: true,
+      confianzaDeclarada: 70,
+      tiempoMs: 1_800_000,
+      fecha: '2026-07-21T10:00:00.000Z',
+    });
+    v17.close();
+
+    const current = new ElomaxDB(name);
+    await current.open();
+    expect(await current.calculoAttempts.count()).toBe(4);
+
+    // Forzado acertado: la línea se reconstruye entera desde la solución del ítem.
+    expect(await current.calculoAttempts.get('c-ok')).toMatchObject({
+      preset: 'forzado',
+      itemId: 'r1',
+      correcta: true,
+      primerErrorEn: null,
+      tiempoMs: 200_000,
+      ramas: [{ linea: ['d5c6', 'b7c6', 'd1f3'] }],
+    });
+    // Forzado fallido: solo los plies que se pueden afirmar, no los equivocados.
+    expect((await current.calculoAttempts.get('c-fallo'))!.ramas).toEqual([{ linea: ['d5c6'] }]);
+    expect((await current.calculoAttempts.get('c-huerfano'))!.ramas).toEqual([{ linea: [] }]);
+
+    // Abierto: una rama por candidata, el acierto viejo era la cobertura, y la
+    // brecha de evaluación queda declarada como desconocida.
+    expect(await current.calculoAttempts.get('s1')).toMatchObject({
+      preset: 'abierto',
+      cobertura: true,
+      profundidadVista: 1,
+      brechaEvaluacion: null,
+      confianzaDeclarada: 70,
+      ramas: [{ linea: ['d5c6'], evaluacion: '±' }, { linea: ['g1f3'], evaluacion: '=' }],
+    });
+
+    // Las tablas viejas quedan intactas: son el respaldo si la conversión
+    // resultara equivocada, y la exportación las sigue llevando.
+    expect(await current.compromisoAttempts.count()).toBe(3);
+    expect(await current.stoykoAttempts.count()).toBe(1);
+    current.close();
+  });
+
+  it('sin intentos viejos, v18 no crea ninguno', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v17 = new Dexie(name);
+    v17.version(17).stores({ compromisoAttempts: 'id, itemId, fecha', stoykoAttempts: 'id, itemId, fecha', calculoAttempts: 'id, preset, itemId, fecha' });
+    await v17.open();
+    v17.close();
+
+    const current = new ElomaxDB(name);
+    await current.open();
+    expect(await current.calculoAttempts.count()).toBe(0);
+    current.close();
+  });
+
   it('sin diagnóstico completado, v16 no atribuye nada', async () => {
     const name = `elomax-test-${crypto.randomUUID()}`;
     const v15 = new Dexie(name);

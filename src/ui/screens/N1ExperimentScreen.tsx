@@ -9,11 +9,10 @@ import {
   type N1ExperimentData,
 } from '../../core/n1Experiment';
 import type { N1Experiment, N1Modality, N1OutcomeSnapshot } from '../../core/types';
-import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
+import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
-import { stoykoAttemptRepo } from '../../services/storage/stoykoAttemptRepo';
 import { t } from '../i18n/es';
 import { formatDecimal } from '../format';
 
@@ -67,12 +66,11 @@ export function N1ExperimentScreen({ onClose }: Props) {
     void Promise.all([
       gameRepo.list(),
       sessionRepo.list(),
-      compromisoAttemptRepo.list(),
-      stoykoAttemptRepo.list(),
+      calculoAttemptRepo.list(),
       n1ExperimentRepo.list(),
-    ]).then(async ([games, sessions, compromisoAttempts, stoykoAttempts, experiments]) => {
+    ]).then(async ([games, sessions, calculoAttempts, experiments]) => {
       if (!alive) return;
-      const loadedData = { games, sessions, compromisoAttempts, stoykoAttempts };
+      const loadedData = { games, sessions, calculoAttempts };
       const latest = experiments[0] ?? null;
       const loadedAt = new Date();
       const updated = latest ? closeDueN1Phases(latest, loadedData, loadedAt) : null;

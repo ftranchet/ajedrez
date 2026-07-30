@@ -30,7 +30,7 @@ import { dueCurriculumItems, esDemostracionLimpia, finalesJugadosHoy, interleave
 import { DEFAULT_PROFILE, detectarFugaCalculo, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { prescripcionesExternas, type PrescripcionExterna } from '../../core/prescripcionesExternas';
 import { gameRepo } from '../../services/storage/gameRepo';
-import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
+import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
@@ -612,7 +612,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
 
           await Promise.all([curriculumItemRepo.ensureSeeded(), radarItemRepo.ensureSeeded()]);
-          const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts, compromisoAttempts] =
+          const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts, calculoAttempts] =
             await Promise.all([
               errorCardRepo.list(),
               curriculumItemRepo.list(),
@@ -621,7 +621,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
               gameRepo.list(),
               radarItemRepo.list(),
               radarAttemptRepo.list(),
-              compromisoAttemptRepo.list(),
+              calculoAttemptRepo.list(),
             ]);
           if (generation !== summaryGeneration) return;
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
@@ -665,7 +665,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
               finalesPendientes,
               finalesHechosHoy,
               profile,
-              compromisoAttempts,
+              calculoAttempts,
               fugaCalculo: detectarFugaCalculo(radarAttempts, radarItems),
               // El plan semanal gobierna la carga: lo que no entra en el
               // presupuesto de hoy se muestra como tarea de la semana.

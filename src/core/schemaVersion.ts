@@ -13,4 +13,4 @@
 // test lo verifica contra la base real, porque si se declara una migración
 // nueva y esto no sube, el manifiesto miente sobre el esquema y la guarda de
 // "archivo más nuevo que la app" deja pasar paquetes que no puede leer.
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;

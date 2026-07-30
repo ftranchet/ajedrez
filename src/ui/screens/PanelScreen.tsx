@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { CalibrationRecord, Color, CompromisoAttempt, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, StoykoAttempt, TransferMeasurement, TriageAttempt } from '../../core/types';
+import type { CalculoAttempt, CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas, serieErroresGraves, tendenciaSerie } from '../../core/panel';
@@ -16,7 +16,7 @@ import { transferAvailability, transferDelta, transferResults } from '../../core
 import { detectOverfitting } from '../../core/overfitting';
 import { resumenCriterio } from '../../core/triage';
 import { hitosLogrados } from '../../core/milestones';
-import { resumenCompromiso, resumenStoyko } from '../../core/calculoSummary';
+import { resumenAbierto, resumenForzado } from '../../core/calculoSummary';
 import { currentN1Phase } from '../../core/n1Experiment';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { radarAttemptRepo } from '../../services/storage/radarAttemptRepo';
@@ -26,8 +26,7 @@ import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAt
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
 import { triageAttemptRepo } from '../../services/storage/triageAttemptRepo';
-import { compromisoAttemptRepo } from '../../services/storage/compromisoAttemptRepo';
-import { stoykoAttemptRepo } from '../../services/storage/stoykoAttemptRepo';
+import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { n1ExperimentRepo } from '../../services/storage/n1ExperimentRepo';
 import { TRANSFER_DATASET_VERSION } from '../../services/puzzles/transferSeedData';
@@ -394,21 +393,23 @@ function ResumenView({
   );
 }
 
-// Cálculo (E7): que hacer los ejercicios deje rastro medible. Auto-carga sus
-// intentos (línea comprometida y Stoyko) para no acoplarse al resto del Panel.
+// Cálculo (E7): que hacer el ejercicio deje rastro medible. Auto-carga sus
+// intentos —un solo formato desde ADR-0015, los dos presets— para no acoplarse
+// al resto del Panel. Cada preset se lee con su propia vara: nunca un promedio
+// entre una posición con respuesta verificable y otra sin ella.
 function CalculoSummary() {
-  const [data, setData] = useState<{ compromiso: CompromisoAttempt[]; stoyko: StoykoAttempt[] } | null>(null);
+  const [data, setData] = useState<CalculoAttempt[] | null>(null);
   useEffect(() => {
     let alive = true;
-    void Promise.all([compromisoAttemptRepo.list(), stoykoAttemptRepo.list()]).then(([compromiso, stoyko]) => {
-      if (alive) setData({ compromiso, stoyko });
+    void calculoAttemptRepo.list().then((attempts) => {
+      if (alive) setData(attempts);
     });
     return () => { alive = false; };
   }, []);
   if (data === null) return null;
 
-  const comp = resumenCompromiso(data.compromiso);
-  const stk = resumenStoyko(data.stoyko);
+  const comp = resumenForzado(data);
+  const stk = resumenAbierto(data);
   return (
     <section className="rounded-lg border border-subtle bg-surface p-4">
       <SectionHeading className="mb-2">{t.panel.calculoTitulo}</SectionHeading>
@@ -428,12 +429,24 @@ function CalculoSummary() {
             {stk
               ? t.panel.calculoStoyko
                   .replace('{fecha}', new Date(stk.fecha).toLocaleDateString('es-AR'))
-                  .replace('{resultado}', stk.acierto ? t.panel.calculoStoykoAcierto : t.panel.calculoStoykoFallo)
+                  .replace('{resultado}', stk.cobertura ? t.panel.calculoStoykoAcierto : t.panel.calculoStoykoFallo)
               : t.panel.calculoStoykoNunca}
             {stk && stk.tiempoMsUltima !== null && (
               <> {t.panel.calculoStoykoTiempo.replace('{duracion}', formatDuracion(stk.tiempoMsUltima))}</>
             )}
           </p>
+          {/* La brecha de evaluación es lo que este ejercicio entrena de verdad
+              (E10) y hasta ADR-0015 se recogía y se descartaba. Se muestra la
+              de la última toma y la media, y se dice cuando todavía no se pudo
+              medir en vez de dibujar un 0. */}
+          {stk && stk.brechaEvaluacion !== null && (
+            <p className="m-0">
+              {t.panel.calculoBrecha.replace('{pasos}', String(stk.brechaEvaluacion))}
+              {stk.brechaMedia !== null && (
+                <> {t.panel.calculoBrechaMedia.replace('{media}', formatDecimal(stk.brechaMedia, 1))}</>
+              )}
+            </p>
+          )}
         </div>
       )}
     </section>

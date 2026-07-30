@@ -3,6 +3,7 @@
 // nuevo con su upgrade; nunca se edita una versión ya publicada.
 import Dexie, { type Table } from 'dexie';
 import type {
+  CalculoAttempt,
   CalibrationRecord,
   CandidataAttempt,
   CompromisoAttempt,
@@ -26,6 +27,7 @@ import type {
   TriageAttempt,
   TransferMeasurement,
 } from '../../core/types';
+import { compromisoAAttempt, stoykoAAttempt } from '../../core/calculoMigracion';
 
 export const DB_NAME = 'elomax';
 // La versión de esquema es el contrato del paquete de exportación, así que vive
@@ -55,6 +57,9 @@ export class ElomaxDB extends Dexie {
   profile!: Table<Profile, string>;
   candidataAttempts!: Table<CandidataAttempt, string>;
   compromisoAttempts!: Table<CompromisoAttempt, string>;
+  /** Intentos del ejercicio de cálculo declarado (ADR-0015). Unifica los dos
+   * formatos anteriores; la migración v18 convierte los viejos. */
+  calculoAttempts!: Table<CalculoAttempt, string>;
   dobleSolucionAttempts!: Table<DobleSolucionAttempt, string>;
   stoykoItems!: Table<StoykoItem, string>;
   stoykoDatasetMeta!: Table<StoykoDatasetMeta, string>;
@@ -499,6 +504,60 @@ export class ElomaxDB extends Dexie {
       n1Experiments: 'id, creadoEn, estado',
       dailyAssignments: 'id, creadoEn',
     });
+
+    // v18 — un solo ejercicio de cálculo declarado (ADR-0015). "Línea
+    // comprometida" (RF-7.1) y "Stoyko" (RF-7.2) no eran dos métodos sino dos
+    // cortes del mismo procedimiento, y tenían dos formatos de intento para el
+    // mismo acto. `calculoAttempts` los unifica en un árbol de ramas.
+    //
+    // Los intentos viejos se **convierten**, no se leen en paralelo para
+    // siempre: el Panel, el resumen de cálculo y el experimento n=1 leen estos
+    // datos, y triplicar las formas de leerlos es la clase de deuda que después
+    // nadie paga. La conversión no descarta campos (core/calculoMigracion.ts) y
+    // deja explícito lo que el formato viejo no guardaba —la línea declarada de
+    // un intento fallido, la brecha de evaluación— en vez de inventarlo. Las
+    // tablas originales quedan intactas: son el respaldo si esta conversión
+    // resultara equivocada, y la exportación las sigue llevando.
+    this.version(18)
+      .stores({
+        games: 'id, fecha, fuente, contexto',
+        errorCards: 'id, fsrs.due, origen, categoria',
+        radarItems: 'id, tipo, rating',
+        calibrationRecords: 'id, contexto, fecha',
+        radarProgress: 'id, updatedAt',
+        radarDatasetMeta: 'id',
+        radarAttempts: 'id, fecha, tipo, rating, dificultadNormalizada, origenContenido',
+        curriculumItems: 'id, tipo, patternKey',
+        curriculumDatasetMeta: 'id',
+        curriculumProgress: 'id, fsrs.due, updatedAt',
+        profile: 'id',
+        candidataAttempts: 'id, itemId, fecha',
+        compromisoAttempts: 'id, itemId, fecha',
+        calculoAttempts: 'id, preset, itemId, fecha',
+        dobleSolucionAttempts: 'id, itemId, fecha',
+        stoykoItems: 'id',
+        stoykoDatasetMeta: 'id',
+        stoykoAttempts: 'id, itemId, fecha',
+        triageAttempts: 'id, itemId, fecha',
+        sessions: 'id, fechaInicio, estado',
+        transferMeasurements: 'id, startedAt, completedAt, datasetVersion',
+        n1Experiments: 'id, creadoEn, estado',
+        dailyAssignments: 'id, creadoEn',
+      })
+      .upgrade(async (tx) => {
+        // La línea declarada de un intento forzado no se guardaba: se
+        // reconstruyen los plies que la solución del ítem permite afirmar,
+        // cuando el ítem todavía está en el catálogo.
+        const radarItems = (await tx.table('radarItems').toArray()) as RadarItem[];
+        const solucionPorItem = new Map(radarItems.map((item) => [item.id, item.solucion] as const));
+        const compromiso = (await tx.table('compromisoAttempts').toArray()) as CompromisoAttempt[];
+        const stoyko = (await tx.table('stoykoAttempts').toArray()) as StoykoAttempt[];
+        const convertidos: CalculoAttempt[] = [
+          ...compromiso.map((viejo) => compromisoAAttempt(viejo, solucionPorItem.get(viejo.itemId))),
+          ...stoyko.map(stoykoAAttempt),
+        ];
+        if (convertidos.length > 0) await tx.table('calculoAttempts').bulkPut(convertidos);
+      });
   }
 }
 

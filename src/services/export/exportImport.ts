@@ -12,6 +12,7 @@ import { curriculumProgressRepo } from '../storage/curriculumProgressRepo';
 import { profileRepo } from '../storage/profileRepo';
 import { candidataAttemptRepo } from '../storage/candidataAttemptRepo';
 import { compromisoAttemptRepo } from '../storage/compromisoAttemptRepo';
+import { calculoAttemptRepo } from '../storage/calculoAttemptRepo';
 import { dobleSolucionAttemptRepo } from '../storage/dobleSolucionAttemptRepo';
 import { stoykoAttemptRepo } from '../storage/stoykoAttemptRepo';
 import { triageAttemptRepo } from '../storage/triageAttemptRepo';
@@ -39,6 +40,7 @@ function userDataTables() {
     db.profile,
     db.candidataAttempts,
     db.compromisoAttempts,
+    db.calculoAttempts,
     db.dobleSolucionAttempts,
     db.stoykoAttempts,
     db.triageAttempts,
@@ -72,6 +74,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     profile: await profileRepo.get(),
     candidataAttempts: await candidataAttemptRepo.list(),
     compromisoAttempts: await compromisoAttemptRepo.list(),
+    calculoAttempts: await calculoAttemptRepo.list(),
     dobleSolucionAttempts: await dobleSolucionAttemptRepo.list(),
     stoykoAttempts: await stoykoAttemptRepo.list(),
     triageAttempts: await triageAttemptRepo.list(),
@@ -93,6 +96,7 @@ export async function exportAllData(): Promise<Uint8Array> {
     'profile.json': strToU8(JSON.stringify(bundle.profile, null, 2)),
     'candidataAttempts.json': strToU8(JSON.stringify(bundle.candidataAttempts, null, 2)),
     'compromisoAttempts.json': strToU8(JSON.stringify(bundle.compromisoAttempts, null, 2)),
+    'calculoAttempts.json': strToU8(JSON.stringify(bundle.calculoAttempts, null, 2)),
     'dobleSolucionAttempts.json': strToU8(JSON.stringify(bundle.dobleSolucionAttempts, null, 2)),
     'stoykoAttempts.json': strToU8(JSON.stringify(bundle.stoykoAttempts, null, 2)),
     'triageAttempts.json': strToU8(JSON.stringify(bundle.triageAttempts, null, 2)),
@@ -146,6 +150,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const profileRaw = unzipped['profile.json'];
   const candidataAttemptsRaw = unzipped['candidataAttempts.json'];
   const compromisoAttemptsRaw = unzipped['compromisoAttempts.json'];
+  const calculoAttemptsRaw = unzipped['calculoAttempts.json'];
   const dobleSolucionAttemptsRaw = unzipped['dobleSolucionAttempts.json'];
   const stoykoAttemptsRaw = unzipped['stoykoAttempts.json'];
   const triageAttemptsRaw = unzipped['triageAttempts.json'];
@@ -175,6 +180,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       candidataAttempts: candidataAttemptsRaw ? JSON.parse(strFromU8(candidataAttemptsRaw)) : [],
       // Ni cálculo comprometido (E7, RF-7.1).
       compromisoAttempts: compromisoAttemptsRaw ? JSON.parse(strFromU8(compromisoAttemptsRaw)) : [],
+      calculoAttempts: calculoAttemptsRaw ? JSON.parse(strFromU8(calculoAttemptsRaw)) : [],
       // Ni doble solución (RF-5.7).
       dobleSolucionAttempts: dobleSolucionAttemptsRaw ? JSON.parse(strFromU8(dobleSolucionAttemptsRaw)) : [],
       // Ni el historial de Stoyko (E7) o Triage (E9), agregados en esquema v11.
@@ -216,6 +222,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       await db.profile.put(bundle.profile);
       if (bundle.candidataAttempts.length > 0) await db.candidataAttempts.bulkPut(bundle.candidataAttempts);
       if (bundle.compromisoAttempts.length > 0) await db.compromisoAttempts.bulkPut(bundle.compromisoAttempts);
+      if (bundle.calculoAttempts.length > 0) await db.calculoAttempts.bulkPut(bundle.calculoAttempts);
       if (bundle.dobleSolucionAttempts.length > 0) await db.dobleSolucionAttempts.bulkPut(bundle.dobleSolucionAttempts);
       if (bundle.stoykoAttempts.length > 0) await db.stoykoAttempts.bulkPut(bundle.stoykoAttempts);
       if (bundle.triageAttempts.length > 0) await db.triageAttempts.bulkPut(bundle.triageAttempts);

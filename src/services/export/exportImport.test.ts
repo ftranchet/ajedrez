@@ -112,7 +112,7 @@ describe('exportAllData / importAllData', () => {
     });
     await db.n1Experiments.put(startN1Experiment(
       { modalidadA: 'radar', modalidadB: 'calculo', dosisSemanalA: 24, dosisSemanalB: 3 },
-      { games: [game], sessions: [], compromisoAttempts: [], stoykoAttempts: [] },
+      { games: [game], sessions: [], calculoAttempts: [] },
       new Date('2026-07-19T12:00:00.000Z'),
       'n1-1',
     ));

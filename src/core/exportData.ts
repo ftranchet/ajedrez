@@ -2,6 +2,7 @@
 // validación del paquete. La mecánica de archivo (.zip) vive en
 // services/export — acá no hay File, Blob ni fetch (CONTRIBUTING regla 4).
 import type {
+  CalculoAttempt,
   CalibrationRecord,
   CandidataAttempt,
   CompromisoAttempt,
@@ -42,6 +43,7 @@ export interface ExportBundle {
   profile: Profile;
   candidataAttempts: CandidataAttempt[];
   compromisoAttempts: CompromisoAttempt[];
+  calculoAttempts: CalculoAttempt[];
   dobleSolucionAttempts: DobleSolucionAttempt[];
   stoykoAttempts: StoykoAttempt[];
   triageAttempts: TriageAttempt[];
@@ -61,6 +63,7 @@ export interface ExportSourceData {
   profile: Profile;
   candidataAttempts: CandidataAttempt[];
   compromisoAttempts: CompromisoAttempt[];
+  calculoAttempts: CalculoAttempt[];
   dobleSolucionAttempts: DobleSolucionAttempt[];
   stoykoAttempts: StoykoAttempt[];
   triageAttempts: TriageAttempt[];
@@ -83,6 +86,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     profile: data.profile,
     candidataAttempts: data.candidataAttempts,
     compromisoAttempts: data.compromisoAttempts,
+    calculoAttempts: data.calculoAttempts,
     dobleSolucionAttempts: data.dobleSolucionAttempts,
     stoykoAttempts: data.stoykoAttempts,
     triageAttempts: data.triageAttempts,
@@ -346,9 +350,15 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.candidataAttempts !== undefined && !Array.isArray(obj.candidataAttempts)) {
     return { ok: false, error: 'El historial de la regla de candidatas no tiene la forma esperada.' };
   }
-  // Tampoco cálculo comprometido (E7, RF-7.1).
+  // Tampoco cálculo comprometido (E7, RF-7.1), el formato anterior a ADR-0015.
   if (obj.compromisoAttempts !== undefined && !Array.isArray(obj.compromisoAttempts)) {
     return { ok: false, error: 'El historial de cálculo comprometido no tiene la forma esperada.' };
+  }
+  // Ni el formato unificado de cálculo declarado (ADR-0015, esquema v18): un
+  // respaldo anterior no lo trae y se restaura igual — la migración lo
+  // reconstruye desde los dos formatos viejos, que sí viajan en el paquete.
+  if (obj.calculoAttempts !== undefined && !Array.isArray(obj.calculoAttempts)) {
+    return { ok: false, error: 'El historial de cálculo declarado no tiene la forma esperada.' };
   }
   // Ni doble solución (RF-5.7).
   if (obj.dobleSolucionAttempts !== undefined && !Array.isArray(obj.dobleSolucionAttempts)) {
@@ -412,6 +422,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       profile: (obj.profile ?? DEFAULT_PROFILE) as Profile,
       candidataAttempts: (obj.candidataAttempts ?? []) as CandidataAttempt[],
       compromisoAttempts: (obj.compromisoAttempts ?? []) as CompromisoAttempt[],
+      calculoAttempts: (obj.calculoAttempts ?? []) as CalculoAttempt[],
       dobleSolucionAttempts: (obj.dobleSolucionAttempts ?? []) as DobleSolucionAttempt[],
       stoykoAttempts: (obj.stoykoAttempts ?? []) as StoykoAttempt[],
       triageAttempts: (obj.triageAttempts ?? []) as TriageAttempt[],

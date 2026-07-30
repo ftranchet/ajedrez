@@ -3,7 +3,7 @@ import type { GameRecord, N1Experiment, SessionRecord } from './types';
 import { closeDueN1Phases, compareN1Conditions, currentN1Phase, n1DoseForWindow, startN1Experiment, type N1ExperimentData } from './n1Experiment';
 
 const START = new Date('2026-01-01T12:00:00.000Z');
-const emptyData: N1ExperimentData = { games: [], sessions: [], compromisoAttempts: [], stoykoAttempts: [] };
+const emptyData: N1ExperimentData = { games: [], sessions: [], calculoAttempts: [] };
 
 function game(id: string, day: number, errors: number): GameRecord {
   return {
@@ -55,8 +55,12 @@ describe('experimento n=1 ABAB (RF-12.4)', () => {
     const data: N1ExperimentData = {
       games: [game('g1', 1, 2)],
       sessions: [session],
-      compromisoAttempts: [{ id: 'c1', itemId: 'x', profundidad: 3, correcta: true, primerErrorEn: null, fecha: START.toISOString() }],
-      stoykoAttempts: [{ id: 'st1', itemId: 'x', candidatas: [], acierto: true, confianzaDeclarada: 50, tiempoMs: 1, fecha: START.toISOString() }],
+      // Los dos presets cuentan para la misma modalidad: es el mismo
+      // tratamiento (ADR-0015, y ya era así antes de unificar el formato).
+      calculoAttempts: [
+        { id: 'c1', preset: 'forzado', itemId: 'x', ramas: [{ linea: ['e2e4'] }], correcta: true, primerErrorEn: null, fecha: START.toISOString() },
+        { id: 'c2', preset: 'abierto', itemId: 'x', ramas: [{ linea: ['e2e4'], evaluacion: '=' }], cobertura: true, profundidadVista: 1, brechaEvaluacion: 0, confianzaDeclarada: 50, tiempoMs: 1, fecha: START.toISOString() },
+      ],
     };
     const end = new Date(START.getTime() + 14 * 86_400_000);
     expect(n1DoseForWindow('radar', data, START, end)).toBe(7);

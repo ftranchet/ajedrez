@@ -278,6 +278,45 @@ export interface DobleSolucionAttempt {
  * completa se declaró antes de mover en el tablero, y se puntúa entera, no
  * solo la primera jugada.
  */
+/**
+ * Intento del ejercicio de cálculo declarado (E7, ADR-0015). Reemplaza a
+ * `CompromisoAttempt` y `StoykoAttempt`, que eran dos formatos para el mismo
+ * acto; la migración v18 convierte los dos a esta forma sin descartar campos.
+ */
+/** Preset del ejercicio, tal como se persiste (ver `PresetCalculo` en core/calculo.ts). */
+export type PresetCalculoPersistido = 'forzado' | 'abierto';
+
+export interface CalculoAttempt {
+  id: string;
+  preset: PresetCalculoPersistido;
+  /** Posición del catálogo (Radar o Stoyko) cuando no viene de una partida propia. */
+  itemId?: string;
+  /**
+   * Origen cuando la posición sale de una partida propia analizada (ADR-0015,
+   * punto 4): qué partida y en qué media jugada se paró el ejercicio.
+   */
+  origen?: { gameId: string; ply: number };
+  /** Lo declarado: una rama por candidata, cada una con su línea en UCI. */
+  ramas: { linea: string[]; evaluacion?: EvalSymbol }[];
+  /** Preset forzado: primer ply que no coincidió con la línea verificada; null si coincidió toda. */
+  primerErrorEn?: number | null;
+  /** Preset forzado: la línea entera coincidió. */
+  correcta?: boolean;
+  /** Preset abierto: la mejor jugada del motor estuvo entre las candidatas. */
+  cobertura?: boolean;
+  /** Preset abierto: plies seguidos de la variante principal del motor que se declararon. */
+  profundidadVista?: number;
+  /** Preset abierto: distancia en pasos de la escala entre la evaluación declarada y la del motor. */
+  brechaEvaluacion?: number | null;
+  /** Confianza declarada 0–100 cuando el preset la pide (RF-10.1). */
+  confianzaDeclarada?: number;
+  /** Milisegundos hasta declarar, registrados en silencio (RF-7.3). */
+  tiempoMs?: number;
+  fecha: string; // ISO 8601
+}
+
+/** @deprecated Formato anterior a ADR-0015; se conserva para leer la exportación
+ * de una versión vieja y para la migración v18. Nada nuevo lo escribe. */
 export interface CompromisoAttempt {
   id: string;
   itemId: string;
@@ -603,6 +642,10 @@ export interface StoykoDatasetMeta {
  * las candidatas que el usuario anotó con su evaluación, el tiempo que le
  * llevó (RF-7.3, cronómetro silencioso) y su confianza declarada— para poder
  * auditarlo y, a futuro, medir la calidad/cobertura de las candidatas.
+ *
+ * @deprecated Formato anterior a ADR-0015: lo reemplaza `CalculoAttempt`, y la
+ * migración v18 convierte cada candidata en una rama de un ply. Se conserva
+ * para leer exportaciones viejas y para esa migración.
  */
 export interface StoykoAttempt {
   id: string;
