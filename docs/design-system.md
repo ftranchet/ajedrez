@@ -183,6 +183,7 @@ Cada componente lista sus **estados obligatorios**; un componente sin todos sus 
 | `SessionCard` | pendiente / en curso / completado / salteado | siempre con su porqué en `text-secondary`; en curso = borde `accent`; completado = tachado + opacidad .75; salteado = borde punteado |
 | `EvalPicker` | default / seleccionado | 3 chips "mejor blancas / igual / mejor negras" (RF-5.2, evaluación rápida del Radar antes de jugar); selección = `accent-subtle` + borde `accent` |
 | `EvalScalePicker` | default / seleccionado | 5 chips `+− ± = ∓ −+` en `font-mono` (RF-3.1c, escala de evaluación de la fase 1 del análisis); mismo criterio de selección que `EvalPicker` |
+| Compositor de ramas (Cálculo) | rama en curso / ramas cerradas | recuadro `accent` para la rama que se está cargando (ply a ply, `font-mono`) y lista de las cerradas con su evaluación al final; el botón de cerrar **no se deshabilita**, explica qué falta (ADR-0015) |
 | `ConfidenceSlider` | default / arrastrando / confirmado | 0–100, aparece solo por muestreo; nunca descartable |
 | `FeedbackPanel` | acierto / fallo / no-había-táctica (info) | fondo `-subtle` + borde 35%; `status` polite; el porqué es obligatorio, también sin táctica (RF-5.3) |
 | `SensoryPreferencesCard` | ambos apagados / canal activo / no soportado / guardando / error | controles independientes, opt-in; vive después de plan y recordatorio, nunca compite con el CTA diario |

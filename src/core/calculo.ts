@@ -24,6 +24,24 @@ export const RAMAS_MIN_ABIERTO = 2;
 export const RAMAS_MAX_ABIERTO = 5;
 
 /**
+ * Cuántas ramas del preset abierto tienen que traer **línea**, no solo la
+ * candidata. Cargar cinco líneas de cuatro plies en un celular es una carga de
+ * datos, no un ejercicio de ajedrez: se pide la línea en las dos primeras —las
+ * que el usuario considera de verdad— y el resto entran como candidata suelta
+ * con su evaluación, que es lo que sostiene la amplitud. La profundidad se
+ * mide igual sobre la rama que empiece por la mejor jugada del motor, así que
+ * quien calcule más profundo lo ve reflejado sin que el formulario lo exija.
+ */
+export const RAMAS_CON_LINEA = 2;
+
+/**
+ * Mínimo para que algo cuente como línea y no como jugada suelta: tu jugada y
+ * la respuesta que esperás. Con un solo ply no hay cálculo declarado, hay una
+ * intención. No hay tope: la profundidad declarada es justamente lo que se mide.
+ */
+export const PLIES_MIN_LINEA = 2;
+
+/**
  * Qué se le pide al usuario en esta corrida. Lo que cambia entre presets no es
  * el método sino la dosis y el tipo de posición: `forzado` es corto y entra en
  * la lista de hoy cuando hay fuga de cálculo (RF-11.2); `abierto` es el
@@ -135,14 +153,19 @@ export function evaluarAbierto(entrada: EntradaAbierto, ramas: RamaDeclarada[]):
   return { cobertura, profundidadVista, brechaEvaluacion };
 }
 
+/** ¿Esta rama del preset abierto tiene que traer línea, por su posición en la lista? */
+export function ramaPideLinea(indice: number): boolean {
+  return indice < RAMAS_CON_LINEA;
+}
+
 /** ¿La declaración está completa para el preset? Gobierna el botón de revelar. */
 export function declaracionCompleta(preset: PresetCalculo, ramas: RamaDeclarada[], profundidadPedida: number): boolean {
   if (preset === 'forzado') {
     return ramas.length === 1 && ramas[0].linea.length >= profundidadPedida;
   }
-  return (
-    ramas.length >= RAMAS_MIN_ABIERTO &&
-    ramas.length <= RAMAS_MAX_ABIERTO &&
-    ramas.every((rama) => rama.linea.length >= 1 && rama.evaluacion !== undefined)
-  );
+  if (ramas.length < RAMAS_MIN_ABIERTO || ramas.length > RAMAS_MAX_ABIERTO) return false;
+  return ramas.every((rama, indice) => {
+    const pliesMinimos = ramaPideLinea(indice) ? PLIES_MIN_LINEA : 1;
+    return rama.linea.length >= pliesMinimos && rama.evaluacion !== undefined;
+  });
 }

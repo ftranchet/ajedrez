@@ -1,7 +1,8 @@
-// E2E de Stoyko semanal (E7, RF-7.2): se anotan candidatas antes de revelar
-// y se compara con la línea del motor. La lógica (acierto, enfriamiento) ya
-// está probada en core/stoyko.test.ts y src/ui/state/stoykoStore.test.ts —
-// acá se verifica que la UI (sub-modo de "Cálculo") está bien conectada.
+// E2E del preset abierto del cálculo declarado (E7, RF-7.2, ADR-0015): se
+// declaran candidatas —las dos primeras con su línea— antes de revelar, y se
+// comparan con el motor. La lógica (las tres varas, el enfriamiento) ya está
+// probada en core/calculo.test.ts y src/ui/state/stoykoStore.test.ts — acá se
+// verifica que la UI (sub-modo de "Cálculo") está bien conectada.
 import { expect, test, type Page } from '@playwright/test';
 import { STOYKO_DATASET_VERSION } from '../src/services/puzzles/stoykoSeedData';
 
@@ -48,13 +49,29 @@ test('Stoyko semanal: anotar la jugada del motor entre las candidatas acierta y 
   const board = page.locator('cg-board');
   await board.waitFor({ timeout: 15_000 });
 
-  // Anota dos candidatas: una que no es, y la que coincide con la línea del motor.
+  // Dos candidatas con su línea: la primera no es la del motor, la segunda sí.
+  // Cada ply se carga por separado, como en el preset forzado.
+  const declararRama = async (plies: string[]) => {
+    for (const ply of plies) {
+      await page.getByPlaceholder('p. ej. e2e4').fill(ply);
+      await page.getByRole('button', { name: 'Sumar jugada' }).click();
+    }
+    await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
+  };
+
+  // Con un solo ply la primera rama no se puede cerrar: pide línea.
   await page.getByPlaceholder('p. ej. e2e4').fill('b1c3');
-  await page.getByRole('button', { name: 'Agregar candidata' }).click();
-  await page.getByPlaceholder('p. ej. e2e4').fill('f1c4');
-  await page.getByRole('button', { name: 'Agregar candidata' }).click();
-  await page.getByText('b1c3').waitFor();
-  await page.getByText('f1c4').waitFor();
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
+  await expect(page.getByText(/Esta rama pide al menos 2 jugada/)).toBeVisible();
+
+  await page.getByPlaceholder('p. ej. e2e4').fill('g8f6');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
+  await expect(page.getByText('b1c3 g8f6')).toBeVisible();
+
+  await declararRama(['f1c4', 'f8c5', 'e1g1']);
+  await expect(page.getByText('f1c4 f8c5 e1g1')).toBeVisible();
 
   await page.getByRole('button', { name: 'Terminar análisis' }).click();
   await page.getByText('¿Cuánta confianza tenés en haber incluido la mejor jugada').waitFor({ timeout: 10_000 });
@@ -62,6 +79,10 @@ test('Stoyko semanal: anotar la jugada del motor entre las candidatas acierta y 
 
   await page.getByText('La tenías entre tus candidatas').waitFor({ timeout: 10_000 });
   await page.getByText('Bc4 Bc5 O-O').waitFor();
+  // Las tres varas se leen por separado (ADR-0015): la profundidad vista y la
+  // brecha contra la evaluación del motor, que antes se descartaba.
+  await expect(page.getByText(/viste 3 jugada/)).toBeVisible();
+  await expect(page.getByText('Tu evaluación contra la del motor')).toBeVisible();
 });
 
 test('el deep link #/calculo/stoyko aterriza en el modo Stoyko, no en Línea comprometida', async ({ page }) => {

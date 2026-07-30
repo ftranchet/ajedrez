@@ -1,12 +1,13 @@
-// Test de integración de Stoyko semanal (E7, RF-7.2) contra Dexie real: se
-// anotan candidatas antes de revelar, se compara con la línea del motor y
-// se registra para calibración (E10) y para el enfriamiento semanal.
+// Test de integración del preset abierto del cálculo declarado (E7, RF-7.2,
+// ADR-0015) contra Dexie real: se declaran ramas —las dos primeras con su
+// línea— antes de revelar, se comparan con el motor y se registra para
+// calibración (E10) y para el enfriamiento semanal.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStoykoStore } from './stoykoStore';
 import { db } from '../../services/storage/db';
 import { STOYKO_DATASET_VERSION } from '../../services/puzzles/stoykoSeedData';
-import type { Profile, StoykoItem } from '../../core/types';
+import type { EvalSymbol, GameRecord, Profile, StoykoItem } from '../../core/types';
 import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
 
 const item: StoykoItem = {
@@ -21,18 +22,29 @@ async function seedProfile(overrides: Partial<Profile> = {}) {
   await db.profile.put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: '2026-07-01T00:00:00.000Z', ...overrides });
 }
 
+/** Declara una rama completa: sus plies y su evaluación. */
+function declararRama(plies: string[], evaluacion?: EvalSymbol) {
+  for (const ply of plies) {
+    useStoykoStore.getState().setInputActual(ply);
+    useStoykoStore.getState().agregarPly();
+  }
+  if (evaluacion) useStoykoStore.getState().setEvalSeleccionada(evaluacion);
+  useStoykoStore.getState().cerrarRama();
+}
+
 beforeEach(async () => {
   vi.restoreAllMocks();
   await db.stoykoItems.clear();
   await db.stoykoDatasetMeta.clear();
   await db.calibrationRecords.clear();
   await db.calculoAttempts.clear();
+  await db.games.clear();
   await db.profile.clear();
   await db.stoykoItems.put(item);
   await db.stoykoDatasetMeta.put({ id: 'catalogo', version: STOYKO_DATASET_VERSION, seededAt: new Date().toISOString() });
 });
 
-describe('stoykoStore', () => {
+describe('stoykoStore — preset abierto', () => {
   it('sale de la carga ante un fallo del catálogo y permite reintentar', async () => {
     const failure = vi.spyOn(stoykoItemRepo, 'ensureSeeded').mockRejectedValueOnce(new Error('indexeddb'));
 
@@ -44,11 +56,12 @@ describe('stoykoStore', () => {
     expect(useStoykoStore.getState().phase).toBe('analizando');
   });
 
-  it('sin perfil (nunca se hizo), sirve el ítem apto determinísticamente', async () => {
+  it('sin partidas analizadas sirve el ítem del catálogo', async () => {
     await useStoykoStore.getState().empezar();
     const s = useStoykoStore.getState();
     expect(s.phase).toBe('analizando');
-    expect(s.item?.id).toBe(item.id);
+    expect(s.origen).toMatchObject({ tipo: 'catalogo' });
+    expect(s.fen).toBe(item.fen);
   });
 
   it('en enfriamiento si ya se hizo dentro de los últimos 7 días', async () => {
@@ -65,48 +78,81 @@ describe('stoykoStore', () => {
     expect(useStoykoStore.getState().phase).toBe('analizando');
   });
 
-  it('agregarCandidata rechaza formato inválido sin agregarla', async () => {
+  it('rechaza formato inválido sin sumar el ply', async () => {
     await useStoykoStore.getState().empezar();
     useStoykoStore.getState().setInputActual('caballo a f3');
-    useStoykoStore.getState().agregarCandidata();
+    useStoykoStore.getState().agregarPly();
     const s = useStoykoStore.getState();
-    expect(s.candidatas).toEqual([]);
+    expect(s.ramaEnCurso.linea).toEqual([]);
     expect(s.inputError).not.toBeNull();
   });
 
-  it('agregarCandidata rechaza una jugada ilegal en la posición', async () => {
+  it('rechaza una jugada ilegal en la posición', async () => {
     await useStoykoStore.getState().empezar();
     useStoykoStore.getState().setInputActual('a2a5'); // el peón de a2 no llega a a5 de un salto
-    useStoykoStore.getState().agregarCandidata();
-    const s = useStoykoStore.getState();
-    expect(s.candidatas).toEqual([]);
-    expect(s.inputError).toBe('Esa jugada no es legal en esta posición.');
+    useStoykoStore.getState().agregarPly();
+    expect(useStoykoStore.getState().ramaEnCurso.linea).toEqual([]);
+    expect(useStoykoStore.getState().inputError).toBe('Esa jugada no es legal en esta posición.');
   });
 
-  it('agregarCandidata rechaza una candidata repetida', async () => {
+  // Cada ply se valida contra la posición que dejó el anterior: una línea
+  // declarada tiene que ser jugable, si no no es una línea.
+  it('valida cada ply contra la posición que deja el ply anterior', async () => {
     await useStoykoStore.getState().empezar();
     useStoykoStore.getState().setInputActual('f1c4');
-    useStoykoStore.getState().agregarCandidata();
-    useStoykoStore.getState().setInputActual('f1c4');
-    useStoykoStore.getState().agregarCandidata();
-    const s = useStoykoStore.getState();
-    expect(s.candidatas).toHaveLength(1);
-    expect(s.inputError).toBe('Ya anotaste esa candidata.');
+    useStoykoStore.getState().agregarPly();
+    // Le toca a las negras: una jugada blanca no es legal acá.
+    useStoykoStore.getState().setInputActual('e1g1');
+    useStoykoStore.getState().agregarPly();
+    expect(useStoykoStore.getState().ramaEnCurso.linea).toEqual(['f1c4']);
+    expect(useStoykoStore.getState().inputError).not.toBeNull();
   });
 
-  it('terminarAnalisis no avanza sin al menos una candidata', async () => {
+  it('rechaza una candidata repetida entre ramas', async () => {
     await useStoykoStore.getState().empezar();
+    declararRama(['f1c4', 'f8c5']);
+    useStoykoStore.getState().setInputActual('f1c4');
+    useStoykoStore.getState().agregarPly();
+    expect(useStoykoStore.getState().ramaEnCurso.linea).toEqual([]);
+    expect(useStoykoStore.getState().inputError).toBe('Ya anotaste esa candidata.');
+  });
+
+  // Decisión de producto: línea en las dos primeras, el resto sueltas.
+  it('las dos primeras ramas piden línea; de la tercera alcanza la candidata suelta', async () => {
+    await useStoykoStore.getState().empezar();
+    useStoykoStore.getState().setInputActual('f1c4');
+    useStoykoStore.getState().agregarPly();
+    useStoykoStore.getState().cerrarRama(); // un solo ply en la primera rama: no alcanza
+    expect(useStoykoStore.getState().ramas).toHaveLength(0);
+    expect(useStoykoStore.getState().inputError).not.toBeNull();
+
+    useStoykoStore.getState().setInputActual('f8c5');
+    useStoykoStore.getState().agregarPly();
+    useStoykoStore.getState().cerrarRama();
+    expect(useStoykoStore.getState().ramas).toHaveLength(1);
+
+    declararRama(['d2d4', 'e5d4']);
+    expect(useStoykoStore.getState().ramas).toHaveLength(2);
+
+    // Tercera: suelta alcanza.
+    useStoykoStore.getState().setInputActual('b1c3');
+    useStoykoStore.getState().agregarPly();
+    useStoykoStore.getState().cerrarRama();
+    expect(useStoykoStore.getState().ramas).toHaveLength(3);
+  });
+
+  it('terminarAnalisis no avanza con una sola rama', async () => {
+    await useStoykoStore.getState().empezar();
+    declararRama(['f1c4', 'f8c5']);
     useStoykoStore.getState().terminarAnalisis();
     expect(useStoykoStore.getState().phase).toBe('analizando');
+    expect(useStoykoStore.getState().inputError).not.toBeNull();
   });
 
-  it('acierta si alguna candidata coincide con la línea del motor; persiste calibración y enfriamiento', async () => {
+  it('mide las tres varas por separado y persiste calibración y enfriamiento', async () => {
     await useStoykoStore.getState().empezar();
-    useStoykoStore.getState().setInputActual('d2d4');
-    useStoykoStore.getState().agregarCandidata();
-    useStoykoStore.getState().setEvalSeleccionada('±');
-    useStoykoStore.getState().setInputActual('f1c4'); // coincide con mejorLinea[0]
-    useStoykoStore.getState().agregarCandidata();
+    declararRama(['d2d4', 'e5d4'], '∓');
+    declararRama(['f1c4', 'f8c5', 'e1g1'], '='); // coincide con la línea del motor
     useStoykoStore.getState().terminarAnalisis();
     expect(useStoykoStore.getState().phase).toBe('confianza');
 
@@ -115,6 +161,8 @@ describe('stoykoStore', () => {
     expect(s.phase).toBe('revelado');
     expect(s.acierto).toBe(true);
     expect(s.lineaMotorSan.length).toBeGreaterThan(0);
+    // Declaró '=' en la rama de la mejor jugada y el motor dice '=': brecha 0.
+    expect(s.resultado).toEqual({ cobertura: true, profundidadVista: 3, brechaEvaluacion: 0 });
 
     const records = await db.calibrationRecords.toArray();
     expect(records).toHaveLength(1);
@@ -123,24 +171,34 @@ describe('stoykoStore', () => {
     const profile = await db.profile.get('principal');
     expect(profile?.stoykoUltimaCompletadaEn).toBe(records[0].fecha);
 
-    // Persiste el intento entero (RF-7.2/7.3): candidatas con evaluación,
-    // confianza y tiempo (cronómetro silencioso), no solo el acierto.
     const attempts = await db.calculoAttempts.toArray();
     expect(attempts).toHaveLength(1);
-    // Formato unificado (ADR-0015): preset abierto, una rama por candidata y
-    // las tres varas medidas por separado. La brecha de evaluación es la que
-    // antes se recogía y se descartaba.
     expect(attempts[0]).toMatchObject({
       preset: 'abierto',
       itemId: item.id,
       cobertura: true,
+      profundidadVista: 3,
+      brechaEvaluacion: 0,
       confianzaDeclarada: 80,
     });
-    expect(attempts[0].ramas.map((rama) => rama.linea[0])).toEqual(['d2d4', 'f1c4']);
-    expect(attempts[0].ramas[1].evaluacion).toBe('±');
-    expect(typeof attempts[0].brechaEvaluacion).toBe('number');
+    // Las líneas declaradas quedan enteras, no solo su primera jugada.
+    expect(attempts[0].ramas.map((rama) => rama.linea)).toEqual([
+      ['d2d4', 'e5d4'],
+      ['f1c4', 'f8c5', 'e1g1'],
+    ]);
     expect(typeof attempts[0].tiempoMs).toBe('number');
-    expect(attempts[0].tiempoMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('la brecha se mide aunque no se tenga la mejor jugada del motor', async () => {
+    await useStoykoStore.getState().empezar();
+    declararRama(['d2d4', 'e5d4'], '+-'); // el motor dice '=': dos pasos
+    declararRama(['b1c3', 'g8f6'], '=');
+    useStoykoStore.getState().terminarAnalisis();
+    await useStoykoStore.getState().confirmarConfianza(40);
+
+    const s = useStoykoStore.getState();
+    expect(s.acierto).toBe(false);
+    expect(s.resultado).toMatchObject({ cobertura: false, profundidadVista: 0, brechaEvaluacion: 2 });
   });
 
   it('practicar durante el enfriamiento sirve una posición y NO mide ni resetea la semana', async () => {
@@ -152,18 +210,16 @@ describe('stoykoStore', () => {
     expect(useStoykoStore.getState().phase).toBe('enfriamiento');
 
     await useStoykoStore.getState().practicar();
-    let s = useStoykoStore.getState();
-    expect(s.phase).toBe('analizando');
-    expect(s.practica).toBe(true);
+    expect(useStoykoStore.getState().phase).toBe('analizando');
+    expect(useStoykoStore.getState().practica).toBe(true);
 
-    s.setInputActual('f1c4'); // coincide con la línea del motor
-    useStoykoStore.getState().agregarCandidata();
+    declararRama(['f1c4', 'f8c5'], '=');
+    declararRama(['d2d4', 'e5d4'], '±');
     useStoykoStore.getState().terminarAnalisis();
     await useStoykoStore.getState().confirmarConfianza(70);
 
-    s = useStoykoStore.getState();
-    expect(s.phase).toBe('revelado');
-    expect(s.acierto).toBe(true); // se ve el resultado
+    expect(useStoykoStore.getState().phase).toBe('revelado');
+    expect(useStoykoStore.getState().acierto).toBe(true); // se ve el resultado
 
     // Pero nada se persiste: sin calibración, sin intento, y el enfriamiento intacto.
     expect(await db.calibrationRecords.toArray()).toHaveLength(0);
@@ -172,17 +228,43 @@ describe('stoykoStore', () => {
     expect(profile?.stoykoUltimaCompletadaEn).toBe(ultima);
   });
 
-  it('no acierta si ninguna candidata coincide con la línea del motor', async () => {
-    await useStoykoStore.getState().empezar();
-    useStoykoStore.getState().setInputActual('d2d4');
-    useStoykoStore.getState().agregarCandidata();
-    useStoykoStore.getState().terminarAnalisis();
+  // ADR-0015, punto 4: el material propio le gana al catálogo minado.
+  it('con una partida analizada, la posición sale de ahí y no del catálogo', async () => {
+    const game: GameRecord = {
+      id: 'g-propia',
+      pgn: '1. e4 e5 *',
+      fuente: 'local',
+      ritmo: 'clasica',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: true,
+      fecha: '2026-07-20T10:00:00.000Z',
+      jugadorColor: 'w',
+      analisis: {
+        jugadas: [
+          {
+            ply: 0,
+            san: 'Nf3',
+            fenAntes: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+            ladoQueMueve: 'w',
+            jugadaUsuario: 'g1f3',
+            jugadaMotor: 'e2e4',
+            cpAntes: 20,
+            cpDespues: -180,
+            cpPerdidos: 200,
+            clasificacion: 'error',
+          },
+        ],
+        comparacionEvaluaciones: [],
+        analizadaEn: '2026-07-20T11:00:00.000Z',
+      },
+    };
+    await db.games.put(game);
 
-    await useStoykoStore.getState().confirmarConfianza(40);
+    await useStoykoStore.getState().empezar(true);
     const s = useStoykoStore.getState();
-    expect(s.acierto).toBe(false);
-
-    const records = await db.calibrationRecords.toArray();
-    expect(records[0]).toMatchObject({ acierto: false, confianzaDeclarada: 40 });
+    expect(s.phase).toBe('analizando');
+    expect(s.origen).toMatchObject({ tipo: 'propia', posicion: { gameId: 'g-propia', motivo: 'mas-centipeones' } });
+    expect(s.fen).toBe(game.analisis!.jugadas[0].fenAntes);
   });
 });

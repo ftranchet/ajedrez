@@ -1,18 +1,37 @@
-// Ejercicio de Stoyko semanal (E7, RF-7.2): ante una posición rica y sin
-// reloj, el usuario anota todas las jugadas candidatas que consideraría —
-// cada una con su evaluación — antes de comparar con la línea del motor.
-// Simplificación v1 documentada: "líneas candidatas" (RF-7.2) se toma como
-// jugadas candidatas (el primer ply de cada una), cada una con su
-// evaluación — captura el espíritu del ejercicio (enumerar todo lo que se
-// consideraría) sin la complejidad de ramificar cada candidata en una línea
-// propia. El tablero nunca se mueve mientras se anota (mismo dispositivo que
-// Cálculo comprometido, RF-7.1) y el tiempo se registra en silencio, sin
-// cronómetro visible (RF-7.3).
+// Preset **abierto** del cálculo declarado (E7, RF-7.2, ADR-0015): una posición
+// sin respuesta única, sin reloj, en la que el usuario declara sus candidatas
+// —las dos primeras con la línea que calculó, el resto sueltas— cada una con su
+// evaluación, y recién ahí compara con el motor.
+//
+// El tablero nunca se mueve mientras se anota (mismo dispositivo que el preset
+// forzado) y el tiempo se registra en silencio (RF-7.3). El estado del preset
+// corto vive en `compromisoStore`: comparten el modelo persistido
+// (`calculoAttempts`) y la pantalla, pero cada flujo se lee mejor con su propio
+// estado — uno declara una línea contra una solución verificada, el otro un
+// árbol contra una posición sin respuesta correcta.
+//
+// La posición sale de tus **partidas propias analizadas** cuando hay alguna
+// (ADR-0015, punto 4): la jugada donde perdiste más centipeones o donde
+// consumiste más tiempo. Ahí no hay `mejorLinea` precalculada, así que el motor
+// evalúa en el dispositivo al revelar — es una sola posición, sin reloj, y el
+// motor ya está cargado. Sin partidas analizadas cae al catálogo minado.
 import { create } from 'zustand';
 import { Chess } from 'chess.js';
 import type { EvalSymbol, StoykoItem } from '../../core/types';
-import { stoykoDisponible, stoykoProximaDisponibleEn, type Candidata } from '../../core/stoyko';
-import { evaluarAbierto, type ResultadoAbierto } from '../../core/calculo';
+import { stoykoDisponible, stoykoProximaDisponibleEn } from '../../core/stoyko';
+import {
+  PLIES_MIN_LINEA,
+  RAMAS_MAX_ABIERTO,
+  declaracionCompleta,
+  evaluarAbierto,
+  ramaPideLinea,
+  type RamaDeclarada,
+  type ResultadoAbierto,
+} from '../../core/calculo';
+import { posicionPropiaParaCalculo, type PosicionPropia } from '../../core/calculoPosicion';
+import { evalToSymbol } from '../../core/analysis';
+import { engine } from '../../services/engine/stockfishEngine';
+import { gameRepo } from '../../services/storage/gameRepo';
 import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
 import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
@@ -22,16 +41,33 @@ import { t } from '../i18n/es';
 
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
 
+/** Profundidad de la evaluación en el dispositivo, para una posición propia. */
+const DEPTH_POSICION_PROPIA = 16;
+
 type Phase = 'cargando' | 'error' | 'sinContenido' | 'enfriamiento' | 'analizando' | 'confianza' | 'revelado';
+
+/** De dónde salió la posición servida, para poder decírselo al usuario. */
+export type OrigenPosicion =
+  | { tipo: 'catalogo'; item: StoykoItem }
+  | { tipo: 'propia'; posicion: PosicionPropia };
+
+/** La rama que se está armando, antes de cerrarla con su evaluación. */
+interface RamaEnCurso {
+  linea: string[];
+  evaluacion: EvalSymbol;
+}
 
 interface StoykoState {
   phase: Phase;
   pool: StoykoItem[];
-  item: StoykoItem | null;
+  /** Posición servida y su origen. */
+  origen: OrigenPosicion | null;
+  fen: string;
   proximaDisponibleEn: string | null;
-  candidatas: Candidata[];
+  /** Ramas ya cerradas: las dos primeras con línea, el resto candidata suelta. */
+  ramas: RamaDeclarada[];
+  ramaEnCurso: RamaEnCurso;
   inputActual: string;
-  evalSeleccionada: EvalSymbol;
   inputError: string | null;
   confianza: number | null;
   acierto: boolean | null;
@@ -39,7 +75,7 @@ interface StoykoState {
    * Las tres varas del preset abierto (ADR-0015): cobertura, profundidad vista
    * y brecha de evaluación. La brecha es lo que antes se recogía y se
    * descartaba: el usuario declaraba una evaluación por candidata y nadie la
-   * comparaba con `evaluacionMotor`, que el catálogo ya traía.
+   * comparaba con la del motor.
    */
   resultado: ResultadoAbierto | null;
   lineaMotorSan: string[];
@@ -48,13 +84,19 @@ interface StoykoState {
   inicioMs: number | null;
   /** Repetición libre durante el enfriamiento: no mide ni resetea la semana. */
   practica: boolean;
+  /** El motor no pudo evaluar una posición propia; el resto del feedback sigue. */
+  motorError: boolean;
 
   empezar(force?: boolean): Promise<void>;
   practicar(): Promise<void>;
   setInputActual(value: string): void;
   setEvalSeleccionada(value: EvalSymbol): void;
-  agregarCandidata(): void;
-  quitarCandidata(index: number): void;
+  /** Suma un ply a la rama en curso (la línea que se está calculando). */
+  agregarPly(): void;
+  borrarUltimoPly(): void;
+  /** Cierra la rama en curso y la agrega a la lista. */
+  cerrarRama(): void;
+  quitarRama(index: number): void;
   terminarAnalisis(): void;
   confirmarConfianza(valor: number): Promise<void>;
 }
@@ -62,14 +104,62 @@ interface StoykoState {
 let loadGeneration = 0;
 let loadPromise: { generation: number; promise: Promise<void> } | null = null;
 
+const RAMA_VACIA: RamaEnCurso = { linea: [], evaluacion: '=' };
+
+/** Estado limpio al servir una posición nueva. */
+function estadoInicial(origen: OrigenPosicion, practica: boolean) {
+  return {
+    phase: 'analizando' as const,
+    practica,
+    origen,
+    fen: origen.tipo === 'catalogo' ? origen.item.fen : origen.posicion.fen,
+    ramas: [] as RamaDeclarada[],
+    ramaEnCurso: { ...RAMA_VACIA },
+    inputActual: '',
+    inputError: null,
+    confianza: null,
+    acierto: null,
+    resultado: null,
+    lineaMotorSan: [],
+    evaluacionMotor: null,
+    motorError: false,
+    inicioMs: Date.now(),
+  };
+}
+
+/**
+ * Posición a servir: primero una de tus partidas analizadas (ADR-0015, punto 4)
+ * y, si no hay ninguna, el catálogo minado.
+ */
+async function elegirPosicion(): Promise<{ origen: OrigenPosicion; pool: StoykoItem[] } | null> {
+  const propia = posicionPropiaParaCalculo(await gameRepo.list());
+  await stoykoItemRepo.ensureSeeded();
+  const pool = await stoykoItemRepo.list();
+  if (propia) return { origen: { tipo: 'propia', posicion: propia }, pool };
+  if (pool.length === 0) return null;
+  return { origen: { tipo: 'catalogo', item: pool[Math.floor(Math.random() * pool.length)] }, pool };
+}
+
+/** Reproduce la línea ya ingresada, para validar la legalidad del próximo ply. */
+function replayLinea(fen: string, linea: string[]): Chess {
+  const chess = new Chess(fen);
+  for (const uci of linea) {
+    const move = chess.moves({ verbose: true }).find((m) => m.from + m.to + (m.promotion ?? '') === uci);
+    if (!move) break;
+    chess.move(move);
+  }
+  return chess;
+}
+
 export const useStoykoStore = create<StoykoState>((set, get) => ({
   phase: 'cargando',
   pool: [],
-  item: null,
+  origen: null,
+  fen: '',
   proximaDisponibleEn: null,
-  candidatas: [],
+  ramas: [],
+  ramaEnCurso: { ...RAMA_VACIA },
   inputActual: '',
-  evalSeleccionada: '=',
   inputError: null,
   confianza: null,
   acierto: null,
@@ -78,6 +168,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   evaluacionMotor: null,
   inicioMs: null,
   practica: false,
+  motorError: false,
 
   async empezar(force = false) {
     if (loadPromise && !force) return loadPromise.promise;
@@ -91,30 +182,15 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
           set({ phase: 'enfriamiento', proximaDisponibleEn: stoykoProximaDisponibleEn(profile) });
           return;
         }
-        await stoykoItemRepo.ensureSeeded();
-        const pool = await stoykoItemRepo.list();
+        const elegida = await elegirPosicion();
         if (generation !== loadGeneration) return;
-        if (pool.length === 0) {
-          set({ phase: 'sinContenido', pool });
+        if (!elegida) {
+          set({ phase: 'sinContenido', pool: [] });
           return;
         }
-        const item = pool[Math.floor(Math.random() * pool.length)];
-        set({
-          phase: 'analizando',
-          practica: false,
-          pool,
-          item,
-          candidatas: [],
-          inputActual: '',
-          evalSeleccionada: '=',
-          inputError: null,
-          confianza: null,
-          acierto: null,
-          lineaMotorSan: [],
-          inicioMs: Date.now(),
-        });
+        set({ pool: elegida.pool, ...estadoInicial(elegida.origen, false) });
       } catch {
-        if (generation === loadGeneration) set({ phase: 'error', item: null });
+        if (generation === loadGeneration) set({ phase: 'error', origen: null });
       } finally {
         if (loadPromise?.generation === generation) loadPromise = null;
       }
@@ -132,30 +208,15 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     loadPromise = null;
     set({ phase: 'cargando' });
     try {
-      await stoykoItemRepo.ensureSeeded();
-      const pool = await stoykoItemRepo.list();
+      const elegida = await elegirPosicion();
       if (generation !== loadGeneration) return;
-      if (pool.length === 0) {
-        set({ phase: 'sinContenido', pool });
+      if (!elegida) {
+        set({ phase: 'sinContenido', pool: [] });
         return;
       }
-      const item = pool[Math.floor(Math.random() * pool.length)];
-      set({
-        phase: 'analizando',
-        practica: true,
-        pool,
-        item,
-        candidatas: [],
-        inputActual: '',
-        evalSeleccionada: '=',
-        inputError: null,
-        confianza: null,
-        acierto: null,
-        lineaMotorSan: [],
-        inicioMs: Date.now(),
-      });
+      set({ pool: elegida.pool, ...estadoInicial(elegida.origen, true) });
     } catch {
-      if (generation === loadGeneration) set({ phase: 'error', item: null });
+      if (generation === loadGeneration) set({ phase: 'error', origen: null });
     }
   },
 
@@ -164,69 +225,129 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   },
 
   setEvalSeleccionada(value) {
-    set({ evalSeleccionada: value });
+    set({ ramaEnCurso: { ...get().ramaEnCurso, evaluacion: value } });
   },
 
-  agregarCandidata() {
+  agregarPly() {
     const s = get();
-    if (s.phase !== 'analizando' || !s.item) return;
+    if (s.phase !== 'analizando' || !s.fen) return;
     const jugada = s.inputActual.trim().toLowerCase();
     if (!UCI_RE.test(jugada)) {
       set({ inputError: t.calculo.errorFormato });
       return;
     }
-    const chess = new Chess(s.item.fen);
+    // Cada ply se valida contra la posición que deja el ply anterior: una línea
+    // declarada tiene que ser jugable, si no no es una línea.
+    const chess = replayLinea(s.fen, s.ramaEnCurso.linea);
     const legales = chess.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ''));
     if (!legales.includes(jugada)) {
       set({ inputError: t.stoyko.errorIlegal });
       return;
     }
-    if (s.candidatas.some((c) => c.jugada === jugada)) {
+    // La candidata (primer ply) no puede repetirse entre ramas: dos ramas con la
+    // misma jugada inicial son la misma candidata contada dos veces.
+    if (s.ramaEnCurso.linea.length === 0 && s.ramas.some((rama) => rama.linea[0] === jugada)) {
       set({ inputError: t.stoyko.errorDuplicada });
       return;
     }
     set({
-      candidatas: [...s.candidatas, { jugada, evaluacion: s.evalSeleccionada }],
+      ramaEnCurso: { ...s.ramaEnCurso, linea: [...s.ramaEnCurso.linea, jugada] },
       inputActual: '',
       inputError: null,
     });
   },
 
-  quitarCandidata(index) {
+  borrarUltimoPly() {
+    const s = get();
+    if (s.phase !== 'analizando' || s.ramaEnCurso.linea.length === 0) return;
+    set({ ramaEnCurso: { ...s.ramaEnCurso, linea: s.ramaEnCurso.linea.slice(0, -1) }, inputError: null });
+  },
+
+  cerrarRama() {
     const s = get();
     if (s.phase !== 'analizando') return;
-    set({ candidatas: s.candidatas.filter((_, i) => i !== index) });
+    if (s.ramas.length >= RAMAS_MAX_ABIERTO) {
+      set({ inputError: t.stoyko.errorTopeRamas });
+      return;
+    }
+    // Las dos primeras ramas piden línea (decisión de producto 2026-07-30):
+    // cinco líneas completas en un celular son una carga de datos, y la
+    // amplitud la sostienen las candidatas sueltas del final.
+    const pliesMinimos = ramaPideLinea(s.ramas.length) ? PLIES_MIN_LINEA : 1;
+    if (s.ramaEnCurso.linea.length < pliesMinimos) {
+      set({ inputError: t.stoyko.errorLineaCorta.replace('{n}', String(pliesMinimos)) });
+      return;
+    }
+    set({
+      ramas: [...s.ramas, { linea: s.ramaEnCurso.linea, evaluacion: s.ramaEnCurso.evaluacion }],
+      ramaEnCurso: { ...RAMA_VACIA },
+      inputActual: '',
+      inputError: null,
+    });
+  },
+
+  quitarRama(index) {
+    const s = get();
+    if (s.phase !== 'analizando') return;
+    set({ ramas: s.ramas.filter((_, i) => i !== index) });
   },
 
   terminarAnalisis() {
     const s = get();
-    if (s.phase !== 'analizando' || s.candidatas.length === 0) return;
-    set({ phase: 'confianza' });
+    if (s.phase !== 'analizando') return;
+    if (!declaracionCompleta('abierto', s.ramas, 0)) {
+      set({ inputError: t.stoyko.errorDeclaracionIncompleta });
+      return;
+    }
+    set({ phase: 'confianza', inputError: null });
   },
 
   async confirmarConfianza(valor) {
     const s = get();
-    if (s.phase !== 'confianza' || !s.item) return;
-    const item = s.item;
-    // Una candidata de un ply es una rama de un ply: el mismo criterio del
-    // preset abierto, ya en el formato unificado (ADR-0015). Cuando la entrada
-    // de ramas exista, esto no cambia.
-    const ramas = s.candidatas.map((candidata) => ({ linea: [candidata.jugada], evaluacion: candidata.evaluacion }));
-    const resultado = evaluarAbierto({ lineaMotor: item.mejorLinea, evaluacionMotor: item.evaluacionMotor }, ramas);
-    const acierto = resultado.cobertura;
-    const lineaMotorSan = sanDeLinea(item.fen, item.mejorLinea);
+    if (s.phase !== 'confianza' || !s.origen) return;
+    const origen = s.origen;
+    const ramas = s.ramas;
+
+    // La referencia del motor: del catálogo cuando viene de ahí, y evaluada en
+    // el dispositivo cuando la posición sale de una partida propia.
+    let referencia: { lineaMotor: string[]; evaluacionMotor: EvalSymbol } | null = null;
+    let motorError = false;
+    if (origen.tipo === 'catalogo') {
+      referencia = { lineaMotor: origen.item.mejorLinea, evaluacionMotor: origen.item.evaluacionMotor };
+    } else {
+      try {
+        const evaluacion = await engine.evaluate(s.fen, DEPTH_POSICION_PROPIA);
+        // `cp` viene desde la perspectiva de quien mueve y la escala de
+        // símbolos es desde blancas: se invierte cuando mueven las negras.
+        const mueveNegras = s.fen.split(' ')[1] === 'b';
+        const cpBlancas = evaluacion.cp === null
+          ? (evaluacion.mateIn ?? 0) > 0 === !mueveNegras ? 10_000 : -10_000
+          : mueveNegras ? -evaluacion.cp : evaluacion.cp;
+        referencia = { lineaMotor: [evaluacion.move], evaluacionMotor: evalToSymbol(cpBlancas) };
+      } catch {
+        motorError = true;
+      }
+    }
+
+    const resultado = referencia ? evaluarAbierto(referencia, ramas) : null;
+    const acierto = resultado?.cobertura ?? false;
+    const lineaMotorSan = referencia ? sanDeLinea(s.fen, referencia.lineaMotor) : [];
     set({
       phase: 'revelado',
       confianza: valor,
       acierto,
       resultado,
       lineaMotorSan,
-      evaluacionMotor: item.evaluacionMotor,
+      evaluacionMotor: referencia?.evaluacionMotor ?? null,
+      motorError,
     });
 
     // Práctica libre: se muestra la línea del motor, pero no se mide ni se
     // resetea el enfriamiento semanal (RF-7.2).
     if (s.practica) return;
+    // Sin referencia del motor no hay nada que medir: no se inventa un intento
+    // con varas vacías ni se consume el Stoyko de la semana.
+    if (!resultado) return;
 
     const ahora = new Date().toISOString();
     await calibrationRepo.save({
@@ -242,7 +363,9 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     await calculoAttemptRepo.save({
       id: crypto.randomUUID(),
       preset: 'abierto',
-      itemId: item.id,
+      ...(origen.tipo === 'catalogo'
+        ? { itemId: origen.item.id }
+        : { origen: { gameId: origen.posicion.gameId, ply: origen.posicion.ply } }),
       ramas,
       cobertura: resultado.cobertura,
       profundidadVista: resultado.profundidadVista,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { RadarItem } from './types';
 import {
+  PLIES_MIN_LINEA,
+  RAMAS_CON_LINEA,
   RAMAS_MIN_ABIERTO,
   declaracionCompleta,
   distanciaEvaluacion,
@@ -108,16 +110,34 @@ describe('declaracionCompleta', () => {
     expect(declaracionCompleta('forzado', [{ linea: ['e2e4', 'e7e5', 'g1f3'] }, { linea: ['d2d4'] }], 3)).toBe(false);
   });
 
-  it('el abierto pide varias ramas y una evaluación en cada una', () => {
-    const conEval = { linea: ['e2e4'], evaluacion: '=' as const };
-    expect(declaracionCompleta('abierto', [conEval], 0)).toBe(false);
-    expect(declaracionCompleta('abierto', [conEval, { linea: ['d2d4'] }], 0)).toBe(false);
-    expect(declaracionCompleta('abierto', [conEval, { linea: ['d2d4'], evaluacion: '±' }], 0)).toBe(true);
+  // Decisión de producto (2026-07-30): línea en las dos primeras ramas, el
+  // resto candidata suelta. Cinco líneas de cuatro plies en un celular es una
+  // carga de datos, no un ejercicio; la amplitud la sostienen las sueltas.
+  it('el abierto pide línea en las dos primeras ramas y evaluación en todas', () => {
+    const conLinea = (jugada: string) => ({ linea: [jugada, 'e7e5'], evaluacion: '=' as const });
+    const suelta = (jugada: string) => ({ linea: [jugada], evaluacion: '±' as const });
+
+    // Dos ramas, pero la segunda sin línea: incompleta.
+    expect(declaracionCompleta('abierto', [conLinea('e2e4'), suelta('d2d4')], 0)).toBe(false);
+    // Las dos con línea: completa.
+    expect(declaracionCompleta('abierto', [conLinea('e2e4'), conLinea('d2d4')], 0)).toBe(true);
+    // Y de la tercera en adelante, la candidata suelta alcanza.
+    expect(declaracionCompleta('abierto', [conLinea('e2e4'), conLinea('d2d4'), suelta('c2c4')], 0)).toBe(true);
+    expect(RAMAS_CON_LINEA).toBe(2);
+    expect(PLIES_MIN_LINEA).toBe(2);
+  });
+
+  it('sin evaluación no está completa, tenga línea o no', () => {
+    expect(declaracionCompleta('abierto', [{ linea: ['e2e4', 'e7e5'] }, { linea: ['d2d4', 'd7d5'] }], 0)).toBe(false);
+  });
+
+  it('una sola rama no alcanza, aunque tenga línea y evaluación', () => {
+    expect(declaracionCompleta('abierto', [{ linea: ['e2e4', 'e7e5'], evaluacion: '=' }], 0)).toBe(false);
     expect(RAMAS_MIN_ABIERTO).toBe(2);
   });
 
   it('el abierto no acepta más ramas que el tope', () => {
-    const ramas = Array.from({ length: 6 }, (_, i) => ({ linea: [`e2e${i}`], evaluacion: '=' as const }));
+    const ramas = Array.from({ length: 6 }, (_, i) => ({ linea: [`e2e${i}`, 'e7e5'], evaluacion: '=' as const }));
     expect(declaracionCompleta('abierto', ramas, 0)).toBe(false);
   });
 });
