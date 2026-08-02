@@ -7,11 +7,13 @@ import { computeDests, sanDeLinea } from './chessBoardUtils';
 // Cálculo comprometido y en Stoyko. El bug de promoción de abajo vivió acá sin
 // que nada lo detectara.
 describe('sanDeLinea', () => {
-  it('traduce una línea UCI a notación legible', () => {
+  // La notación de salida es la algebraica española (FIDE, Apéndice C): es la
+  // que la app muestra y la que pide para escribir.
+  it('traduce una línea UCI a algebraica española', () => {
     expect(sanDeLinea('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', ['e2e4', 'e7e5', 'g1f3'])).toEqual([
       'e4',
       'e5',
-      'Nf3',
+      'Cf3',
     ]);
   });
 
@@ -24,10 +26,10 @@ describe('sanDeLinea', () => {
    */
   it('respeta la pieza de promoción: c1=D y c1=C son jugadas distintas', () => {
     const fen = '4k3/8/8/8/8/7K/2p5/8 b - - 0 1';
-    expect(sanDeLinea(fen, ['c2c1q'])).toEqual(['c1=Q']);
-    expect(sanDeLinea(fen, ['c2c1n'])).toEqual(['c1=N']);
-    expect(sanDeLinea(fen, ['c2c1r'])).toEqual(['c1=R']);
-    expect(sanDeLinea(fen, ['c2c1b'])).toEqual(['c1=B']);
+    expect(sanDeLinea(fen, ['c2c1q'])).toEqual(['c1=D']);
+    expect(sanDeLinea(fen, ['c2c1n'])).toEqual(['c1=C']);
+    expect(sanDeLinea(fen, ['c2c1r'])).toEqual(['c1=T']);
+    expect(sanDeLinea(fen, ['c2c1b'])).toEqual(['c1=A']);
   });
 
   it('la promoción equivocada rompía el resto de la línea', () => {
@@ -37,14 +39,14 @@ describe('sanDeLinea', () => {
     const fen = '8/7R/5p2/p7/7P/2p5/3k2N1/1K6 b - - 0 48';
     const conDama = sanDeLinea(fen, ['c3c2', 'b1a2', 'c2c1q', 'h7d7', 'd2e2']);
     expect(conDama).toHaveLength(5);
-    expect(conDama[2]).toBe('c1=Q');
+    expect(conDama[2]).toBe('c1=D');
     // Con la promoción a caballo, la línea moría en la tercera jugada.
     expect(sanDeLinea(fen, ['c3c2', 'b1a2', 'c2c1n', 'h7d7', 'd2e2'])).toHaveLength(3);
   });
 
   it('sin sufijo de promoción toma la jugada legal que corresponda', () => {
     // Una jugada normal no lleva sufijo y no debe verse afectada.
-    expect(sanDeLinea('4k3/8/8/8/8/8/8/R3K3 w Q - 0 1', ['a1a8'])).toEqual(['Ra8+']);
+    expect(sanDeLinea('4k3/8/8/8/8/8/8/R3K3 w Q - 0 1', ['a1a8'])).toEqual(['Ta8+']);
   });
 
   it('corta en la primera jugada ilegal en vez de tirar', () => {

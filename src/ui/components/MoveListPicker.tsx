@@ -2,6 +2,7 @@
 // como referencia visual con clasificación por color en la fase 2 (design
 // system §5 MoveList: "error grave/error/imprecisión con marca de color").
 import type { MoveClassification } from '../../core/types';
+import { aEspanol } from '../../core/notacion';
 
 export interface MoveListEntry {
   ply: number;
@@ -46,7 +47,7 @@ export function MoveListPicker({
 function MoveButton({ entry, selected, onSelect }: { entry: MoveListEntry; selected: boolean; onSelect?: (ply: number) => void }) {
   const color = entry.clasificacion ? COLOR_CLASIFICACION[entry.clasificacion] : 'text-primary';
   if (!onSelect) {
-    return <span className={`${color} mr-2`}>{entry.san}</span>;
+    return <span className={`${color} mr-2`}>{aEspanol(entry.san)}</span>;
   }
   return (
     <button
@@ -55,7 +56,7 @@ function MoveButton({ entry, selected, onSelect }: { entry: MoveListEntry; selec
         selected ? 'bg-accent-subtle text-primary' : `${color} hover:bg-elevated`
       }`}
     >
-      {entry.san}
+      {aEspanol(entry.san)}
     </button>
   );
 }

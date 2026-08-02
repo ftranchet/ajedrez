@@ -18,7 +18,8 @@ import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { useStoykoStore } from '../state/stoykoStore';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { PLIES_MIN_LINEA, declaracionCompleta, ramaPideLinea } from '../../core/calculo';
-import { formatDuracion } from '../format';
+import { lineaAEspanol } from '../../core/notacion';
+import { formatDecimal, formatDuracion } from '../format';
 import { t } from '../i18n/es';
 
 // La sub-ruta #/calculo/stoyko sigue entrando acá (el router resuelve por el
@@ -175,7 +176,7 @@ function OrigenDeLaPosicion() {
   const texto = origen.tipo === 'catalogo'
     ? t.stoyko.origenCatalogo
     : origen.posicion.motivo === 'mas-centipeones'
-      ? t.stoyko.origenPropiaCentipeones.replace('{cp}', String(origen.posicion.cpPerdidos))
+      ? t.stoyko.origenPropiaPeones.replace('{peones}', formatDecimal(origen.posicion.cpPerdidos / 100, 1))
       : t.stoyko.origenPropiaTiempo.replace('{duracion}', formatDuracion(origen.posicion.tiempoMs ?? 0));
   return <p className="m-0 rounded-md border border-info/40 bg-info-subtle px-3 py-2 text-xs text-secondary">{texto}</p>;
 }
@@ -191,9 +192,10 @@ function Analizando() {
     <div className="flex flex-col gap-3">
       <p className="m-0 text-sm text-secondary">{t.stoyko.consigna}</p>
 
-      {/* Las ramas ya cerradas, con su línea en UCI y su evaluación al final.
-          Mostrar la línea entera —y no solo la candidata— es lo que hace que el
-          ejercicio se parezca al de Stoyko (ADR-0015). */}
+      {/* Las ramas ya cerradas, con su línea en algebraica y su evaluación al
+          final. Mostrar la línea entera —y no solo la candidata— es lo que hace
+          que el ejercicio se parezca al de Stoyko (ADR-0015). Se traduce del
+          UCI guardado a la notación que el usuario escribe y lee. */}
       {s.ramas.length > 0 && (
         <div className="rounded-lg border border-subtle bg-surface p-3">
           <p className="m-0 mb-2 text-xs tracking-wider text-tertiary uppercase">{t.stoyko.candidatasTitulo}</p>
@@ -201,7 +203,7 @@ function Analizando() {
             {s.ramas.map((rama, i) => (
               <li key={`${rama.linea.join('-')}-${i}`} className="flex items-start justify-between gap-2">
                 <span className="min-w-0 font-mono text-sm break-words text-primary">
-                  {rama.linea.join(' ')}{' '}
+                  {lineaAEspanol(s.fen, rama.linea).join(' ')}{' '}
                   <span className="text-tertiary">({rama.evaluacion ? EVAL_LABELS[rama.evaluacion] : ''})</span>
                 </span>
                 <button onClick={() => s.quitarRama(i)} className="shrink-0 text-xs text-secondary underline">
@@ -220,7 +222,7 @@ function Analizando() {
           {(pideLinea ? t.stoyko.ramaConLinea : t.stoyko.ramaSuelta).replace('{n}', String(s.ramas.length + 1))}
         </p>
         <p className="m-0 font-mono text-sm text-primary">
-          {s.ramaEnCurso.linea.length > 0 ? s.ramaEnCurso.linea.join(' ') : t.stoyko.ramaVacia}
+          {s.ramaEnCurso.linea.length > 0 ? lineaAEspanol(s.fen, s.ramaEnCurso.linea).join(' ') : t.stoyko.ramaVacia}
         </p>
 
         <form

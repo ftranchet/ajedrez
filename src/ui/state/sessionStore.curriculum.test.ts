@@ -11,6 +11,7 @@ import { seedCurriculumItems } from '../../services/puzzles/curriculumSeedData';
 import { dietaPorBanda } from '../../core/prescriptor';
 import { dailyAssignmentId } from '../../core/dailyAssignment';
 import { DEFAULT_PROFILE } from '../../services/storage/profileRepo';
+import { aEspanol } from '../../core/notacion';
 
 // Perfil por defecto (sin diagnóstico): fija cuántos elementos del
 // currículo sirve el Prescriptor por sesión (RF-11.2).
@@ -84,7 +85,7 @@ describe('sessionStore — bloque de currículo', () => {
     const solucion = item.solucion[0];
     const chess = new Chess(item.fen);
     const sanEsperado = chess.move({ from: solucion.slice(0, 2), to: solucion.slice(2, 4), promotion: solucion.slice(4, 5) || undefined }).san;
-    expect(after.curriculumJugadaCorrecta).toBe(sanEsperado);
+    expect(after.curriculumJugadaCorrecta).toBe(aEspanol(sanEsperado));
     expect(after.curriculumJugadaCorrecta).not.toBe(solucion);
   });
 

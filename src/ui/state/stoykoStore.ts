@@ -16,7 +16,6 @@
 // evalúa en el dispositivo al revelar — es una sola posición, sin reloj, y el
 // motor ya está cargado. Sin partidas analizadas cae al catálogo minado.
 import { create } from 'zustand';
-import { Chess } from 'chess.js';
 import type { EvalSymbol, StoykoItem } from '../../core/types';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from '../../core/stoyko';
 import {
@@ -37,9 +36,9 @@ import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
+import { interpretarJugada } from '../../core/notacion';
 import { t } from '../i18n/es';
 
-const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
 
 /** Profundidad de la evaluación en el dispositivo, para una posición propia. */
 const DEPTH_POSICION_PROPIA = 16;
@@ -140,16 +139,11 @@ async function elegirPosicion(): Promise<{ origen: OrigenPosicion; pool: StoykoI
   return { origen: { tipo: 'catalogo', item: pool[Math.floor(Math.random() * pool.length)] }, pool };
 }
 
-/** Reproduce la línea ya ingresada, para validar la legalidad del próximo ply. */
-function replayLinea(fen: string, linea: string[]): Chess {
-  const chess = new Chess(fen);
-  for (const uci of linea) {
-    const move = chess.moves({ verbose: true }).find((m) => m.from + m.to + (m.promotion ?? '') === uci);
-    if (!move) break;
-    chess.move(move);
-  }
-  return chess;
-}
+const MENSAJE_POR_ERROR = {
+  formato: t.stoyko.errorFormato,
+  ilegal: t.stoyko.errorIlegal,
+  'notacion-inglesa': t.stoyko.errorNotacionInglesa,
+} as const;
 
 export const useStoykoStore = create<StoykoState>((set, get) => ({
   phase: 'cargando',
@@ -231,19 +225,16 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   agregarPly() {
     const s = get();
     if (s.phase !== 'analizando' || !s.fen) return;
-    const jugada = s.inputActual.trim().toLowerCase();
-    if (!UCI_RE.test(jugada)) {
-      set({ inputError: t.stoyko.errorFormato });
+    // Se escribe en notación algebraica española (FIDE); `interpretarJugada`
+    // la valida contra la posición que deja el ply anterior —una línea
+    // declarada tiene que ser jugable, si no no es una línea— y devuelve el
+    // UCI, que es lo que se guarda.
+    const interpretada = interpretarJugada(s.fen, s.ramaEnCurso.linea, s.inputActual);
+    if ('error' in interpretada) {
+      set({ inputError: MENSAJE_POR_ERROR[interpretada.error] });
       return;
     }
-    // Cada ply se valida contra la posición que deja el ply anterior: una línea
-    // declarada tiene que ser jugable, si no no es una línea.
-    const chess = replayLinea(s.fen, s.ramaEnCurso.linea);
-    const legales = chess.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ''));
-    if (!legales.includes(jugada)) {
-      set({ inputError: t.stoyko.errorIlegal });
-      return;
-    }
+    const jugada = interpretada.uci;
     // La candidata (primer ply) no puede repetirse entre ramas: dos ramas con la
     // misma jugada inicial son la misma candidata contada dos veces.
     if (s.ramaEnCurso.linea.length === 0 && s.ramas.some((rama) => rama.linea[0] === jugada)) {

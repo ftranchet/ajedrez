@@ -56,32 +56,32 @@ test('cálculo: anotar la jugada del motor entre las candidatas acierta y revela
   // Cada ply se carga por separado — la mecánica que traía la pestaña corta.
   const declararRama = async (plies: string[]) => {
     for (const ply of plies) {
-      await page.getByPlaceholder('p. ej. e2e4').fill(ply);
+      await page.getByPlaceholder('p. ej. Cf3').fill(ply);
       await page.getByRole('button', { name: 'Sumar jugada' }).click();
     }
     await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
   };
 
   // Con un solo ply la primera rama no se puede cerrar: pide línea.
-  await page.getByPlaceholder('p. ej. e2e4').fill('b1c3');
+  await page.getByPlaceholder('p. ej. Cf3').fill('Cc3');
   await page.getByRole('button', { name: 'Sumar jugada' }).click();
   await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
   await expect(page.getByText(/Esta rama pide al menos 2 jugada/)).toBeVisible();
 
-  await page.getByPlaceholder('p. ej. e2e4').fill('g8f6');
+  await page.getByPlaceholder('p. ej. Cf3').fill('Cf6');
   await page.getByRole('button', { name: 'Sumar jugada' }).click();
   await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
-  await expect(page.getByText('b1c3 g8f6')).toBeVisible();
+  await expect(page.getByText('Cc3 Cf6')).toBeVisible();
 
-  await declararRama(['f1c4', 'f8c5', 'e1g1']);
-  await expect(page.getByText('f1c4 f8c5 e1g1')).toBeVisible();
+  await declararRama(['Ac4', 'Ac5', 'O-O']);
+  await expect(page.getByText('Ac4 Ac5 O-O')).toBeVisible();
 
   await page.getByRole('button', { name: 'Terminar análisis' }).click();
   await page.getByText('¿Cuánta confianza tenés en haber incluido la mejor jugada').waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Confirmar' }).click();
 
   await page.getByText('La tenías entre tus candidatas').waitFor({ timeout: 10_000 });
-  await page.getByText('Bc4 Bc5 O-O').waitFor();
+  await page.getByText('Ac4 Ac5 O-O').first().waitFor();
   // Las tres varas se leen por separado (ADR-0015): la profundidad vista y la
   // brecha contra la evaluación del motor, que antes se descartaba.
   await expect(page.getByText(/viste 3 jugada/)).toBeVisible();
@@ -98,7 +98,7 @@ test('las dos rutas de Cálculo abren el mismo ejercicio, sin selector de modo',
 
   for (const ruta of ['./#/calculo', './#/calculo/stoyko']) {
     await page.goto(ruta);
-    await expect(page.getByText('Anotás todas tus candidatas', { exact: false })).toBeVisible();
+    await expect(page.getByText('Calcular a fondo una sola posición', { exact: false })).toBeVisible();
     await expect(page.getByRole('radio')).toHaveCount(0);
   }
 });

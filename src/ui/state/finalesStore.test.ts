@@ -151,7 +151,7 @@ describe('finalesStore', () => {
       correcta: ['a6', 'a1'],
       jaque: false,
     });
-    expect(store.getState().jugadaCorrecta).toBe('Ra1');
+    expect(store.getState().jugadaCorrecta).toBe('Ta1');
   });
 
   it('si mueve primero el rival, Stockfish juega antes de habilitar al usuario', async () => {

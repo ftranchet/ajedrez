@@ -11,6 +11,7 @@ import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
 import type { CategoriaError } from '../../core/types';
 import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
+import { aEspanol } from '../../core/notacion';
 
 export function AnalizarScreen() {
   const phase = useAnalysisStore((s) => s.phase);
@@ -88,7 +89,7 @@ function MomentoCritico() {
               {enTablero
                 ? t.analisis.momentoJugadaActual
                     .replace('{n}', String(Math.floor(enTablero.ply / 2) + 1))
-                    .replace('{san}', enTablero.san)
+                    .replace('{san}', aEspanol(enTablero.san))
                 : t.analisis.momentoPosicionInicial}
             </p>
             <button
@@ -351,7 +352,7 @@ function ConfirmarErrores() {
             <p className="m-0 font-mono text-xs text-tertiary">
               {t.analisis.confirmarProgreso.replace('{actual}', String(s.erroresConfirmados + 1)).replace('{total}', String(total))}
             </p>
-            <p className="m-0 mt-1 font-display text-xl">{entry.san}</p>
+            <p className="m-0 mt-1 font-display text-xl">{aEspanol(entry.san)}</p>
             <p className="m-0 mt-2 text-sm text-secondary">
               {t.analisis.confirmarJugadaJugada}: <span className="font-mono text-primary">{entry.jugadaUsuario}</span>
             </p>

@@ -512,7 +512,7 @@ describe('sessionStore — bloque Cola', () => {
     expect(revisada!.fsrs.reps).toBe(1);
   });
 
-  it('el feedback de la Cola muestra la jugada correcta en SAN, no en UCI crudo', async () => {
+  it('el feedback de la Cola muestra la jugada correcta en algebraica española, no en UCI crudo', async () => {
     // Una captura (bxc6), para que UCI ("b7c6") y SAN de verdad difieran en forma.
     const vencida = buildErrorCard({
       fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
@@ -528,7 +528,7 @@ describe('sessionStore — bloque Cola', () => {
 
     await s.colaUserMove('g8' as never, 'f6' as never); // no es f8c5: fallo, dispara feedback igual
     const after = useSessionStore.getState();
-    expect(after.colaJugadaCorrecta).toBe('Bc5');
+    expect(after.colaJugadaCorrecta).toBe('Ac5');
     expect(after.colaJugadaCorrecta).not.toBe('f8c5');
   });
 
