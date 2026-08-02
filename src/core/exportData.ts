@@ -21,6 +21,7 @@ import type {
   TransferMeasurement,
 } from './types';
 import { SCHEMA_VERSION } from './schemaVersion';
+import { esEsquemaMigrable } from './importMigrations';
 import { DEFAULT_PROFILE } from './prescriptor';
 import { isValidWeeklyPlan } from './adherence';
 import { isValidReminder } from './reminder';
@@ -324,6 +325,12 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   if (manifest.esquema > SCHEMA_VERSION) {
     return { ok: false, error: `El archivo es de una versión más nueva (esquema ${manifest.esquema}) que esta app (${SCHEMA_VERSION}). Actualizá la app antes de restaurar.` };
+  }
+  // Una versión que la cadena de migraciones no cubre (0, negativa, fraccional)
+  // no se puede interpretar: escribirla sería adivinar en qué formato están los
+  // datos. Ver core/importMigrations.ts.
+  if (!esEsquemaMigrable(manifest.esquema)) {
+    return { ok: false, error: `El manifiesto declara una versión de esquema inválida (${manifest.esquema}).` };
   }
   if (!Array.isArray(obj.games) || !Array.isArray(obj.errorCards) || !Array.isArray(obj.calibrationRecords)) {
     return { ok: false, error: 'El paquete no tiene la forma esperada (faltan partidas, tarjetas o calibración).' };

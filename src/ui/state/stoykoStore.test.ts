@@ -189,6 +189,26 @@ describe('stoykoStore — preset abierto', () => {
     expect(typeof attempts[0].tiempoMs).toBe('number');
   });
 
+  it('dos confirmaciones simultáneas guardan una sola calibración y un solo intento', async () => {
+    // Regresión del doble envío: la guarda del store miraba `phase`, que recién
+    // pasa a 'revelado' después de esperar al motor y a IndexedDB. Dos clics
+    // rápidos pasaban los dos y guardaban dos observaciones del mismo acto,
+    // contaminando el Brier y el historial de cálculo.
+    await useStoykoStore.getState().empezar();
+    declararRama(['d2d4', 'e5d4'], '∓');
+    declararRama(['f1c4', 'f8c5', 'e1g1'], '=');
+    useStoykoStore.getState().terminarAnalisis();
+    expect(useStoykoStore.getState().phase).toBe('confianza');
+
+    await Promise.all([
+      useStoykoStore.getState().confirmarConfianza(80),
+      useStoykoStore.getState().confirmarConfianza(80),
+    ]);
+
+    expect(await db.calibrationRecords.count()).toBe(1);
+    expect(await db.calculoAttempts.count()).toBe(1);
+  });
+
   it('la brecha se mide aunque no se tenga la mejor jugada del motor', async () => {
     await useStoykoStore.getState().empezar();
     declararRama(['d2d4', 'e5d4'], '+-'); // el motor dice '=': dos pasos

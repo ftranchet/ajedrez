@@ -27,22 +27,23 @@ import type {
   TriageAttempt,
   TransferMeasurement,
 } from '../../core/types';
-import { compromisoAAttempt, stoykoAAttempt } from '../../core/calculoMigracion';
-import { classifyMoveLoss, computeCpLoss } from '../../core/analysis';
+import { unificarIntentosDeCalculo } from '../../core/calculoMigracion';
+// Las transformaciones de datos de cada migración viven en `core` y las usan
+// también los respaldos importados (core/importMigrations.ts): actualizar la
+// base in situ y restaurar un respaldo viejo tienen que dar el mismo
+// resultado, y la única forma de garantizarlo es que sea el mismo código.
+import {
+  cierreDelDiagnostico,
+  esRespuestaDelDiagnostico,
+  partidasDelDiagnostico,
+  recalcularPerdidas,
+} from '../../core/importMigrations';
 
 export const DB_NAME = 'elomax';
 // La versión de esquema es el contrato del paquete de exportación, así que vive
 // en `core`; se re-exporta acá para no romper a quien ya la importaba de este
 // módulo. Un test comprueba que coincida con la última `this.version(N)`.
 export { SCHEMA_VERSION } from '../../core/schemaVersion';
-
-/**
- * Ventana hacia atrás desde `diagnosticoCompletadoEn` dentro de la cual una
- * partida local sin reloj se atribuye al diagnóstico en la migración v16. El
- * diagnóstico es una sola sentada (su pausa solo sobrevive mientras la pestaña
- * siga abierta), así que 12 horas es holgado y a la vez acotado.
- */
-const VENTANA_ATRIBUCION_DIAGNOSTICO_MS = 12 * 60 * 60 * 1000;
 
 export class ElomaxDB extends Dexie {
   games!: Table<GameRecord, string>;
@@ -427,51 +428,19 @@ export class ElomaxDB extends Dexie {
       })
       .upgrade(async (tx) => {
         const profile: Partial<Profile> | undefined = await tx.table('profile').get('principal');
-        const completadoEn = profile?.diagnosticoCompletadoEn
-          ? new Date(profile.diagnosticoCompletadoEn).getTime()
-          : Number.NaN;
-        if (!Number.isFinite(completadoEn)) return;
-        const desde = completadoEn - VENTANA_ATRIBUCION_DIAGNOSTICO_MS;
+        const cierre = cierreDelDiagnostico(profile?.diagnosticoCompletadoEn);
+        if (cierre === null) return;
 
-        const enVentana = (iso: unknown): boolean => {
-          const t = typeof iso === 'string' ? new Date(iso).getTime() : Number.NaN;
-          return Number.isFinite(t) && t >= desde && t <= completadoEn;
-        };
-
-        // Las dos partidas del diagnóstico: locales, sin reloj y terminadas
-        // antes de que se guardara la banda. Si hubiera más candidatas (el
-        // usuario puede saltear el diagnóstico y jugar suelto antes de
-        // volver), se atribuyen las dos más cercanas al cierre y las demás
-        // quedan como partidas propias.
         const partidas: Array<Partial<GameRecord> & { id: string }> = await tx.table('games').toArray();
-        const delDiagnostico = partidas
-          .filter(
-            (game) =>
-              game.contexto === undefined &&
-              game.fuente === 'local' &&
-              game.ritmo === 'sin-reloj' &&
-              enVentana(game.fecha),
-          )
-          .sort((a, b) => new Date(String(b.fecha)).getTime() - new Date(String(a.fecha)).getTime())
-          .slice(0, 2);
-        for (const game of delDiagnostico) {
-          await tx.table('games').update(game.id, { contexto: 'diagnostico' });
+        for (const id of partidasDelDiagnostico(partidas, cierre)) {
+          await tx.table('games').update(id, { contexto: 'diagnostico' });
         }
 
-        // Las respuestas del Radar del diagnóstico son las únicas anteriores
-        // al cierre que no llevan dificultad normalizada: la sesión siempre la
-        // registra, salvo en errores propios, que van marcados aparte.
         await tx
           .table('radarAttempts')
           .toCollection()
           .modify((attempt: Partial<RadarAttempt>) => {
-            if (
-              attempt.origenContenido === undefined &&
-              attempt.dificultadNormalizada === undefined &&
-              enVentana(attempt.fecha)
-            ) {
-              attempt.origenContenido = 'diagnostico';
-            }
+            if (esRespuestaDelDiagnostico(attempt, cierre)) attempt.origenContenido = 'diagnostico';
           });
       });
 
@@ -553,10 +522,7 @@ export class ElomaxDB extends Dexie {
         const solucionPorItem = new Map(radarItems.map((item) => [item.id, item.solucion] as const));
         const compromiso = (await tx.table('compromisoAttempts').toArray()) as CompromisoAttempt[];
         const stoyko = (await tx.table('stoykoAttempts').toArray()) as StoykoAttempt[];
-        const convertidos: CalculoAttempt[] = [
-          ...compromiso.map((viejo) => compromisoAAttempt(viejo, solucionPorItem.get(viejo.itemId))),
-          ...stoyko.map(stoykoAAttempt),
-        ];
+        const convertidos: CalculoAttempt[] = unificarIntentosDeCalculo(compromiso, stoyko, solucionPorItem);
         if (convertidos.length > 0) await tx.table('calculoAttempts').bulkPut(convertidos);
       });
 
@@ -569,16 +535,7 @@ export class ElomaxDB extends Dexie {
     // que se recalcula sin volver a llamar al motor.
     this.version(19).upgrade(async (tx) => {
       const games = (await tx.table('games').toArray()) as GameRecord[];
-      const corregidos = games.filter((game) => game.analisis?.jugadas?.length).map((game) => ({
-        ...game,
-        analisis: {
-          ...game.analisis!,
-          jugadas: game.analisis!.jugadas.map((jugada) => {
-            const cpPerdidos = computeCpLoss(jugada.cpAntes, jugada.cpDespues, jugada.ladoQueMueve);
-            return { ...jugada, cpPerdidos, clasificacion: classifyMoveLoss(cpPerdidos) };
-          }),
-        },
-      }));
+      const corregidos = games.filter((game) => game.analisis?.jugadas?.length).map(recalcularPerdidas);
       if (corregidos.length > 0) await tx.table('games').bulkPut(corregidos);
     });
   }

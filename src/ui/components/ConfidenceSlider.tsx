@@ -9,11 +9,27 @@ export function ConfidenceSlider({
   label = t.radar.confianza,
   confirmLabel = t.radar.confirmarConfianza,
 }: {
-  onConfirm: (valor: number) => void;
+  onConfirm: (valor: number) => void | Promise<void>;
   label?: string;
   confirmLabel?: string;
 }) {
   const [valor, setValor] = useState(50);
+  // Guardar la calibración toca IndexedDB y a veces el motor: hasta que
+  // termine, el botón queda deshabilitado. El store además es single-flight
+  // (state/singleFlight.ts) —esto es lo que el usuario ve, aquello es lo que
+  // garantiza que no se guarde dos veces—.
+  const [guardando, setGuardando] = useState(false);
+
+  async function confirmar() {
+    if (guardando) return;
+    setGuardando(true);
+    try {
+      await onConfirm(valor);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-4">
       <label className="flex flex-col gap-1">
@@ -26,10 +42,16 @@ export function ConfidenceSlider({
           step={5}
           value={valor}
           onChange={(e) => setValor(Number(e.target.value))}
+          disabled={guardando}
           className="w-full accent-[var(--color-accent)]"
         />
       </label>
-      <button onClick={() => onConfirm(valor)} className="btn-primary">
+      <button
+        onClick={() => void confirmar()}
+        disabled={guardando}
+        aria-busy={guardando}
+        className="btn-primary disabled:opacity-60"
+      >
         {confirmLabel}
       </button>
     </div>

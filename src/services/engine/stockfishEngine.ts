@@ -37,6 +37,12 @@ export class StockfishEngine implements EnginePort {
    * mezclan sus `bestmove` (p. ej. una partida en curso y un análisis E3
    * disparados casi a la vez sobre este mismo singleton). */
   private pending: Promise<unknown> = Promise.resolve();
+  /**
+   * Rechazos de las esperas en curso. Cuando el worker se descarta —timeout,
+   * `error`, `messageerror`— hay que cortarlas en el acto: si no, se quedan
+   * colgadas hasta su propio timeout esperando a un worker que ya no existe.
+   */
+  private esperando = new Set<(err: Error) => void>();
 
   init(): Promise<void> {
     this.initPromise ??= this.boot().catch((err) => {
@@ -59,7 +65,18 @@ export class StockfishEngine implements EnginePort {
     const res = await fetch(`${base}engine/manifest.json`);
     if (!res.ok) throw new Error('No se encontró el manifest del motor');
     const { file } = (await res.json()) as { file: string };
-    this.worker = new Worker(`${base}engine/${file}`);
+    const worker = new Worker(`${base}engine/${file}`);
+    // Un worker que muere o manda algo indeserializable no avisaba por ningún
+    // lado: la operación en curso se quedaba esperando hasta su timeout y la
+    // siguiente hablaba con un worker roto. Se descarta y la próxima consulta
+    // arranca uno nuevo.
+    worker.addEventListener('error', () => {
+      this.descartarWorker('El motor se cayó; se reinicia en la próxima consulta.', worker);
+    });
+    worker.addEventListener('messageerror', () => {
+      this.descartarWorker('El motor mandó un mensaje ilegible; se reinicia en la próxima consulta.', worker);
+    });
+    this.worker = worker;
     this.send('uci');
     await this.waitFor(/^uciok$/m);
     this.send('isready');
@@ -150,9 +167,32 @@ export class StockfishEngine implements EnginePort {
   }
 
   dispose(): void {
+    this.descartarWorker('El motor se cerró.');
+  }
+
+  /**
+   * Tira el worker y corta lo que estuviera esperándolo. La próxima consulta
+   * re-bootea (`searchNow` siempre pasa por `init()`).
+   *
+   * **Por qué terminar y no solo mandar `stop`.** UCI es un protocolo con
+   * estado: al vencer un timeout, Stockfish sigue pensando y responde a `stop`
+   * con un `bestmove` tardío. Si para entonces la operación siguiente ya
+   * instaló su listener, ese `bestmove` la resolvía —asociando la jugada o la
+   * evaluación de una posición a otra distinta—. Drenar ese mensaje y
+   * resincronizar con `isready`/`readyok` también funcionaría, pero deja al
+   * motor en un estado que hay que razonar; terminar el worker no deja nada
+   * que drenar.
+   */
+  private descartarWorker(motivo: string, soloSi?: Worker): void {
+    // Un evento tardío de un worker ya reemplazado no puede matar al nuevo:
+    // sus esperas se rechazaron cuando se lo descartó.
+    if (soloSi !== undefined && this.worker !== soloSi) return;
     this.worker?.terminate();
     this.worker = null;
     this.initPromise = null;
+    const esperando = [...this.esperando];
+    this.esperando.clear();
+    for (const rechazar of esperando) rechazar(new Error(motivo));
   }
 
   private send(cmd: string): void {
@@ -164,22 +204,28 @@ export class StockfishEngine implements EnginePort {
     const worker = this.worker;
     if (!worker) return Promise.reject(new Error('Motor no inicializado'));
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const terminar = (): void => {
+        clearTimeout(timer);
         worker.removeEventListener('message', onMessage);
-        // Cortar la búsqueda en curso: sin `stop`, el motor sigue pensando y su
-        // `bestmove` tardío podría llegar durante la siguiente operación y
-        // resolverla con un resultado ajeno.
-        worker.postMessage('stop');
+        this.esperando.delete(reject);
+      };
+      const timer = setTimeout(() => {
+        terminar();
+        // El worker se tira entero: su `bestmove` tardío no puede aparecer en
+        // la operación siguiente si el worker ya no existe (ver
+        // `descartarWorker`).
+        this.descartarWorker(`Timeout esperando ${pattern}`, worker);
         reject(new Error(`Timeout esperando ${pattern}`));
       }, timeoutMs);
       const onMessage = (e: MessageEvent) => {
         const text = typeof e.data === 'string' ? e.data : '';
         if (pattern.test(text)) {
-          clearTimeout(timer);
-          worker.removeEventListener('message', onMessage);
+          terminar();
           resolve(text);
         }
       };
+      // Registrado para que un fallo del worker corte esta espera en el acto.
+      this.esperando.add(reject);
       worker.addEventListener('message', onMessage);
     });
   }

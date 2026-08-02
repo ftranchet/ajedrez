@@ -1111,6 +1111,7 @@ const RITMOS: Ritmo[] = ['rapida', 'clasica', 'blitz', 'bullet', 'sin-reloj'];
 function errorMensaje(error: PgnParseError): string {
   if (error === 'vacio') return t.panel.importarPgnErrorVacio;
   if (error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
+  if (error === 'posicion-inicial-no-estandar') return t.panel.importarPgnErrorPosicionNoEstandar;
   return t.panel.importarPgnErrorInvalido;
 }
 

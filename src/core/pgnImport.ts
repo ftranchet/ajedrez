@@ -5,7 +5,7 @@
 import { Chess } from 'chess.js';
 import type { Resultado } from './types';
 
-export type PgnParseError = 'vacio' | 'invalido' | 'sin-jugadas';
+export type PgnParseError = 'vacio' | 'invalido' | 'sin-jugadas' | 'posicion-inicial-no-estandar';
 
 export type PgnParseResult = {
   ok: true;
@@ -25,6 +25,26 @@ function parseElo(raw: string | undefined): number | undefined {
   if (!raw || !/^\d{3,4}$/.test(raw)) return undefined;
   const value = Number(raw);
   return value >= 100 && value <= 4000 ? value : undefined;
+}
+
+const FEN_INICIAL_ESTANDAR = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -';
+
+/**
+ * ¿La partida arranca de algo que no es la posición inicial estándar?
+ *
+ * Se miran las tres formas en que un PGN lo declara: el par `SetUp`/`FEN`, un
+ * `FEN` suelto (chess.js lo respeta igual) y el `Variant` de Lichess
+ * ("From Position", "Chess960", atómico…). Del FEN se comparan los cuatro
+ * primeros campos: los contadores de jugada no cambian la posición.
+ */
+function posicionInicialNoEstandar(headers: Record<string, string>): boolean {
+  const fen = headers.FEN?.trim();
+  if (fen) return fen.split(/\s+/).slice(0, 4).join(' ') !== FEN_INICIAL_ESTANDAR;
+  // `SetUp: 1` sin FEN es un PGN que se declara no estándar y no dice desde
+  // dónde: no hay forma de reproducirlo bien.
+  if (headers.SetUp?.trim() === '1') return true;
+  const variante = headers.Variant?.trim().toLowerCase();
+  return variante !== undefined && variante !== '' && variante !== 'standard';
 }
 
 /** Fecha PGN `YYYY.MM.DD`; los signos `?` indican que no es utilizable. */
@@ -54,6 +74,17 @@ export function parsePastedPgn(raw: string): PgnParseResult {
   if (plyCount === 0) return { ok: false, error: 'sin-jugadas' };
 
   const headers = chess.getHeaders();
+  // Una partida que no arranca de la posición estándar se rechaza en la puerta.
+  // El PGN se guarda como texto y todo lo que lo vuelve a reproducir —el
+  // analizador del motor y la fase manual— parte de un `new Chess()` estándar,
+  // así que aceptarla evalúa un tablero distinto del importado: si las jugadas
+  // también son legales desde la posición normal el error es *silencioso*, y
+  // Stockfish termina puntuando una partida que nadie jugó. Mejor un rechazo
+  // explícito que un análisis falso. Levantar esto exige persistir el FEN raíz
+  // y usarlo en reproducción, fase 1 y motor.
+  if (posicionInicialNoEstandar(headers)) {
+    return { ok: false, error: 'posicion-inicial-no-estandar' };
+  }
   const whiteElo = parseElo(headers.WhiteElo);
   const blackElo = parseElo(headers.BlackElo);
   const playedAt = parsePlayedAt(headers.Date);

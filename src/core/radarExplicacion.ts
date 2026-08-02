@@ -34,10 +34,18 @@ export interface AnalisisSolucion {
   /** Jugadas del solucionador hasta el mate, o null si la línea no da mate. */
   mateEn: number | null;
   /**
-   * Material del solucionador menos el del rival **al terminar la línea**,
-   * menos el mismo balance en la posición inicial. Positivo = termina arriba.
+   * Material que **la línea gana**: balance al terminarla menos balance al
+   * empezarla. Positivo = la línea gana material. NO es el balance final:
+   * recuperar 6 peones estando 8 abajo deja este campo en +6 y al solucionador
+   * 2 abajo sobre el tablero.
    */
-  materialPeones: number;
+  materialGanado: number;
+  /**
+   * Balance material del solucionador **al terminar la línea**: lo suyo menos
+   * lo del rival. Positivo = termina arriba sobre el tablero. Es el único
+   * número con el que se puede afirmar "quedás X arriba".
+   */
+  balanceFinal: number;
   /** Jugadas verificadas como equivalentes (solo tranquilas), en SAN. */
   equivalentesSan: string[];
   /** La jugada "familiar" del subtipo doble solución, en SAN. */
@@ -80,7 +88,8 @@ function sanDeUci(fen: string, uci: string): string | null {
 const SIN_ANALISIS: AnalisisSolucion = {
   lineaSan: [],
   mateEn: null,
-  materialPeones: 0,
+  materialGanado: 0,
+  balanceFinal: 0,
   equivalentesSan: [],
   familiarSan: null,
 };
@@ -105,11 +114,13 @@ export function analizarSolucion(item: RadarItem): AnalisisSolucion {
     lineaSan.push(san);
   }
 
+  const balanceFinal = balanceMaterial(chess, solucionador);
   return {
     lineaSan,
     // Las jugadas del solucionador son las de índice par: la línea alterna.
     mateEn: chess.isCheckmate() ? Math.ceil(lineaSan.length / 2) : null,
-    materialPeones: balanceMaterial(chess, solucionador) - balanceInicial,
+    materialGanado: balanceFinal - balanceInicial,
+    balanceFinal,
     equivalentesSan: (item.jugadasAceptables ?? [])
       .map((uci) => sanDeUci(item.fen, uci))
       .filter((san): san is string => san !== null),
@@ -249,18 +260,38 @@ const GENERICA_FALLO: Record<TipoRadar, string> = {
   envenenada: 'Era una trampa: había que declinar la captura.',
 };
 
-/** Lo que consiguió la línea, dicho solo cuando el tablero lo respalda. */
+/**
+ * Lo que consiguió la línea, dicho solo cuando el tablero lo respalda.
+ *
+ * **Ganar material y quedar arriba no son lo mismo.** Una versión anterior
+ * medía la ganancia de la línea y la anunciaba como balance final: en
+ * `lichess-00Cqg` las blancas empiezan 8 abajo, la línea recupera 6 y el texto
+ * afirmaba "quedás 6 peones arriba" cuando en el tablero se termina 2 abajo.
+ * Es la clase de error que enseña una conclusión ajedrecística falsa, así que
+ * cada número sale ahora del campo que lo respalda: "arriba" solo desde
+ * `balanceFinal`, "gana/recupera" solo desde `materialGanado`.
+ */
 function fraseDesenlace(analisis: AnalisisSolucion): string | null {
   if (analisis.mateEn !== null) {
     return analisis.mateEn === 1 ? 'Es mate en una.' : `La línea fuerza mate en ${analisis.mateEn}.`;
   }
-  // Un balance negativo NO se reporta: la línea del catálogo se corta cuando la
-  // ventaja ya es clara, y en un sacrificio la compensación llega después del
-  // corte. Decir "perdés una pieza" sería cierto del tablero y falso del juego.
-  if (analisis.materialPeones > 0) {
-    return `Al terminar la línea quedás ${nombreMaterial(analisis.materialPeones)} arriba.`;
+  // Una línea que no gana material NO se reporta: se corta cuando la ventaja ya
+  // es clara, y en un sacrificio la compensación llega después del corte. Decir
+  // "perdés una pieza" sería cierto del tablero y falso del juego.
+  if (analisis.materialGanado <= 0) return null;
+
+  if (analisis.balanceFinal > 0) {
+    // Cuando se partía de material igualado, ganancia y balance coinciden y
+    // repetir el número dos veces sobra.
+    return analisis.balanceFinal === analisis.materialGanado
+      ? `Al terminar la línea quedás ${nombreMaterial(analisis.balanceFinal)} arriba.`
+      : `La línea gana ${nombreMaterial(analisis.materialGanado)}: al terminar quedás ${nombreMaterial(analisis.balanceFinal)} arriba.`;
   }
-  return null;
+  // Se ganó material sin llegar a estar arriba: se cuenta lo recuperado, que es
+  // lo que la posición pedía, y no se afirma nada sobre el balance.
+  return analisis.balanceFinal === 0
+    ? `La línea recupera ${nombreMaterial(analisis.materialGanado)} y deja el material igualado.`
+    : `La línea recupera ${nombreMaterial(analisis.materialGanado)}.`;
 }
 
 /**

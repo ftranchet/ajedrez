@@ -843,6 +843,8 @@ export const es = {
     importarPgnErrorVacio: 'Pegá un PGN para importar.',
     importarPgnErrorInvalido: 'Ese texto no es un PGN válido.',
     importarPgnErrorSinJugadas: 'El PGN no tiene jugadas.',
+    importarPgnErrorPosicionNoEstandar:
+      'Esa partida no empieza en la posición inicial estándar (PGN con FEN propio, Chess960 o "From Position"). Todavía no se puede analizar bien, así que no se importa.',
     ritmos: {
       bullet: 'Bullet',
       blitz: 'Blitz',
@@ -858,9 +860,10 @@ export const es = {
     importar: 'Importar / restaurar',
     importando: 'Restaurando…',
     importadoOk: 'Restaurado: {partidas} partidas, {tarjetas} tarjetas, {calibraciones} registros de calibración y {radar} respuestas del Radar',
+    importadoMigrado: 'El respaldo era de un formato anterior (esquema {esquema}) y se actualizó al restaurarlo.',
     importadoError: 'No se pudo restaurar',
     eliminar: 'Eliminar todos mis datos',
-    eliminarAdvertencia: 'Se borran tu perfil, partidas, repasos y todo tu progreso. No se puede deshacer. Si querés conservarlos, exportá primero.',
+    eliminarAdvertencia: 'Se borran tu perfil, partidas, repasos y todo tu progreso, más las preferencias de este dispositivo y el token de Lichess (queda desconectado acá; revocarlo en tu cuenta de Lichess es aparte). No se puede deshacer. Si querés conservarlos, exportá primero.',
     eliminarConfirmar: 'Sí, borrar todo',
     eliminarCancelar: 'Cancelar',
     eliminando: 'Eliminando…',

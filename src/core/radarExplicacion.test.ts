@@ -41,14 +41,28 @@ describe('analizarSolucion', () => {
     expect(analisis.mateEn).toBe(4);
   });
 
-  it('mide el material al terminar la línea, no al empezarla', () => {
-    // Las negras se llevan la dama (+9) y las blancas recapturan el caballo
-    // (−3): al terminar la línea el neto es +6, no +9.
+  it('separa lo que la línea gana de cómo termina el tablero', () => {
+    // Las negras empiezan 6 abajo (caballo contra dama), se llevan la dama
+    // (+9) y las blancas recapturan el caballo (−3): la línea gana 6 y el
+    // tablero termina igualado. Son dos números distintos y confundirlos es
+    // exactamente el bug que este test protege.
     const analisis = analizarSolucion(
       item({ fen: '4k3/8/8/8/8/5n2/3Q4/4K3 b - - 0 1', solucion: ['f3d2', 'e1d2'] }),
     );
     expect(analisis.lineaSan).toEqual(['Nxd2', 'Kxd2']);
-    expect(analisis.materialPeones).toBe(6);
+    expect(analisis.materialGanado).toBe(6);
+    expect(analisis.balanceFinal).toBe(0);
+  });
+
+  it('el balance final cuenta el material del tablero, no el de la línea', () => {
+    // lichess-00Cqg, del lote publicado: las blancas empiezan 8 abajo y la
+    // línea recupera 6. El texto llegó a afirmar "quedás 6 peones arriba"
+    // sobre una posición en la que se termina 2 abajo.
+    const posicion = seedRadarItems.find((p) => p.id === 'lichess-00Cqg');
+    expect(posicion, 'lichess-00Cqg debe seguir en el lote').toBeDefined();
+    const analisis = analizarSolucion(posicion!);
+    expect(analisis.materialGanado).toBe(6);
+    expect(analisis.balanceFinal).toBe(-2);
   });
 
   it('respeta la pieza de promoción: c1=D y c1=C no son la misma jugada', () => {
@@ -117,18 +131,33 @@ describe('explicarPosicion', () => {
   });
 
   it('dice cuánto material queda al final de la línea', () => {
-    // Negras se llevan la dama y nadie recaptura: +9.
+    // Negras (caballo contra dama, 6 abajo) se llevan la dama y nadie
+    // recaptura: la línea gana 9 y el tablero termina 3 arriba. Las dos cifras
+    // se dicen, cada una con su verbo.
     const texto = explicarPosicion(item({ fen: '4k3/8/8/8/8/8/1n6/3Q1K2 b - - 0 1', solucion: ['b2d1'] }), false);
-    expect(texto).toContain('una dama arriba');
+    expect(texto).toContain('gana una dama');
+    expect(texto).toContain('una pieza arriba');
+    expect(texto).not.toContain('una dama arriba');
+  });
+
+  it('nunca afirma "arriba" sobre una línea que termina abajo en material', () => {
+    // Las negras recuperan 6 peones pero terminan 1 abajo: se cuenta lo
+    // recuperado y no se afirma ninguna ventaja que el tablero no muestre.
+    const texto = explicarPosicion(
+      item({ fen: '4k3/8/8/8/8/5n2/3Q1P2/4K3 b - - 0 1', solucion: ['f3d2', 'e1d2', 'e8e7', 'd2d3'] }),
+      false,
+    );
+    expect(texto).toContain('recupera 6 peones');
+    expect(texto).not.toContain('arriba');
   });
 
   it('solo nombra la pieza cuando el número es exactamente el suyo', () => {
     // 4 peones netos no son "una pieza": ahí gana el número.
     const cuatro = explicarPosicion(
-      item({ fen: '4k3/8/8/8/8/5n2/3Q1P2/4K3 b - - 0 1', solucion: ['f3d2', 'e1d2', 'e8e7', 'd2d3'] }),
+      item({ fen: '4k3/8/8/8/8/5n2/3QP3/4K3 b - - 0 1', solucion: ['f3d2', 'e1d2'] }),
       false,
     );
-    expect(cuatro).toContain('6 peones arriba');
+    expect(cuatro).toContain('6 peones');
     expect(cuatro).not.toContain('una pieza');
   });
 

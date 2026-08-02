@@ -36,6 +36,7 @@ import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
+import { singleFlight } from './singleFlight';
 import { interpretarJugada } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
 import { t } from '../i18n/es';
@@ -298,7 +299,10 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     set({ phase: 'confianza', inputError: null });
   },
 
-  async confirmarConfianza(valor) {
+  // Single-flight: la fase pasa a 'revelado' recién después de evaluar con el
+  // motor, así que dos clics rápidos pasaban los dos la guarda de fase y
+  // guardaban dos intentos y dos calibraciones del mismo acto.
+  confirmarConfianza: singleFlight(async (valor: number) => {
     const s = get();
     if (s.phase !== 'confianza' || !s.origen) return;
     const origen = s.origen;
@@ -372,5 +376,5 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     });
     const profile = await profileRepo.get();
     await profileRepo.save({ ...profile, stoykoUltimaCompletadaEn: ahora });
-  },
+  }),
 }));

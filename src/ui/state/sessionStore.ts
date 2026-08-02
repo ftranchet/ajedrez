@@ -60,6 +60,7 @@ import { curriculumProgressRepo } from '../../services/storage/curriculumProgres
 import { profileRepo } from '../../services/storage/profileRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
+import { singleFlight } from './singleFlight';
 
 /** Ventana para la tasa de acierto reciente que ajusta la dificultad (RF-5.5). */
 const VENTANA_TASA_ACIERTO = 8;
@@ -1063,7 +1064,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       set({ ...boardSnapshot(), lastMove: null, radarSubPhase: 'jugando' });
     },
 
-    async radarConfirmarConfianza(valor) {
+    // Single-flight: sin esto, dos clics rápidos en "Confirmar" guardaban dos
+    // calibraciones distintas —la fase recién pasa a 'feedback' después del
+    // await— y el Brier quedaba contaminado con una observación inventada.
+    radarConfirmarConfianza: singleFlight(async (valor: number) => {
       const s = get();
       if (!s.radarItem || s.radarUltimoAcierto === null || !s.radarJugadaUsuario) return;
       const record: CalibrationRecord = {
@@ -1076,7 +1080,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       await calibrationRepo.save(record);
       set({ radarSubPhase: 'feedback' });
       await finalizeRadarAnswer(s.radarItem, s.radarUltimoAcierto, s.radarJugadaUsuario);
-    },
+    }),
 
     async radarContinuar() {
       const s = get();

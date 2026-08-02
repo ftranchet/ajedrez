@@ -3,12 +3,13 @@
 // exportando de una base, vaciándola (simula "otro dispositivo" vacío) e
 // importando de vuelta.
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteAllUserData, exportAllData, importAllData } from './exportImport';
 import { db } from '../storage/db';
 import { buildGameRecord } from '../../core/game';
 import { buildErrorCard } from '../../core/errorCard';
 import { startN1Experiment } from '../../core/n1Experiment';
+import { SCHEMA_VERSION } from '../../core/schemaVersion';
 
 beforeEach(async () => {
   await db.games.clear();
@@ -141,7 +142,15 @@ describe('exportAllData / importAllData', () => {
     const outcome = await importAllData(zip);
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.resumen).toEqual({ partidas: 1, tarjetas: 1, calibraciones: 1, respuestasRadar: 1 });
+    expect(outcome.resumen).toEqual({
+      partidas: 1,
+      tarjetas: 1,
+      calibraciones: 1,
+      respuestasRadar: 1,
+      esquemaOrigen: SCHEMA_VERSION,
+      // Un respaldo recién exportado ya está al día: no corre ninguna migración.
+      migraciones: [],
+    });
 
     const restoredGame = await db.games.get(game.id);
     expect(restoredGame).toEqual(game);
@@ -216,6 +225,36 @@ describe('exportAllData / importAllData', () => {
     expect(await db.radarItems.get('radar-seed-1')).toBeDefined();
   });
 
+  it('deleteAllUserData también borra el token de Lichess y las preferencias locales', async () => {
+    // El agujero de privacidad que cierra: el borrado vaciaba solo IndexedDB,
+    // así que tras "Eliminar todos mis datos" y recargar, la app seguía
+    // conectada a Lichess con el bearer token intacto en localStorage.
+    const almacen = new Map<string, string>([
+      ['elomax-lichess-token', 'lip_secreto'],
+      ['elomax-theme', 'dark'],
+      ['elomax-notacion', 'en'],
+      ['elomax-blind-training', 'off'],
+      ['otra-app', 'no se toca'],
+    ]);
+    vi.stubGlobal('localStorage', {
+      get length() {
+        return almacen.size;
+      },
+      key: (i: number) => [...almacen.keys()][i] ?? null,
+      getItem: (k: string) => almacen.get(k) ?? null,
+      setItem: (k: string, v: string) => almacen.set(k, v),
+      removeItem: (k: string) => almacen.delete(k),
+    });
+
+    await deleteAllUserData();
+
+    expect(almacen.get('elomax-lichess-token')).toBeUndefined();
+    expect([...almacen.keys()].filter((k) => k.startsWith('elomax-'))).toEqual([]);
+    // Lo de otras apps en el mismo origen no es asunto de ELOmax.
+    expect(almacen.get('otra-app')).toBe('no se toca');
+    vi.unstubAllGlobals();
+  });
+
   it('importar dos veces el mismo respaldo deja el mismo estado (idempotente)', async () => {
     const game = buildGameRecord({ pgn: '1. e4 e5 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
     await db.games.put(game);
@@ -246,6 +285,68 @@ describe('exportAllData / importAllData', () => {
     expect(await db.games.get(bueno.id)).toBeDefined();
   });
 
+  it('restaura un respaldo v17 migrándolo: el historial de cálculo no desaparece', async () => {
+    // Regresión de punta a punta del agujero de migraciones: las migraciones
+    // de Dexie solo corren cuando cambia la versión de IndexedDB, y restaurar
+    // no la cambia. Un respaldo v17 entraba crudo en la base v19 y sus
+    // intentos quedaban en las tablas viejas, invisibles para el Panel, que
+    // lee `calculoAttempts`.
+    const { zipSync, strToU8 } = await import('fflate');
+    // El catálogo local aporta la solución para reconstruir los plies.
+    await db.radarItems.put({
+      id: 'radar-1',
+      fen: 'r4rk1/pp2Bppp/2n1b3/q1pp4/8/P1Q2NP1/1PP1PP1P/2KR3R b - - 1 15',
+      tipo: 'ofensiva',
+      temas: [],
+      rating: 1412,
+      solucion: ['a5c3', 'b2c3', 'c6e7'],
+      fuente: 'lichess-cc0',
+    });
+    const zip = zipSync({
+      'manifest.json': strToU8(JSON.stringify({ esquema: 17, exportadoEn: '2026-02-01T00:00:00.000Z', app: 'elomax' })),
+      'games.json': strToU8('[]'),
+      'errorCards.json': strToU8('[]'),
+      'calibrationRecords.json': strToU8('[]'),
+      'compromisoAttempts.json': strToU8(
+        JSON.stringify([
+          { id: 'comp-viejo', itemId: 'radar-1', profundidad: 3, correcta: false, primerErrorEn: 2, fecha: '2026-01-05T10:00:00.000Z' },
+        ]),
+      ),
+      'stoykoAttempts.json': strToU8(
+        JSON.stringify([
+          { id: 'st-viejo', itemId: 'stoyko-01', candidatas: [{ jugada: 'e2e4', evaluacion: '=' }], acierto: true, confianzaDeclarada: 60, tiempoMs: 30_000, fecha: '2026-01-06T10:00:00.000Z' },
+        ]),
+      ),
+    });
+
+    const outcome = await importAllData(zip);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.resumen.esquemaOrigen).toBe(17);
+    expect(outcome.resumen.migraciones).toEqual([18, 19]);
+
+    // Lo que el Panel lee: los dos intentos, ya convertidos.
+    const unificados = await db.calculoAttempts.toArray();
+    expect(unificados.map((a) => a.id).sort()).toEqual(['comp-viejo', 'st-viejo']);
+    expect(unificados.find((a) => a.id === 'comp-viejo')!.ramas[0]!.linea).toEqual(['a5c3', 'b2c3']);
+    // Y el original tampoco se pierde.
+    expect(await db.compromisoAttempts.count()).toBe(1);
+  });
+
+  it('rechaza un manifiesto con una versión de esquema que ninguna migración cubre', async () => {
+    const { zipSync, strToU8 } = await import('fflate');
+    const zip = zipSync({
+      'manifest.json': strToU8(JSON.stringify({ esquema: 0, exportadoEn: new Date().toISOString(), app: 'elomax' })),
+      'games.json': strToU8('[]'),
+      'errorCards.json': strToU8('[]'),
+      'calibrationRecords.json': strToU8('[]'),
+    });
+    const outcome = await importAllData(zip);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.error).toContain('inválida');
+  });
+
   it('rechaza un archivo comprimido descomunal antes de descomprimirlo', async () => {
     // > 100 MB de entrada: se corta sin intentar unzipSync (evita el spike de memoria).
     const enorme = new Uint8Array(101 * 1024 * 1024);
@@ -267,6 +368,22 @@ describe('exportAllData / importAllData', () => {
     await db.games.put(game);
     const zip = await exportAllData();
     const files = unzipSync(zip);
-    expect(strFromU8(files[`games/${game.id}.pgn`])).toBe('1. d4 d5 *');
+    const pgns = Object.keys(files).filter((nombre) => nombre.endsWith('.pgn'));
+    expect(pgns).toHaveLength(1);
+    expect(pgns[0]).toContain(game.id);
+    expect(strFromU8(files[pgns[0]!])).toBe('1. d4 d5 *');
+  });
+
+  it('un id de partida con traversal no genera una entrada fuera de games/', async () => {
+    // Los ids propios son UUID, pero uno importado puede ser cualquier string.
+    // ELOmax no extrae el zip al disco, pero sí lo genera: no puede emitir un
+    // archivo que ataque al descompresor de quien lo abra.
+    const { unzipSync } = await import('fflate');
+    const game = buildGameRecord({ pgn: '1. e4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put({ ...game, id: '../../../etc/passwd' });
+
+    const nombres = Object.keys(unzipSync(await exportAllData()));
+    expect(nombres.every((nombre) => !nombre.includes('..'))).toBe(true);
+    expect(nombres.filter((n) => n.endsWith('.pgn')).every((n) => n.startsWith('games/'))).toBe(true);
   });
 });

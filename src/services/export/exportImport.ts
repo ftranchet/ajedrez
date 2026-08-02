@@ -3,6 +3,9 @@
 // acá solo entra/sale un Uint8Array — el puerto entre dominio y IO.
 import { strToU8, strFromU8, zipSync, unzipSync } from 'fflate';
 import { buildExportBundle, validateImportBundle, type ExportSourceData, type ImportResult } from '../../core/exportData';
+import { migrarDatosImportados } from '../../core/importMigrations';
+import { clearLocalNamespace } from '../storage/localNamespace';
+import { cancelReminder } from '../notifications/reminder';
 import { errorCardRepo } from '../storage/errorCardRepo';
 import { calibrationRepo } from '../storage/calibrationRepo';
 import { gameRepo } from '../storage/gameRepo';
@@ -22,8 +25,24 @@ import { n1ExperimentRepo } from '../storage/n1ExperimentRepo';
 import { dailyAssignmentRepo } from '../storage/dailyAssignmentRepo';
 import { db } from '../storage/db';
 
-function pgnFileName(gameId: string): string {
-  return `games/${gameId}.pgn`;
+/**
+ * Nombre del PGN dentro del .zip, saneado.
+ *
+ * Los IDs propios son UUID, pero un `id` importado puede ser cualquier string:
+ * uno como `../../fuera` se reexportaba como una entrada con traversal. ELOmax
+ * nunca extrae el .zip al disco —el import lee `games.json`—, así que no es un
+ * agujero *de esta app*; lo sería del descompresor de quien abra el archivo, y
+ * ese archivo lo genera ELOmax. Se sanea acá y no en el import porque el
+ * nombre lo elige la exportación.
+ *
+ * Colisiones: dos IDs que sanean igual (`a/b` y `a_b`) se desambiguan con el
+ * índice, para que ningún PGN pise a otro dentro del zip.
+ */
+function pgnFileName(gameId: string, indice: number): string {
+  // El punto tampoco sobrevive: sin puntos no hay `..` posible, ni siquiera
+  // dentro de un segmento, y un id nunca necesitó puntos.
+  const seguro = gameId.replace(/[^A-Za-z0-9_-]/g, '_');
+  return `games/${indice}-${seguro.slice(0, 80) || 'partida'}.pgn`;
 }
 
 /** Tablas con datos del usuario: todo lo exportable/borrable. Los catálogos
@@ -51,15 +70,29 @@ function userDataTables() {
   ];
 }
 
-/** Borra TODOS los datos del usuario (E14): perfil, partidas, tarjetas de
- * error, progreso, intentos, sesiones y mediciones. Deja la app como recién
- * instalada —los catálogos reseedables se repueblan solos—. Es irreversible;
- * la confirmación vive en la UI. */
+/**
+ * Borra TODOS los datos del usuario (E14): perfil, partidas, tarjetas de
+ * error, progreso, intentos, sesiones y mediciones en IndexedDB, **más** el
+ * namespace local del dispositivo —tema, notación, modo a ciegas y el token de
+ * Lichess— y el recordatorio agendado. Deja la app como recién instalada; los
+ * catálogos reseedables se repueblan solos. Es irreversible; la confirmación
+ * vive en la UI.
+ *
+ * El token entra en el borrado aunque nunca entre en la exportación: son dos
+ * promesas distintas. La exportación no lo lleva para que un respaldo no sea
+ * una credencial suelta; el borrado sí lo toca porque "eliminar todos mis
+ * datos" y dejar la sesión de Lichess viva es exactamente lo que el usuario no
+ * espera. Desconectar la cuenta del lado de Lichess sigue siendo cosa suya: la
+ * app puede olvidar el token, no revocarlo.
+ */
 export async function deleteAllUserData(): Promise<void> {
   const tables = userDataTables();
   await db.transaction('rw', tables, async () => {
     await Promise.all(tables.map((table) => table.clear()));
   });
+  clearLocalNamespace();
+  // Sin esto seguía llegando la notificación diaria de una rutina ya borrada.
+  await cancelReminder();
 }
 
 /** Arma el .zip completo (RF-14.1): manifiesto + JSON + PGN legible aparte. */
@@ -107,14 +140,28 @@ export async function exportAllData(): Promise<Uint8Array> {
   };
   // PGN legible por separado (RF-14.3/14.5): cualquier visor lo abre sin
   // depender de esta app, aunque el import solo lee games.json.
-  for (const game of bundle.games) {
-    files[pgnFileName(game.id)] = strToU8(game.pgn);
-  }
+  bundle.games.forEach((game, indice) => {
+    files[pgnFileName(game.id, indice)] = strToU8(game.pgn);
+  });
 
   return zipSync(files, { level: 6 });
 }
 
-export type ImportOutcome = { ok: true; resumen: { partidas: number; tarjetas: number; calibraciones: number; respuestasRadar: number } } | { ok: false; error: string };
+export type ImportOutcome =
+  | {
+      ok: true;
+      resumen: {
+        partidas: number;
+        tarjetas: number;
+        calibraciones: number;
+        respuestasRadar: number;
+        /** Esquema del respaldo, tal como venía en su manifiesto. */
+        esquemaOrigen: number;
+        /** Versiones de migración aplicadas al restaurar; vacío si estaba al día. */
+        migraciones: number[];
+      };
+    }
+  | { ok: false; error: string };
 
 // Topes de tamaño para no descomprimir un archivo enorme o un "zip bomb" en
 // memoria (unzipSync descomprime todo de una). Una exportación real de ELOmax
@@ -199,7 +246,22 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
   const result: ImportResult = validateImportBundle(parsed);
   if (!result.ok) return { ok: false, error: result.error };
 
-  const { bundle } = result;
+  // Un respaldo viejo se migra ANTES de escribir. Las migraciones de Dexie no
+  // corren al restaurar —solo cuando cambia la versión de IndexedDB—, así que
+  // sin este paso los datos entraban crudos en la base actual: intentos de
+  // cálculo invisibles para el Panel, pérdidas de centipeones imposibles y
+  // partidas del diagnóstico contadas como entrenamiento propio.
+  const { bundle: validado } = result;
+  // La reconstrucción de los intentos de cálculo viejos necesita el catálogo
+  // del Radar, que no viaja en el respaldo por ser contenido reseedable. Se lee
+  // el local; si todavía no está sembrado, la conversión deja las ramas vacías
+  // en vez de inventarlas.
+  const solucionPorItem = new Map(
+    (await db.radarItems.toArray()).map((item) => [item.id, item.solucion] as const),
+  );
+  const { datos: bundle, aplicadas } = migrarDatosImportados(validado, validado.manifest.esquema, {
+    solucionPorItem,
+  });
   // Restauración = REEMPLAZO, no fusión (RF-14.2, "restauración total"): se
   // vacía cada tabla de datos personales antes de escribir el respaldo, todo
   // dentro de una transacción. Sin esto, `bulkPut` fusionaba —registros
@@ -240,6 +302,8 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
       tarjetas: bundle.errorCards.length,
       calibraciones: bundle.calibrationRecords.length,
       respuestasRadar: bundle.radarAttempts.length,
+      esquemaOrigen: validado.manifest.esquema,
+      migraciones: aplicadas,
     },
   };
 }

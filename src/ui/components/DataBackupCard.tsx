@@ -41,12 +41,18 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const outcome = await importAllData(bytes);
       if (outcome.ok) {
+        const base = t.panel.importadoOk
+          .replace('{partidas}', String(outcome.resumen.partidas))
+          .replace('{tarjetas}', String(outcome.resumen.tarjetas))
+          .replace('{calibraciones}', String(outcome.resumen.calibraciones))
+          .replace('{radar}', String(outcome.resumen.respuestasRadar));
+        // Restaurar un respaldo viejo lo actualiza al formato actual. Se dice:
+        // el usuario tiene que poder entender por qué sus datos cambiaron de
+        // forma (p. ej. intentos de cálculo que ahora sí aparecen en el Panel).
         setMensaje(
-          t.panel.importadoOk
-            .replace('{partidas}', String(outcome.resumen.partidas))
-            .replace('{tarjetas}', String(outcome.resumen.tarjetas))
-            .replace('{calibraciones}', String(outcome.resumen.calibraciones))
-            .replace('{radar}', String(outcome.resumen.respuestasRadar)),
+          outcome.resumen.migraciones.length > 0
+            ? `${base} ${t.panel.importadoMigrado.replace('{esquema}', String(outcome.resumen.esquemaOrigen))}`
+            : base,
         );
         onImported?.();
       } else {

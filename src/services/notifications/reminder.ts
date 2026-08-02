@@ -81,3 +81,12 @@ export async function syncReminder(config: ReminderConfig, texts: ReminderTexts,
     // Permiso denegado, API no disponible o SW no listo: sin recordatorio, sin ruido.
   }
 }
+
+/**
+ * Cancela el recordatorio agendado sin tocar la config. Lo usa el borrado total
+ * de datos: si no, después de "Eliminar todos mis datos" seguía llegando la
+ * notificación de una rutina que ya no existe.
+ */
+export async function cancelReminder(): Promise<void> {
+  await syncReminder({ activo: false, hora: '00:00' }, { titulo: '', cuerpo: '' });
+}
