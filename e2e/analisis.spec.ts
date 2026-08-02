@@ -71,8 +71,9 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   await page.getByRole('button', { name: 'Analizar' }).first().click();
   await page.getByText('Fase 1 — tu análisis').waitFor();
 
-  // Fase 1a: momento crítico — marcar la jugada del blunder (Ba6).
-  await page.getByRole('button', { name: 'Ba6' }).click();
+  // Fase 1a: momento crítico — marcar la jugada del blunder (Aa6 en la
+  // algebraica española que muestra la app; "Ba6" es la inglesa).
+  await page.getByRole('button', { name: 'Aa6' }).click();
   await page.getByRole('button', { name: 'Confirmar momento crítico' }).click();
 
   // Fase 1b: plan.
@@ -94,13 +95,14 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   // El motor real detecta el blunder: Ba6 aparece en rojo en la lista y hay
   // al menos un error a revisar.
   await expect(page.getByRole('button', { name: 'Revisar errores' })).toBeVisible();
-  await expect(page.locator('span.text-error-text', { hasText: 'Ba6' })).toBeVisible();
+  await expect(page.locator('span.text-error-text', { hasText: 'Aa6' })).toBeVisible();
 
   // El momento crítico que se marcó a ciegas en la fase 1 recibe devolución
   // (RF-3.1a): acá se marcó Ba6, que es justo donde el motor ubica el vuelco.
   await expect(page.getByText('Tu lectura de la partida')).toBeVisible();
   await expect(page.getByText(/Le acertaste/)).toBeVisible();
-  await expect(page.getByText(/peones de evaluación/)).toBeVisible();
+  // El costo se dice en peones y con el salto de evaluación, no en centipeones.
+  await expect(page.getByText(/costó .* peones: la evaluación pasó de/)).toBeVisible();
 
   await page.getByRole('button', { name: /Revisar errores/ }).click();
   await page.getByText('Confirmá y categorizá').waitFor();
@@ -152,15 +154,15 @@ test('fase 1: el tablero acompaña la elección del momento crítico', async ({ 
   await expect(page.locator('cg-board square.last-move')).toHaveCount(0);
 
   // Al marcar una jugada, el tablero la resalta (origen y destino).
-  await page.getByRole('button', { name: 'Bc4', exact: true }).click();
-  await expect(page.getByText('Jugada 3 · Bc4')).toBeVisible();
+  await page.getByRole('button', { name: 'Ac4', exact: true }).click();
+  await expect(page.getByText('Jugada 3 · Ac4')).toBeVisible();
   await expect(page.locator('cg-board square.last-move')).toHaveCount(2);
 
   // Las flechas recorren la partida sin volver a la lista.
   await page.getByRole('button', { name: 'Jugada siguiente' }).click();
-  await expect(page.getByText('Jugada 3 · Bc5')).toBeVisible();
+  await expect(page.getByText('Jugada 3 · Ac5')).toBeVisible();
   await page.getByRole('button', { name: 'Jugada anterior' }).click();
-  await expect(page.getByText('Jugada 3 · Bc4')).toBeVisible();
+  await expect(page.getByText('Jugada 3 · Ac4')).toBeVisible();
 
   // La jugada que quedó a la vista es la que se confirma.
   await page.getByRole('button', { name: 'Confirmar momento crítico' }).click();

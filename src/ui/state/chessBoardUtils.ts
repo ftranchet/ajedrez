@@ -1,6 +1,8 @@
 // Utilidades compartidas entre stores que envuelven chess.js para producir
 // el mapa de destinos que espera chessground.
 import { Chess } from 'chess.js';
+import { aNotacion } from '../../core/notacion';
+import { readIdiomaNotacion } from '../notacionPrefs';
 
 export function computeDests(c: Chess): Map<string, string[]> {
   const dests = new Map<string, string[]>();
@@ -17,10 +19,16 @@ export function computeDests(c: Chess): Map<string, string[]> {
 }
 
 /**
- * Reproduce una línea en UCI desde un FEN y devuelve su notación SAN, para
- * mostrarla en pantallas de feedback (Cálculo comprometido, Stoyko). Corta
- * en la primera jugada ilegal en vez de tirar, para no romper un feedback
+ * Reproduce una línea en UCI desde un FEN y devuelve su notación algebraica en
+ * el idioma que el usuario eligió (RNF-9), para mostrarla en pantallas de
+ * feedback.
+ * Corta en la primera jugada ilegal en vez de tirar, para no romper un feedback
  * por una línea parcial.
+ *
+ * Es el embudo único de UCI → notación en la interfaz: Cola, patrones, Radar,
+ * diagnóstico, finales y Cálculo pasan por acá, así que traducir en este punto
+ * es lo que mantiene una sola notación en toda la app y lo que hace que la
+ * preferencia se aplique en todas partes con un solo cambio.
  */
 export function sanDeLinea(fen: string, uciMoves: string[]): string[] {
   const chess = new Chess(fen);
@@ -35,7 +43,7 @@ export function sanDeLinea(fen: string, uciMoves: string[]): string[] {
     const candidatas = chess.moves({ verbose: true }).filter((m) => m.from === from && m.to === to);
     const move = promocion ? candidatas.find((m) => m.promotion === promocion) : candidatas[0];
     if (!move) break;
-    san.push(chess.move(move).san);
+    san.push(aNotacion(chess.move(move).san, readIdiomaNotacion()));
   }
   return san;
 }

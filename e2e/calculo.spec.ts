@@ -56,32 +56,32 @@ test('cálculo: anotar la jugada del motor entre las candidatas acierta y revela
   // Cada ply se carga por separado — la mecánica que traía la pestaña corta.
   const declararRama = async (plies: string[]) => {
     for (const ply of plies) {
-      await page.getByPlaceholder('p. ej. e2e4').fill(ply);
+      await page.getByPlaceholder('p. ej. Cf3').fill(ply);
       await page.getByRole('button', { name: 'Sumar jugada' }).click();
     }
     await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
   };
 
   // Con un solo ply la primera rama no se puede cerrar: pide línea.
-  await page.getByPlaceholder('p. ej. e2e4').fill('b1c3');
+  await page.getByPlaceholder('p. ej. Cf3').fill('Cc3');
   await page.getByRole('button', { name: 'Sumar jugada' }).click();
   await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
   await expect(page.getByText(/Esta rama pide al menos 2 jugada/)).toBeVisible();
 
-  await page.getByPlaceholder('p. ej. e2e4').fill('g8f6');
+  await page.getByPlaceholder('p. ej. Cf3').fill('Cf6');
   await page.getByRole('button', { name: 'Sumar jugada' }).click();
   await page.getByRole('button', { name: 'Cerrar esta candidata' }).click();
-  await expect(page.getByText('b1c3 g8f6')).toBeVisible();
+  await expect(page.getByText('Cc3 Cf6')).toBeVisible();
 
-  await declararRama(['f1c4', 'f8c5', 'e1g1']);
-  await expect(page.getByText('f1c4 f8c5 e1g1')).toBeVisible();
+  await declararRama(['Ac4', 'Ac5', 'O-O']);
+  await expect(page.getByText('Ac4 Ac5 O-O')).toBeVisible();
 
   await page.getByRole('button', { name: 'Terminar análisis' }).click();
   await page.getByText('¿Cuánta confianza tenés en haber incluido la mejor jugada').waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Confirmar' }).click();
 
   await page.getByText('La tenías entre tus candidatas').waitFor({ timeout: 10_000 });
-  await page.getByText('Bc4 Bc5 O-O').waitFor();
+  await page.getByText('Ac4 Ac5 O-O').first().waitFor();
   // Las tres varas se leen por separado (ADR-0015): la profundidad vista y la
   // brecha contra la evaluación del motor, que antes se descartaba.
   await expect(page.getByText(/viste 3 jugada/)).toBeVisible();
@@ -98,7 +98,7 @@ test('las dos rutas de Cálculo abren el mismo ejercicio, sin selector de modo',
 
   for (const ruta of ['./#/calculo', './#/calculo/stoyko']) {
     await page.goto(ruta);
-    await expect(page.getByText('Anotás todas tus candidatas', { exact: false })).toBeVisible();
+    await expect(page.getByText('Calcular a fondo una sola posición', { exact: false })).toBeVisible();
     await expect(page.getByRole('radio')).toHaveCount(0);
   }
 });
@@ -127,4 +127,38 @@ test('cálculo: ya hecho esta semana, avisa el enfriamiento en vez de servir una
   await page.locator('nav:visible button', { hasText: 'Cálculo' }).first().click();
 
   await page.getByText('Ya hiciste tu cálculo de esta semana').waitFor({ timeout: 10_000 });
+});
+
+// RNF-9: las dos notaciones son correctas según la FIDE y cuál se usa depende
+// de con qué aprendió a anotar cada uno, así que es preferencia. Lo que no
+// puede pasar es que convivan: "Re1" es rey en español y torre en inglés.
+test('la notación se elige en Ajustes y cambia lo que la app muestra y acepta', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  await seedStoykoFixture(page);
+  await page.reload();
+  await page.getByText('Tu sesión de hoy').waitFor();
+
+  // Por defecto, español: acepta Ac4 y rechaza la inglesa enseñando la equivalencia.
+  await page.goto('./#/calculo');
+  await page.getByPlaceholder('p. ej. Cf3').fill('Bc4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Esa es la notación inglesa', { exact: false })).toBeVisible();
+  await page.getByPlaceholder('p. ej. Cf3').fill('Ac4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Ac4', { exact: false }).first()).toBeVisible();
+
+  // Cambiada la preferencia, la simetría se invierte. La recarga además
+  // comprueba que la elección persiste y deja el ejercicio desde cero.
+  await page.goto('./#/ajustes');
+  await page.getByRole('radio', { name: 'Inglés (Nf3)' }).click();
+  await page.goto('./#/calculo');
+  await page.reload();
+  await page.getByPlaceholder('p. ej. Nf3').waitFor({ timeout: 15_000 });
+  await page.getByPlaceholder('p. ej. Nf3').fill('Ac4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Esa es la notación española', { exact: false })).toBeVisible();
+  await page.getByPlaceholder('p. ej. Nf3').fill('Bc4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Bc4', { exact: false }).first()).toBeVisible();
 });

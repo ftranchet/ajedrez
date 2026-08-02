@@ -28,6 +28,7 @@ import type {
   TransferMeasurement,
 } from '../../core/types';
 import { compromisoAAttempt, stoykoAAttempt } from '../../core/calculoMigracion';
+import { classifyMoveLoss, computeCpLoss } from '../../core/analysis';
 
 export const DB_NAME = 'elomax';
 // La versión de esquema es el contrato del paquete de exportación, así que vive
@@ -558,6 +559,28 @@ export class ElomaxDB extends Dexie {
         ];
         if (convertidos.length > 0) await tx.table('calculoAttempts').bulkPut(convertidos);
       });
+
+    // v19 — el mate se codifica como ±100.000 centipeones para poder ordenar,
+    // pero `cpPerdidos` lo **restaba**: una jugada que dejaba mate y quedaba en
+    // "+10,9 peones" se guardó como una pérdida de 98.908 centipeones. El tope
+    // vive ahora en `computeCpLoss`; acá se recalculan los análisis ya
+    // guardados, que si no seguirían mostrando el número imposible para
+    // siempre. `cpAntes`, `cpDespues` y `ladoQueMueve` están persistidos, así
+    // que se recalcula sin volver a llamar al motor.
+    this.version(19).upgrade(async (tx) => {
+      const games = (await tx.table('games').toArray()) as GameRecord[];
+      const corregidos = games.filter((game) => game.analisis?.jugadas?.length).map((game) => ({
+        ...game,
+        analisis: {
+          ...game.analisis!,
+          jugadas: game.analisis!.jugadas.map((jugada) => {
+            const cpPerdidos = computeCpLoss(jugada.cpAntes, jugada.cpDespues, jugada.ladoQueMueve);
+            return { ...jugada, cpPerdidos, clasificacion: classifyMoveLoss(cpPerdidos) };
+          }),
+        },
+      }));
+      if (corregidos.length > 0) await tx.table('games').bulkPut(corregidos);
+    });
   }
 }
 

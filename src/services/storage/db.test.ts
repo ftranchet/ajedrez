@@ -900,6 +900,53 @@ describe('migración de esquema Dexie', () => {
     current.close();
   });
 
+  // El mate se codifica como ±100.000 centipeones para poder ordenar; restarlo
+  // dejaba guardadas pérdidas de cientos de peones, que llegaban tal cual a la
+  // pantalla de Cálculo ("perdiste 98908 centipeones"). El tope vive en
+  // `computeCpLoss`; los análisis ya guardados se recalculan acá.
+  it('migra de v18 a v19 recalculando las pérdidas de centipeones imposibles', async () => {
+    const name = `elomax-test-${crypto.randomUUID()}`;
+    const v18 = new Dexie(name);
+    v18.version(18).stores({ games: 'id, fecha, fuente, contexto' });
+    await v18.open();
+    await v18.table('games').add({
+      id: 'g1',
+      pgn: '1. e4 *',
+      fuente: 'local',
+      ritmo: 'clasica',
+      resultado: '*',
+      tiemposPorJugadaMs: [],
+      analizada: true,
+      fecha: '2026-07-20T10:00:00.000Z',
+      analisis: {
+        analizadaEn: '2026-07-20T11:00:00.000Z',
+        jugadas: [
+          // Tenía mate y quedó en +10,92 peones: el número que reportó el uso.
+          { ply: 0, san: 'e4', fenAntes: 'startpos', ladoQueMueve: 'w', jugadaUsuario: 'e2e4', jugadaMotor: 'd2d4', cpAntes: 100_000, cpDespues: 1092, cpPerdidos: 98_908, clasificacion: 'grave' },
+          // Un error real, dentro de la escala: no lo tiene que tocar.
+          { ply: 1, san: 'e5', fenAntes: 'startpos', ladoQueMueve: 'b', jugadaUsuario: 'e7e5', jugadaMotor: 'c7c5', cpAntes: -50, cpDespues: 100, cpPerdidos: 150, clasificacion: 'error' },
+        ],
+      },
+    });
+    v18.close();
+
+    const current = new ElomaxDB(name);
+    await current.open();
+    const game = await current.games.get('g1');
+    const jugadas = game!.analisis!.jugadas;
+
+    // Seguía completamente ganado: en la escala de centipeones no perdió nada,
+    // y deja de estar clasificada como jugada grave.
+    expect(jugadas[0].cpPerdidos).toBe(0);
+    expect(jugadas[0].clasificacion).toBe('buena');
+    // La jugada que ya era correcta queda intacta.
+    expect(jugadas[1]).toMatchObject({ cpPerdidos: 150, clasificacion: 'error' });
+    // Nada más del análisis se toca.
+    expect(game!.analisis!.analizadaEn).toBe('2026-07-20T11:00:00.000Z');
+    expect(jugadas[0].cpAntes).toBe(100_000);
+    current.close();
+  });
+
   it('sin intentos viejos, v18 no crea ninguno', async () => {
     const name = `elomax-test-${crypto.randomUUID()}`;
     const v17 = new Dexie(name);

@@ -33,6 +33,14 @@ export interface PosicionPropia {
   /** Jugada que el usuario jugó entonces, en UCI: se revela al final, no antes. */
   jugadaEntonces: string;
   cpPerdidos: number;
+  /**
+   * La evaluación antes y después de la jugada, **desde la perspectiva de quien
+   * movió** (o sea, del usuario). Decir solo cuánto costó no alcanza: perder
+   * dos peones desde +6 deja la partida ganada, y perderlos desde +1 la entrega.
+   * Lo que ubica la jugada es el salto, no la magnitud suelta.
+   */
+  ventajaAntes: number;
+  ventajaDespues: number;
   /** Milisegundos que consumió en esa jugada, si la partida los registró. */
   tiempoMs?: number;
 }
@@ -79,6 +87,10 @@ export function posicionPropiaParaCalculo(games: GameRecord[], recientes = PARTI
     motivo: porCentipeones ? 'mas-centipeones' : 'mas-tiempo',
     jugadaEntonces: elegida.entry.jugadaUsuario,
     cpPerdidos: elegida.entry.cpPerdidos,
+    // `cpAntes`/`cpDespues` vienen en perspectiva blancas; para negras se
+    // invierten, porque lo que se muestra es la ventaja de quien movió.
+    ventajaAntes: elegida.entry.ladoQueMueve === 'w' ? elegida.entry.cpAntes : -elegida.entry.cpAntes,
+    ventajaDespues: elegida.entry.ladoQueMueve === 'w' ? elegida.entry.cpDespues : -elegida.entry.cpDespues,
     ...(typeof elegida.tiempoMs === 'number' ? { tiempoMs: elegida.tiempoMs } : {}),
   };
 }

@@ -200,3 +200,32 @@ Español rioplatense, directo, sin exclamaciones infladas. Los porqués citan da
 
 ## 7. Proceso de cambio
 (1) ¿existe token? usarlo; (2) ¿no existe? proponerlo acá vía pull request; (3) nunca valores sueltos en componentes. Excepciones = deuda registrada en el changelog.
+
+## Notación de jugadas
+
+Toda jugada que la app **muestra** o **pide escribir** va en notación algebraica
+en español: R (rey), D (dama), T (torre), A (alfil), C (caballo). Es lo que fija
+el Apéndice C de las Leyes del Ajedrez de la FIDE, que además dice explícitamente
+que la inicial de cada pieza es la de su nombre **en el idioma del jugador**.
+
+No se muestra UCI (`e2e4`) en ninguna pantalla: es el protocolo con el que se le
+habla al motor, no notación de ajedrez. Sí es el formato **guardado**, porque es
+inequívoco y no depende del idioma; la traducción ocurre en los dos bordes
+(`core/notacion.ts`, y `sanDeLinea` en `ui/state/chessBoardUtils.ts` como embudo
+único de UCI → notación).
+
+chess.js emite algebraica **inglesa**; nada la muestra sin pasar antes por
+`aNotacion`, que recibe el idioma elegido. Al validar lo que escribe el usuario
+no se aceptan los dos idiomas a la vez: "Re1" es rey en español y torre en
+inglés, y las dos pueden ser legales en la misma posición, así que admitir ambas
+sería elegir en silencio por él. La entrada en el otro idioma se rechaza con un
+mensaje que enseña la equivalencia y señala dónde cambiar la preferencia.
+
+## Cantidades del motor
+
+Evaluaciones y costos se muestran en **peones con un decimal**, nunca en
+centipeones (`formatVentaja` y `formatPeones` en `ui/format.ts`). La evaluación
+lleva signo y usa el menos tipográfico (−), el mismo de los símbolos +−/±/=/∓/−+;
+el costo de una jugada va sin signo, porque es una magnitud. Un costo se informa
+siempre junto al salto de evaluación que lo produjo: la magnitud sola no dice si
+la partida se entregó o si seguía ganada.

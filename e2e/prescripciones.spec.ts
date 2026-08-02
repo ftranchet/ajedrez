@@ -59,7 +59,7 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await expect(calculo).toBeVisible();
   await calculo.click();
   await expect(page).toHaveURL(/#\/calculo$/);
-  await expect(page.getByText('Anotás todas tus candidatas', { exact: false })).toBeVisible();
+  await expect(page.getByText('Calcular a fondo una sola posición', { exact: false })).toBeVisible();
 });
 
 // El primer cálculo se escalonaba tres días desde el diagnóstico y la tarjeta

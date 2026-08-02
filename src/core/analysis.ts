@@ -40,13 +40,35 @@ export function evalToSymbol(cpBlancas: number): EvalSymbol {
 }
 
 /**
+ * Tope de la escala de centipeones para hacer aritmética con evaluaciones.
+ *
+ * El mate se codifica como ±100.000 centipeones (`gameAnalyzer.ts`), que sirve
+ * para ordenar y para saber quién gana, pero **no** para restar: una jugada que
+ * dejaba mate y pasó a "+10,9 peones" daba una pérdida de 98.908 centipeones —
+ * 989 peones, más material del que hay en un tablero—. Ese número llegaba tal
+ * cual a la pantalla de Cálculo ("perdiste 98908 centipeones", reporte de uso
+ * 2026-08-02) y arrastraba la selección de la posición del ejercicio: cualquier
+ * mate desperdiciado le ganaba siempre a cualquier error real.
+ *
+ * Diez peones es el tope habitual (es el que usa Lichess para su ACPL): pasado
+ * ese punto la ventaja ya está decidida y la diferencia entre "+10" y "+30" no
+ * dice nada del cálculo de quien mueve. Con el tope, la pérdida queda acotada a
+ * [0, 2000] y siempre significa lo que dice.
+ */
+export const CP_TOPE = 1000;
+
+const acotar = (cp: number): number => Math.max(-CP_TOPE, Math.min(CP_TOPE, cp));
+
+/**
  * Pérdida de centipeones desde la perspectiva de quien movió. `cpAntes` y
  * `cpDespues` están siempre en perspectiva blancas; para negras, empeorar
  * significa que el valor sube (mejor para blancas), por eso se invierte.
+ *
+ * Las dos evaluaciones se acotan a ±`CP_TOPE` antes de restar: ver ahí por qué.
  */
 export function computeCpLoss(cpAntes: number, cpDespues: number, ladoQueMueve: Color): number {
-  const antes = ladoQueMueve === 'w' ? cpAntes : -cpAntes;
-  const despues = ladoQueMueve === 'w' ? cpDespues : -cpDespues;
+  const antes = acotar(ladoQueMueve === 'w' ? cpAntes : -cpAntes);
+  const despues = acotar(ladoQueMueve === 'w' ? cpDespues : -cpDespues);
   return Math.max(0, antes - despues);
 }
 
@@ -177,6 +199,9 @@ export interface LecturaMomentoCritico {
   /** Media jugada donde el motor ubica el vuelco, y cuánto costó. */
   plyMotor: number;
   cpPerdidos: number;
+  /** Evaluación antes y después, desde la perspectiva de quien movió. */
+  ventajaAntes: number;
+  ventajaDespues: number;
   sanMotor: string;
   /** ¿Le acertó, dentro de una jugada completa de tolerancia? */
   coincide: boolean;
@@ -198,6 +223,9 @@ export function lecturaMomentoCritico(analysis: GameAnalysis, fase1: PhaseOneDat
     plyUsuario: fase1.momentoCriticoPly,
     plyMotor: motor.ply,
     cpPerdidos: motor.cpPerdidos,
+    // Perspectiva de quien movió: la ventaja que se pierde es la suya.
+    ventajaAntes: motor.ladoQueMueve === 'w' ? motor.cpAntes : -motor.cpAntes,
+    ventajaDespues: motor.ladoQueMueve === 'w' ? motor.cpDespues : -motor.cpDespues,
     sanMotor: motor.san,
     coincide: distanciaPlies <= TOLERANCIA_PLIES,
     distanciaJugadas: Math.round(distanciaPlies / 2),

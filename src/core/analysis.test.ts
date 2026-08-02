@@ -3,6 +3,7 @@ import {
   admiteAnalisisExpres,
   buildGameAnalysis,
   classifyMoveLoss,
+  CP_TOPE,
   computeCpLoss,
   detectedErrorMoves,
   esMomentoCriticoValido,
@@ -57,6 +58,27 @@ describe('computeCpLoss', () => {
   it('blancas: mejorar no da pérdida negativa, da 0', () => {
     expect(computeCpLoss(50, 200, 'w')).toBe(0);
   });
+  // El mate se codifica como ±100.000 centipeones para poder ordenar, pero
+  // restarlo daba pérdidas de cientos de peones — más material del que hay en
+  // un tablero—. Reporte de uso 2026-08-02: "perdiste 98908 centipeones".
+  it('el mate no produce pérdidas imposibles: la escala está topeada', () => {
+    // Tenía mate y quedó en "+10,9 peones": sigue completamente ganado, así
+    // que en la escala de centipeones no perdió nada.
+    expect(computeCpLoss(100_000, 1092, 'w')).toBe(0);
+    // Lo verdaderamente grave sí se registra, y acotado: de ganado a mate en
+    // contra es la pérdida máxima posible, 20 peones.
+    expect(computeCpLoss(100_000, -100_000, 'w')).toBe(2 * CP_TOPE);
+    expect(computeCpLoss(500, -100_000, 'w')).toBe(500 + CP_TOPE);
+    // Y del lado de las negras, con el signo invertido.
+    expect(computeCpLoss(-100_000, 100_000, 'b')).toBe(2 * CP_TOPE);
+  });
+
+  it('ninguna pérdida puede superar el doble del tope', () => {
+    for (const [antes, despues] of [[100_000, -100_000], [-100_000, 100_000], [5000, -5000]] as const) {
+      expect(computeCpLoss(antes, despues, 'w')).toBeLessThanOrEqual(2 * CP_TOPE);
+    }
+  });
+
   it('negras: empeorar significa que el eval blanco sube', () => {
     // Negras mueven en una posición de -50 (mejor para negras) y el eval
     // blanco sube a +100: negras perdieron 150cp de su propia perspectiva.
