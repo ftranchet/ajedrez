@@ -3,8 +3,8 @@
 // —las dos primeras con la línea que calculó, el resto sueltas— cada una con su
 // evaluación, y recién ahí compara con el motor.
 //
-// El tablero nunca se mueve mientras se anota (mismo dispositivo que el preset
-// forzado) y el tiempo se registra en silencio (RF-7.3). El estado del preset
+// El tablero nunca se mueve mientras se anota y el tiempo se registra en
+// silencio (RF-7.3). El estado del
 // corto vive en `compromisoStore`: comparten el modelo persistido
 // (`calculoAttempts`) y la pantalla, pero cada flujo se lee mejor con su propio
 // estado — uno declara una línea contra una solución verificada, el otro un
@@ -72,7 +72,7 @@ interface StoykoState {
   confianza: number | null;
   acierto: boolean | null;
   /**
-   * Las tres varas del preset abierto (ADR-0015): cobertura, profundidad vista
+   * Las tres varas del ejercicio (ADR-0015): cobertura, profundidad vista
    * y brecha de evaluación. La brecha es lo que antes se recogía y se
    * descartaba: el usuario declaraba una evaluación por candidata y nadie la
    * comparaba con la del motor.
@@ -233,7 +233,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     if (s.phase !== 'analizando' || !s.fen) return;
     const jugada = s.inputActual.trim().toLowerCase();
     if (!UCI_RE.test(jugada)) {
-      set({ inputError: t.calculo.errorFormato });
+      set({ inputError: t.stoyko.errorFormato });
       return;
     }
     // Cada ply se valida contra la posición que deja el ply anterior: una línea
@@ -295,7 +295,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   terminarAnalisis() {
     const s = get();
     if (s.phase !== 'analizando') return;
-    if (!declaracionCompleta('abierto', s.ramas, 0)) {
+    if (!declaracionCompleta(s.ramas)) {
       set({ inputError: t.stoyko.errorDeclaracionIncompleta });
       return;
     }
@@ -358,7 +358,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
       fecha: ahora,
     });
     // Persistir el intento entero (RF-7.2/7.3) en el formato unificado: las
-    // ramas con su evaluación, las tres varas del preset abierto, el tiempo
+    // ramas con su evaluación, las tres varas del ejercicio, el tiempo
     // (cronómetro silencioso) y la confianza.
     await calculoAttemptRepo.save({
       id: crypto.randomUUID(),

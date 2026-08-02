@@ -1,30 +1,26 @@
-// Cálculo declarado (E7, ADR-0015): un solo ejercicio en el que el usuario
-// declara **lo que ve** antes de que el tablero se mueva, y dos varas para
-// medirlo según el tipo de posición.
+// Cálculo declarado (E7, ADR-0015 y ADR-0016): **un solo ejercicio**, sin
+// presets, en el que el usuario declara lo que ve antes de que el tablero se
+// mueva. Un intento es un **árbol**: ramas, cada una con su línea y su
+// evaluación al final de la línea, no pegada a la jugada suelta.
 //
-// Reemplaza la separación entre "línea comprometida" (RF-7.1) y "Stoyko"
-// (RF-7.2), que no eran dos métodos sino dos cortes del mismo procedimiento:
-// enumerar candidatas, calcular cada una hasta una posición evaluable, evaluar
-// esas hojas y elegir. Un intento es un **árbol**: ramas, cada una con su línea
-// y —cuando el preset la pide— su evaluación al final de la línea, no pegada a
-// la jugada suelta.
+// El ADR-0015 unificó "línea comprometida" (RF-7.1) y "Stoyko" (RF-7.2) en un
+// modelo de datos con dos presets; el ADR-0016 sacó el preset forzado, que no
+// tenía contenido propio —servía posiciones del catálogo del Radar— y cuya
+// mecánica es el caso "una rama, sin evaluación" de este mismo ejercicio. El
+// valor `'forzado'` sobrevive solo como dato ya guardado (RF-7.1b): se lee, se
+// exporta y se muestra como historial, y nada nuevo lo escribe.
 //
-// Las dos varas no se promedian nunca (ADR-0015, punto 3). En una posición con
-// línea forzada verificada existe una respuesta correcta y el puntaje puede ser
-// binario; en una posición sin respuesta única, un binario mide el tipo de
-// posición servida más que el cálculo del usuario.
-import type { EvalSymbol, RadarItem } from './types';
+// Las tres varas no se promedian nunca (ADR-0015, punto 3): en una posición sin
+// respuesta única un binario mide el tipo de posición servida más que el
+// cálculo del usuario.
+import type { EvalSymbol } from './types';
 
-/** Profundidad que puede pedir el preset forzado (RF-7.1). */
-export const PROFUNDIDAD_MIN = 3;
-export const PROFUNDIDAD_MAX = 7;
-
-/** Cuántas ramas pide el preset abierto (RF-7.2). */
+/** Cuántas ramas pide el ejercicio (RF-7.1). */
 export const RAMAS_MIN_ABIERTO = 2;
 export const RAMAS_MAX_ABIERTO = 5;
 
 /**
- * Cuántas ramas del preset abierto tienen que traer **línea**, no solo la
+ * Cuántas ramas tienen que traer **línea**, no solo la
  * candidata. Cargar cinco líneas de cuatro plies en un celular es una carga de
  * datos, no un ejercicio de ajedrez: se pide la línea en las dos primeras —las
  * que el usuario considera de verdad— y el resto entran como candidata suelta
@@ -42,37 +38,22 @@ export const RAMAS_CON_LINEA = 2;
 export const PLIES_MIN_LINEA = 2;
 
 /**
- * Qué se le pide al usuario en esta corrida. Lo que cambia entre presets no es
- * el método sino la dosis y el tipo de posición: `forzado` es corto y entra en
- * la lista de hoy cuando hay fuga de cálculo (RF-11.2); `abierto` es el
- * semanal, sin reloj (RF-11.3a).
- */
-export type PresetCalculo = 'forzado' | 'abierto';
-
-/**
  * Una rama declarada: la candidata (primer ply de `linea`) con la continuación
- * que el usuario calculó y, en el preset abierto, la evaluación de la posición
- * a la que llega esa línea.
+ * que el usuario calculó y la evaluación de la posición a la que llega esa
+ * línea.
  */
 export interface RamaDeclarada {
   /** Jugadas en UCI, empezando por la candidata. Al menos una. */
   linea: string[];
-  /** Evaluación de la hoja de la rama. Obligatoria en el preset abierto. */
+  /** Evaluación de la hoja de la rama. Obligatoria en toda rama cerrada. */
   evaluacion?: EvalSymbol;
 }
 
 export const candidataDeRama = (rama: RamaDeclarada): string | undefined => rama.linea[0];
 
-/** Resultado del preset forzado: la línea declarada contra la verificada. */
-export interface ResultadoForzado {
-  correcta: boolean;
-  /** Índice 0-based del primer ply que no coincide; null si toda la línea coincide. */
-  primerErrorEn: number | null;
-}
-
 /**
- * Resultado del preset abierto: tres números que se leen por separado y que
- * **no** se agregan entre sí (ADR-0015).
+ * Resultado del ejercicio: tres números que se leen por separado y que **no**
+ * se agregan entre sí (ADR-0015, punto 3).
  */
 export interface ResultadoAbierto {
   /** La mejor jugada del motor estuvo entre las candidatas declaradas. */
@@ -81,24 +62,6 @@ export interface ResultadoAbierto {
   profundidadVista: number;
   /** Distancia entre la evaluación declarada para esa rama y la del motor, en pasos de la escala; null si no declaró ninguna. */
   brechaEvaluacion: number | null;
-}
-
-/** Compara una línea declarada contra la solución verificada del ítem (RF-7.1). */
-export function evaluarForzado(item: Pick<RadarItem, 'solucion'>, rama: RamaDeclarada): ResultadoForzado {
-  for (let i = 0; i < item.solucion.length; i++) {
-    if (rama.linea[i] !== item.solucion[i]) return { correcta: false, primerErrorEn: i };
-  }
-  return { correcta: true, primerErrorEn: null };
-}
-
-/** Ítems del catálogo del Radar que sirven como posición del preset forzado:
- * su solución ya es una línea forzada verificada de la profundidad pedida. */
-export function esAptoParaForzado(item: RadarItem): boolean {
-  return item.solucion.length >= PROFUNDIDAD_MIN && item.solucion.length <= PROFUNDIDAD_MAX;
-}
-
-export function itemsParaForzado(pool: RadarItem[]): RadarItem[] {
-  return pool.filter(esAptoParaForzado);
 }
 
 /** Orden de la escala de evaluación, para medir distancias entre símbolos. */
@@ -122,7 +85,7 @@ export interface EntradaAbierto {
 }
 
 /**
- * Puntúa un intento del preset abierto. La profundidad se mide sobre la rama
+ * Puntúa un intento. La profundidad se mide sobre la rama
  * que empieza por la mejor jugada del motor —es la única comparable con su
  * variante principal—; si el usuario no la tuvo entre sus candidatas, la
  * profundidad vista es 0 y la brecha se toma de la rama que él consideró
@@ -153,16 +116,13 @@ export function evaluarAbierto(entrada: EntradaAbierto, ramas: RamaDeclarada[]):
   return { cobertura, profundidadVista, brechaEvaluacion };
 }
 
-/** ¿Esta rama del preset abierto tiene que traer línea, por su posición en la lista? */
+/** ¿Esta rama tiene que traer línea, por su posición en la lista? */
 export function ramaPideLinea(indice: number): boolean {
   return indice < RAMAS_CON_LINEA;
 }
 
-/** ¿La declaración está completa para el preset? Gobierna el botón de revelar. */
-export function declaracionCompleta(preset: PresetCalculo, ramas: RamaDeclarada[], profundidadPedida: number): boolean {
-  if (preset === 'forzado') {
-    return ramas.length === 1 && ramas[0].linea.length >= profundidadPedida;
-  }
+/** ¿La declaración está completa? Gobierna el botón de revelar. */
+export function declaracionCompleta(ramas: RamaDeclarada[]): boolean {
   if (ramas.length < RAMAS_MIN_ABIERTO || ramas.length > RAMAS_MAX_ABIERTO) return false;
   return ramas.every((rama, indice) => {
     const pliesMinimos = ramaPideLinea(indice) ? PLIES_MIN_LINEA : 1;

@@ -6,9 +6,9 @@
 // declarada y la regla de candidatas aparecen al azar 1 de cada 4,5 veces; la
 // doble solución solo si te toca uno de esos ítems; el reciclaje de errores
 // propios ocupa como mucho un cuarto de los lugares del Radar sin decirlo; el
-// modo a ciegas se enciende al dominar un patrón; el bloque de criterio y el
-// cálculo comprometido dependen de fugas que hay que tener; y la batería de
-// transferencia y el experimento n=1 solo existen si vas a buscarlos al Panel.
+// modo a ciegas se enciende al dominar un patrón; el bloque de criterio
+// depende de fugas que hay que tener; y la batería de transferencia y el
+// experimento n=1 solo existen si vas a buscarlos al Panel.
 // Un usuario razonable no puede distinguir "esto no me apareció porque no me
 // corresponde" de "esto no existe" — y esa duda erosiona la confianza en la
 // prescripción, que es justamente lo que sostiene el producto.
@@ -29,8 +29,7 @@ const EJERCICIOS = [
   'ciegas',
   'criterio',
   'finales',
-  'comprometida',
-  'stoyko',
+  'calculo',
   'partidaLenta',
   'transferencia',
   'experimento',

@@ -408,6 +408,9 @@ function CalculoSummary() {
   }, []);
   if (data === null) return null;
 
+  // `resumenForzado` ya no puede crecer: nada escribe el preset corto desde
+  // ADR-0016. Sigue leyéndose para no borrar de la vista lo que el usuario hizo
+  // (RF-7.1b), y devuelve null en cuentas que nunca lo usaron.
   const comp = resumenForzado(data);
   const stk = resumenAbierto(data);
   return (

@@ -113,6 +113,23 @@ describe('dietaPorBanda', () => {
     expect(dieta.criterioActivo).toBe(true);
     expect(dieta.ajusteFugas.categoria).toBe('tactico');
   });
+
+  // ADR-0016: la fuga de cálculo prescribía un ejercicio corto propio, que se
+  // retiró junto con el preset que lo servía. Su respuesta ahora es el bloque
+  // de criterio, que entrena reconocer cuándo la posición pide calcular y sí
+  // entra en el presupuesto del día.
+  it('la fuga de cálculo también activa el bloque de criterio, sin tocar el Radar', () => {
+    const fuga = { activa: true, fallos: 6, total: 10 };
+    const dieta = dietaPorBanda('intermedio', [], new Date(), fuga);
+    expect(dieta.criterioActivo).toBe(true);
+    // Solo la fuga táctica refuerza el Radar; esta no lo mueve.
+    expect(dieta.radarCount).toBe(dietaPorBanda('intermedio', []).radarCount);
+  });
+
+  it('sin fuga de cálculo activa, el bloque de criterio sigue apagado', () => {
+    const dieta = dietaPorBanda('intermedio', [], new Date(), { activa: false, fallos: 1, total: 10 });
+    expect(dieta.criterioActivo).toBe(false);
+  });
 });
 
 describe('estimarBandaElo', () => {

@@ -30,7 +30,6 @@ import { dueCurriculumItems, esDemostracionLimpia, finalesJugadosHoy, interleave
 import { DEFAULT_PROFILE, detectarFugaCalculo, dietaPorBanda, type DietaSesion } from '../../core/prescriptor';
 import { prescripcionesExternas, type PrescripcionExterna } from '../../core/prescripcionesExternas';
 import { gameRepo } from '../../services/storage/gameRepo';
-import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
 import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
@@ -612,7 +611,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
 
           await Promise.all([curriculumItemRepo.ensureSeeded(), radarItemRepo.ensureSeeded()]);
-          const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts, calculoAttempts] =
+          const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts] =
             await Promise.all([
               errorCardRepo.list(),
               curriculumItemRepo.list(),
@@ -621,7 +620,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
               gameRepo.list(),
               radarItemRepo.list(),
               radarAttemptRepo.list(),
-              calculoAttemptRepo.list(),
             ]);
           if (generation !== summaryGeneration) return;
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
@@ -630,7 +628,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
           // Un final jugado en Jugar → Finales no pasa por esta sesión, así que
           // su cumplimiento se lee del planificador (RF-11.3a).
           const finalesHechosHoy = finalesJugadosHoy(curriculumItems, progressById);
-          const dieta = dietaPorBanda(profile.bandaElo, allCards);
+          const dieta = dietaPorBanda(
+            profile.bandaElo,
+            allCards,
+            new Date(),
+            detectarFugaCalculo(radarAttempts, radarItems),
+          );
 
           // Plan del día (RF-11.1): se arma UNA vez por día local, acá — el
           // primer vistazo a Hoy fija qué toca. Las sesiones después solo lo
@@ -665,8 +668,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
               finalesPendientes,
               finalesHechosHoy,
               profile,
-              calculoAttempts,
-              fugaCalculo: detectarFugaCalculo(radarAttempts, radarItems),
               // El plan semanal gobierna la carga: lo que no entra en el
               // presupuesto de hoy se muestra como tarea de la semana.
               minutosSesion: minutosPendientesDelPlan(assignment),
@@ -707,7 +708,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
           radarAttemptRepo.list(),
         ]);
         const due = dueErrorCards(allCards);
-        const dieta = dietaPorBanda(profile.bandaElo, allCards);
+        const dieta = dietaPorBanda(
+          profile.bandaElo,
+          allCards,
+          new Date(),
+          detectarFugaCalculo(radarAttempts, pool),
+        );
         // El perfil de fugas entra en la selección del Radar (RF-11.2): las
         // respuestas recientes mandan, y el diagnóstico solo mientras no haya
         // evidencia propia. Antes esto se medía, se guardaba, se mostraba en el

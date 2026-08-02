@@ -1,78 +1,36 @@
-// Pantalla "Cálculo comprometido" (E7): dos ejercicios que comparten el
-// mismo dispositivo — el tablero nunca se mueve mientras se piensa, y el
-// tiempo se registra en silencio (RF-7.3) — pero distinta consigna. "Línea
-// comprometida" (RF-7.1) declara una línea forzada completa por escrito,
-// ply a ply, antes de revelar. "Stoyko semanal" (RF-7.2) es más abierto: sin
-// reloj, se anotan todas las jugadas candidatas que se considerarían, cada
-// una con su evaluación, antes de comparar con el motor — disponible una
-// vez por semana.
-import { useEffect, useState } from 'react';
+// Pantalla "Cálculo" (E7): un solo ejercicio de cálculo declarado (RF-7.1).
+// Se anotan las candidatas —las dos primeras con su línea— y la evaluación de
+// la posición a la que llega cada una, sin reloj y con el tablero quieto
+// (RF-7.3), antes de comparar con el motor. Disponible una vez por semana
+// (RF-7.2), con práctica libre durante el enfriamiento.
+//
+// Hasta ADR-0016 esta pantalla tenía dos pestañas —"Línea comprometida" y
+// "Stoyko semanal"—. La primera servía posiciones del catálogo del Radar y su
+// mecánica (declarar una línea ply a ply) ya vive acá dentro, en cada rama: era
+// el caso "una rama, sin evaluación" de este mismo ejercicio, con el costo de
+// un selector de modo que contradice el principio 1 del PRD.
+import { useEffect } from 'react';
 import type { Color, EvalSymbol } from '../../core/types';
 import { Board } from '../components/Board';
 import { BoardSkeleton } from '../components/BoardSkeleton';
 import { Chip } from '../components/Chip';
-import { SegmentedControl } from '../components/SegmentedControl';
 import { ConfidenceSlider } from '../components/ConfidenceSlider';
-import { useCompromisoStore } from '../state/compromisoStore';
 import { useStoykoStore } from '../state/stoykoStore';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { PLIES_MIN_LINEA, declaracionCompleta, ramaPideLinea } from '../../core/calculo';
 import { formatDuracion } from '../format';
 import { t } from '../i18n/es';
 
-// La sub-ruta #/calculo/stoyko entra directo al Stoyko semanal (deep-link
-// desde la prescripción de Hoy, mismo patrón que #/jugar/finales), y elegir
-// un modo actualiza el hash para que el botón "atrás" funcione. Sin esto, la
-// tarjeta de Stoyko aterrizaba en Línea comprometida.
-type Modo = 'comprometida' | 'stoyko';
-
-function modoDesdeHash(): Modo {
-  return window.location.hash.includes('/stoyko') ? 'stoyko' : 'comprometida';
-}
-
-const RUTA_POR_MODO: Record<Modo, string> = {
-  comprometida: '#/calculo',
-  stoyko: '#/calculo/stoyko',
-};
-
+// La sub-ruta #/calculo/stoyko sigue entrando acá (el router resuelve por el
+// primer segmento): era el deep-link de la prescripción y puede estar
+// marcado en favoritos. Ya no distingue nada, porque hay un solo ejercicio.
 export function CalculoScreen() {
-  const [modo, setModo] = useState<Modo>(modoDesdeHash);
-
-  useEffect(() => {
-    const onNavigate = () => setModo(modoDesdeHash());
-    window.addEventListener('hashchange', onNavigate);
-    window.addEventListener('popstate', onNavigate);
-    return () => {
-      window.removeEventListener('hashchange', onNavigate);
-      window.removeEventListener('popstate', onNavigate);
-    };
-  }, []);
-
   return (
     <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-3">
       <div className="mx-auto flex w-full max-w-md flex-col gap-1 sm:mx-0 sm:max-w-none">
         <h1 className="m-0 font-display text-3xl font-medium">{t.calculo.titulo}</h1>
-        <p className="m-0 text-sm text-secondary">
-          {modo === 'comprometida' ? t.calculo.subtituloComprometida : t.calculo.subtituloStoyko}
-        </p>
+        <p className="m-0 text-sm text-secondary">{t.calculo.subtitulo}</p>
       </div>
-
-      <SegmentedControl
-        label={t.calculo.modosLabel}
-        value={modo}
-        options={[
-          { value: 'comprometida', label: t.calculo.modoLineaComprometida },
-          { value: 'stoyko', label: t.calculo.modoStoyko },
-        ]}
-        onChange={(value) => {
-          const destino = RUTA_POR_MODO[value as Modo];
-          if (window.location.hash !== destino) {
-            window.history.pushState(null, '', destino);
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          }
-        }}
-        className="mx-auto w-full max-w-md sm:mx-0 sm:max-w-xs"
-      />
 
       {/* Colapsable: en celular el ejercicio necesita el alto para el tablero y
           el input; la explicación se lee una vez y no debe empujar todo abajo. */}
@@ -80,59 +38,52 @@ export function CalculoScreen() {
         <summary className="cursor-pointer list-none text-sm font-medium tracking-wider text-secondary uppercase marker:content-none">
           {t.calculo.queEsTitulo}
         </summary>
-        <p className="m-0 mt-2 text-sm text-secondary">
-          {modo === 'comprometida' ? t.calculo.explicacionComprometida : t.calculo.explicacionStoyko}
-        </p>
+        <p className="m-0 mt-2 text-sm text-secondary">{t.calculo.explicacion}</p>
         {/* Qué parte del ejercicio original implementa esta versión. El código
             documentaba la simplificación (una jugada por candidata, en vez de
             la línea entera) y la pantalla la presentaba como si fuera el
             ejercicio completo: quien lo conoce se da cuenta, y quien no,
             aprende una versión recortada creyendo que es la de Stoyko. */}
-        {modo === 'stoyko' && (
-          <p className="m-0 mt-2 text-sm text-tertiary">{t.calculo.explicacionStoykoAlcance}</p>
-        )}
+        <p className="m-0 mt-2 text-sm text-tertiary">{t.calculo.explicacionAlcance}</p>
       </details>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start">
-        {modo === 'comprometida' ? <LineaComprometida /> : <Stoyko />}
+        <CalculoDeclarado />
       </div>
     </div>
   );
 }
 
-// ---- Línea comprometida (RF-7.1) ----
+const EVAL_SIMBOLOS: EvalSymbol[] = ['+-', '±', '=', '∓', '-+'];
+const EVAL_LABELS: Record<EvalSymbol, string> = { '+-': '+−', '±': '±', '=': '=', '∓': '∓', '-+': '−+' };
 
-function LineaComprometida() {
-  const s = useCompromisoStore();
+function CalculoDeclarado() {
+  const s = useStoykoStore();
   const slow = useSlowLoading(s.phase === 'cargando');
 
-  // Solo al montar (deps []): empezar() ya pone phase en 'cargando' como
-  // primer paso, así que depender de todo el store ([s]) reengancha el
-  // efecto con esa misma condición todavía activa mientras el fetch async
-  // sigue en vuelo — cada reenganche llama empezar() de nuevo, que vuelve a
-  // "tocar" el store, en un ciclo que React corta con "Maximum update depth
-  // exceeded" (reproducido con Playwright al alternar entre los dos modos
-  // de esta pantalla, que le agregan más trabajo async concurrente a Dexie).
+  // Solo al montar (deps []): empezar() ya pone phase en 'cargando' como primer
+  // paso, así que depender de todo el store ([s]) reengancha el efecto con esa
+  // misma condición todavía activa mientras el fetch async sigue en vuelo —
+  // cada reenganche llama empezar() de nuevo, que vuelve a "tocar" el store, en
+  // un ciclo que React corta con "Maximum update depth exceeded".
   useEffect(() => {
-    const store = useCompromisoStore.getState();
-    if (store.phase === 'cargando' && store.pool.length === 0 && !store.item) void store.empezar();
+    const store = useStoykoStore.getState();
+    if (store.phase === 'cargando' && !store.origen) void store.empezar();
   }, []);
 
-  if (s.phase === 'cargando') {
-    return <CargaCalculo slow={slow} onRetry={() => void s.empezar(true)} />;
-  }
+  if (s.phase === 'cargando') return <CargaCalculo slow={slow} onRetry={() => void s.empezar(true)} />;
   if (s.phase === 'error') return <ErrorCalculo onRetry={() => void s.empezar(true)} />;
-  if (s.phase === 'sinContenido') return <Centro texto={t.calculo.sinContenido} />;
+  if (s.phase === 'sinContenido') return <Centro texto={t.stoyko.sinContenido} />;
+  if (s.phase === 'enfriamiento') return <Enfriamiento />;
 
-  const item = s.item;
-  if (!item) return <Centro texto={t.calculo.cargando} />;
-  const turn = (item.fen.split(' ')[1] === 'b' ? 'b' : 'w') as Color;
+  if (!s.origen || !s.fen) return <Centro texto={t.stoyko.cargando} />;
+  const turn = (s.fen.split(' ')[1] === 'b' ? 'b' : 'w') as Color;
 
   return (
     <>
       <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[52vh] sm:mx-0 sm:w-[60%] sm:max-w-[640px]">
         <Board
-          fen={item.fen}
+          fen={s.fen}
           orientation={turn}
           turn={turn}
           lastMove={null}
@@ -144,14 +95,14 @@ function LineaComprometida() {
       </div>
 
       <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
-        <div className="rounded-lg border border-subtle bg-surface p-4">
-          <p className="m-0 font-mono text-xs text-tertiary">
-            {t.calculo.progreso.replace('{actual}', String(s.lineaIngresada.length + (s.phase === 'jugando' ? 1 : 0))).replace('{total}', String(item.solucion.length))}
-          </p>
-        </div>
-
-        {s.phase === 'jugando' && <Jugando />}
-        {s.phase === 'feedback' && <Feedback />}
+        {/* De dónde salió la posición. Servir una posición de tu propia partida
+            sin decirlo sería raro; y decirlo es la mitad del valor (ADR-0015). */}
+        <OrigenDeLaPosicion />
+        {s.phase === 'analizando' && <Analizando />}
+        {s.phase === 'confianza' && (
+          <ConfidenceSlider onConfirm={(v) => void s.confirmarConfianza(v)} label={t.stoyko.confianzaPregunta} />
+        )}
+        {s.phase === 'revelado' && <Revelado />}
       </aside>
     </>
   );
@@ -202,120 +153,7 @@ function ErrorCalculo({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function Jugando() {
-  const s = useCompromisoStore();
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="m-0 text-sm text-secondary">{t.calculo.consigna}</p>
-      {s.lineaIngresada.length > 0 && (
-        <div className="rounded-lg border border-subtle bg-surface p-3">
-          <p className="m-0 mb-1 text-xs tracking-wider text-tertiary uppercase">{t.calculo.lineaTitulo}</p>
-          <p className="m-0 font-mono text-sm text-secondary">{s.lineaIngresada.join('  ')}</p>
-        </div>
-      )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          s.agregarJugada();
-        }}
-        className="flex flex-col gap-2"
-      >
-        <input
-          type="text"
-          value={s.inputActual}
-          onChange={(e) => s.setInputActual(e.target.value)}
-          placeholder={t.calculo.placeholder}
-          className="min-h-11 rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm text-primary"
-          autoFocus
-        />
-        {s.inputError && <p className="m-0 text-xs text-error-text">{s.inputError}</p>}
-        <button type="submit" className="btn-primary">
-          {t.calculo.agregar}
-        </button>
-      </form>
-      {s.lineaIngresada.length > 0 && (
-        <button onClick={() => s.borrarUltima()} className="btn-secondary">
-          {t.calculo.borrar}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function Feedback() {
-  const s = useCompromisoStore();
-  const acierto = s.resultado?.correcta ?? false;
-  return (
-    <div className={`flex flex-col gap-2 rounded-lg border p-4 ${acierto ? 'border-success/35 bg-success-subtle' : 'border-error/35 bg-error-subtle'}`}>
-      <p className="m-0 font-display text-xl font-medium">{acierto ? t.calculo.correcta : t.calculo.incorrecta}</p>
-      <p className="m-0 font-mono text-xs text-secondary">
-        {t.calculo.tuLinea}: {s.lineaUsuarioSan.join(' ') || '—'}
-      </p>
-      {!acierto && (
-        <p className="m-0 font-mono text-xs text-secondary">
-          {t.calculo.lineaCorrecta}: {s.lineaSolucionSan.join(' ')}
-        </p>
-      )}
-      <button onClick={() => s.siguiente()} className="btn-primary mt-1">
-        {t.calculo.otraPosicion}
-      </button>
-    </div>
-  );
-}
-
-// ---- Stoyko semanal (RF-7.2) ----
-
-const EVAL_SIMBOLOS: EvalSymbol[] = ['+-', '±', '=', '∓', '-+'];
-const EVAL_LABELS: Record<EvalSymbol, string> = { '+-': '+−', '±': '±', '=': '=', '∓': '∓', '-+': '−+' };
-
-function Stoyko() {
-  const s = useStoykoStore();
-  const slow = useSlowLoading(s.phase === 'cargando');
-
-  // Solo al montar: mismo motivo que en LineaComprometida más arriba.
-  useEffect(() => {
-    const store = useStoykoStore.getState();
-    if (store.phase === 'cargando' && !store.origen) void store.empezar();
-  }, []);
-
-  if (s.phase === 'cargando') return <CargaCalculo slow={slow} onRetry={() => void s.empezar(true)} />;
-  if (s.phase === 'error') return <ErrorCalculo onRetry={() => void s.empezar(true)} />;
-  if (s.phase === 'sinContenido') return <Centro texto={t.stoyko.sinContenido} />;
-  if (s.phase === 'enfriamiento') return <StoykoEnfriamiento />;
-
-  if (!s.origen || !s.fen) return <Centro texto={t.stoyko.cargando} />;
-  const turn = (s.fen.split(' ')[1] === 'b' ? 'b' : 'w') as Color;
-
-  return (
-    <>
-      <div className="board-stage relative mx-auto w-full min-w-[320px] max-w-[52vh] sm:mx-0 sm:w-[60%] sm:max-w-[640px]">
-        <Board
-          fen={s.fen}
-          orientation={turn}
-          turn={turn}
-          lastMove={null}
-          check={false}
-          dests={new Map()}
-          movableColor={null}
-          onMove={() => {}}
-        />
-      </div>
-
-      <aside className="flex w-full flex-col gap-3 sm:w-[40%] sm:max-w-xs">
-        {/* De dónde salió la posición. Servir una posición de tu propia partida
-            sin decirlo sería raro; y decirlo es la mitad del valor (ADR-0015). */}
-        <OrigenDeLaPosicion />
-        {s.phase === 'analizando' && <StoykoAnalizando />}
-        {s.phase === 'confianza' && (
-          <ConfidenceSlider onConfirm={(v) => void s.confirmarConfianza(v)} label={t.stoyko.confianzaPregunta} />
-        )}
-        {s.phase === 'revelado' && <StoykoRevelado />}
-      </aside>
-    </>
-  );
-}
-
-function StoykoEnfriamiento() {
+function Enfriamiento() {
   const proxima = useStoykoStore((s) => s.proximaDisponibleEn);
   const fecha = proxima ? new Date(proxima).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '';
   return (
@@ -342,12 +180,12 @@ function OrigenDeLaPosicion() {
   return <p className="m-0 rounded-md border border-info/40 bg-info-subtle px-3 py-2 text-xs text-secondary">{texto}</p>;
 }
 
-function StoykoAnalizando() {
+function Analizando() {
   const s = useStoykoStore();
   const pideLinea = ramaPideLinea(s.ramas.length);
   const pliesMinimos = pideLinea ? PLIES_MIN_LINEA : 1;
   const puedeCerrar = s.ramaEnCurso.linea.length >= pliesMinimos;
-  const completa = declaracionCompleta('abierto', s.ramas, 0);
+  const completa = declaracionCompleta(s.ramas);
 
   return (
     <div className="flex flex-col gap-3">
@@ -375,7 +213,8 @@ function StoykoAnalizando() {
         </div>
       )}
 
-      {/* La rama en curso: se carga ply a ply, como en el preset forzado. */}
+      {/* La rama en curso se carga ply a ply: es la mecánica que traía la
+          pestaña de línea comprometida, ahora dentro del único ejercicio. */}
       <div className="flex flex-col gap-2 rounded-lg border border-accent/45 bg-surface p-3">
         <p className="m-0 text-xs tracking-wider text-accent uppercase">
           {(pideLinea ? t.stoyko.ramaConLinea : t.stoyko.ramaSuelta).replace('{n}', String(s.ramas.length + 1))}
@@ -447,7 +286,7 @@ function StoykoAnalizando() {
   );
 }
 
-function StoykoRevelado() {
+function Revelado() {
   const s = useStoykoStore();
   const acierto = s.acierto ?? false;
   const brechaTexto = s.resultado?.brechaEvaluacion !== null && s.resultado?.brechaEvaluacion !== undefined

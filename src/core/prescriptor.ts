@@ -125,7 +125,8 @@ export interface DietaSesion {
   curriculumMax: number;
   radarCount: number;
   ajusteFugas: AjusteFugas;
-  /** RF-9.2/RF-11.2: se suma el bloque "¿Calcular o ya alcanza?" ante fuga táctica. */
+  /** RF-9.2/RF-11.2: se suma el bloque "¿Calcular o ya alcanza?" ante fuga
+   * táctica o fuga de cálculo. */
   criterioActivo: boolean;
 }
 
@@ -134,13 +135,29 @@ export interface DietaSesion {
  * el bloque de criterio "¿Calcular o ya alcanza?" —si tus errores son sobre
  * todo tácticos, conviene entrenar a reconocer cuándo hay que calcular—. Los
  * repasos vencidos de la Cola (punto 1) no tienen tope: eso ya lo resuelve
- * `dueErrorCards`. */
-export function dietaPorBanda(banda: BandaElo, cardsRecientes: ErrorCard[], now: Date = new Date()): DietaSesion {
+ * `dueErrorCards`.
+ *
+ * El bloque de criterio tiene un segundo disparador: la **fuga de cálculo**
+ * (ADR-0016). Hasta entonces esa fuga prescribía un ejercicio corto propio, que
+ * se retiró junto con el preset que lo servía; su respuesta ahora es este
+ * bloque, que entra en el presupuesto del día y entrena exactamente lo que la
+ * fuga señala —reconocer cuándo la posición pide detenerse a calcular—. */
+export function dietaPorBanda(
+  banda: BandaElo,
+  cardsRecientes: ErrorCard[],
+  now: Date = new Date(),
+  fugaCalculo?: AjusteFugaCalculo,
+): DietaSesion {
   const base = DIETA_POR_BANDA[banda];
   const ajusteFugas = detectarFugaTactica(cardsRecientes, now);
   const fugaTactica = ajusteFugas.categoria === 'tactico';
   const radarCount = fugaTactica ? base.radarCount + BONUS_RADAR_POR_FUGA : base.radarCount;
-  return { curriculumMax: base.curriculumMax, radarCount, ajusteFugas, criterioActivo: fugaTactica };
+  return {
+    curriculumMax: base.curriculumMax,
+    radarCount,
+    ajusteFugas,
+    criterioActivo: fugaTactica || (fugaCalculo?.activa ?? false),
+  };
 }
 
 // --- Diagnóstico inicial (RF-11.4) ---

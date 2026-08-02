@@ -13,16 +13,18 @@
 // Este módulo las devuelve como prescripciones de primera clase, con el mismo
 // contrato que un bloque: qué es, por qué aparece hoy y cuánto dura. Cada una
 // sabe además si ya está cumplida, con la señal que le es propia (la semana
-// para la partida lenta y Stoyko, los finales jugados hoy según el
-// planificador, la fecha del último intento para Cálculo), así que no hace
+// para la partida lenta y el cálculo, los finales jugados hoy según el
+// planificador), así que no hace
 // falta persistir nada nuevo.
-import type { CalculoAttempt, GameRecord, Profile } from './types';
+import type { GameRecord, Profile } from './types';
 import { partidaLentaSemanal } from './slowGame';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from './stoyko';
 import { presupuestoPorSesion } from './duracion';
-import type { AjusteFugaCalculo } from './prescriptor';
 
-export type PrescripcionExternaTipo = 'partida-lenta' | 'finales' | 'stoyko' | 'compromiso';
+// El tipo 'compromiso' —el ejercicio corto de cálculo— se retiró con ADR-0016
+// junto con el preset que lo servía. La fuga de cálculo que lo disparaba ahora
+// activa el bloque "¿Calcular o ya alcanza?" dentro de la sesión (RF-11.2).
+export type PrescripcionExternaTipo = 'partida-lenta' | 'finales' | 'stoyko';
 
 export type PrescripcionEstado =
   /** Corresponde hacerla hoy. */
@@ -63,7 +65,6 @@ const MINUTOS = {
   'partida-lenta': 45,
   finales: 8,
   stoyko: 15,
-  compromiso: 6,
 } as const satisfies Record<PrescripcionExternaTipo, number>;
 
 /**
@@ -80,23 +81,9 @@ export interface EntradaPrescripciones {
   /** Finales que ya se jugaron hoy contando para el plan (`finalesJugadosHoy`). */
   finalesHechosHoy?: number;
   profile: Pick<Profile, 'stoykoUltimaCompletadaEn' | 'planSemanal'>;
-  /** Intentos del ejercicio de cálculo (ADR-0015). El preset corto es el que
-   * se prescribe para hoy, así que es el que declara su cumplimiento. */
-  calculoAttempts: Pick<CalculoAttempt, 'preset' | 'fecha'>[];
-  fugaCalculo: AjusteFugaCalculo;
   /** Minutos que ya ocupa la sesión del día; se descuentan del presupuesto. */
   minutosSesion?: number;
   now?: Date;
-}
-
-/** ¿Se hizo hoy el ejercicio corto de cálculo (preset forzado)? */
-function compromisoHechoHoy(attempts: Pick<CalculoAttempt, 'preset' | 'fecha'>[], now: Date): boolean {
-  const inicioDelDia = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  return attempts.some((attempt) => {
-    if (attempt.preset !== 'forzado') return false;
-    const t = new Date(attempt.fecha).getTime();
-    return Number.isFinite(t) && t >= inicioDelDia && t <= now.getTime();
-  });
 }
 
 /**
@@ -155,7 +142,7 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
   }
 
   const proximoStoyko = stoykoProximaDisponibleEn(entrada.profile, now);
-  // Stoyko es semanal por definición ("Stoyko de la semana") y está disponible
+  // El cálculo es semanal por definición ("Cálculo de la semana") y está disponible
   // desde el primer día: se hace cuando el usuario quiera dentro de la semana.
   //
   // Antes el primero se escalonaba tres días después del diagnóstico, para no
@@ -167,31 +154,16 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
   // hasta la hora en que se había completado (bug reportado 2026-07-29).
   prescripciones.push(
     stoykoDisponible(entrada.profile, now)
-      ? { tipo: 'stoyko', estado: 'pendiente', cadencia: 'esta-semana', minutos: MINUTOS.stoyko, ruta: '#/calculo/stoyko' }
+      ? { tipo: 'stoyko', estado: 'pendiente', cadencia: 'esta-semana', minutos: MINUTOS.stoyko, ruta: '#/calculo' }
       : {
           tipo: 'stoyko',
           estado: 'en-espera',
           cadencia: 'esta-semana',
           minutos: MINUTOS.stoyko,
-          ruta: '#/calculo/stoyko',
+          ruta: '#/calculo',
           ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
         },
   );
-
-  if (entrada.fugaCalculo.activa) {
-    // Seis minutos: el ejercicio corto. Entra hoy salvo que no quede nada de
-    // presupuesto, y ahí espera a la semana como los demás.
-    const entraHoy = presupuesto >= MINUTOS.compromiso;
-    prescripciones.push({
-      tipo: 'compromiso',
-      estado: compromisoHechoHoy(entrada.calculoAttempts, now) ? 'cumplida' : 'pendiente',
-      cadencia: entraHoy ? 'hoy' : 'esta-semana',
-      ...(entraHoy ? {} : { fueraDePresupuesto: true }),
-      minutos: MINUTOS.compromiso,
-      ruta: '#/calculo',
-      cantidad: Math.round((entrada.fugaCalculo.fallos / entrada.fugaCalculo.total) * 100),
-    });
-  }
 
   return prescripciones;
 }
