@@ -244,7 +244,7 @@ test.describe('sesión simple: Radar', () => {
     await expect(page.getByText('Posición 2 de')).toBeVisible();
   });
 
-  test('un fallo pulsa bajo el rey y señala la jugada correcta con una flecha', async ({ page }) => {
+  test('un fallo señala la jugada correcta con una flecha y no pinta ninguna casilla', async ({ page }) => {
     await page.addInitScript(() => {
       Math.random = () => 0.99;
     });
@@ -263,13 +263,10 @@ test.describe('sesión simple: Radar', () => {
 
     await page.getByText('No era esa').waitFor({ timeout: 10_000 });
     await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'error');
-    const veil = page.locator('square.feedback-error');
-    await expect(veil).toHaveCount(1);
-    expect(await veil.evaluate((element) => (element as HTMLElement & { cgKey?: string }).cgKey)).toBe('e8');
-    expect(await veil.evaluate((element) => getComputedStyle(element).animationName)).toBe('board-error-settle');
-    const errorOutline = await veil.evaluate((element) => getComputedStyle(element).boxShadow);
-    expect(errorOutline).toContain('rgb(236, 229, 218)');
-    expect(errorOutline).toContain('rgb(23, 19, 16)');
+    // El fallo no pinta casillas: el velo bajo el rey usaba el rojo del jaque
+    // sobre la casilla del jaque, y se leía como un jaque inexistente.
+    await expect(page.locator('square.feedback-error')).toHaveCount(0);
+    await expect(page.locator('square.check')).toHaveCount(0);
 
     // Decir "la jugada correcta era Dh5" no alcanza: el tablero vuelve a la
     // posición en la que se decidió y la dibuja, junto con la jugada propia.

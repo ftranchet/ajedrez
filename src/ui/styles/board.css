@@ -58,16 +58,6 @@ cg-board {
   );
 }
 
-/* Feedback post-respuesta: el error pulsa bajo el rey del lado que resolvió,
-   sin sacudir ni mover la casilla (Chessground usa transform para ubicarla). */
-.cg-wrap square.feedback-error {
-  background-color: rgba(194, 96, 79, 0.34);
-  box-shadow:
-    inset 0 0 0 2px var(--color-primary),
-    inset 0 0 0 4px var(--color-base);
-  animation: board-error-settle 180ms ease-out both;
-}
-
 /* Flechas de la revelación: la jugada aceptada cuando se acierta; la jugada
    correcta (verde) junto a la equivocada (roja, más fina) cuando se falla. Una
    flecha por jugada; el halo de contraste contra el tablero lo da un
@@ -94,12 +84,6 @@ cg-board {
     opacity: 1;
     stroke-dashoffset: 0;
   }
-}
-
-@keyframes board-error-settle {
-  0% { background-color: rgba(194, 96, 79, 0.16); }
-  55% { background-color: rgba(194, 96, 79, 0.46); }
-  100% { background-color: rgba(194, 96, 79, 0.34); }
 }
 
 /* Coordenadas §3.2: font-mono, chicas, en una franja FUERA del tablero (ranks

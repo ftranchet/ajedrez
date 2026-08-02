@@ -10,10 +10,10 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 export type BoardFeedback =
   | { kind: 'success'; move: [string, string] | null }
   /**
-   * Error: además del velo rojo bajo el rey, el tablero vuelve a la posición
-   * en la que se decidió y muestra con flechas lo que se jugó y lo que había
-   * que jugar (RF-5.3). Sin `revision` —un bloque sin jugada correcta que
-   * mostrar, como el criterio de cálculo— se comporta como antes.
+   * Error: el tablero vuelve a la posición en la que se decidió y muestra con
+   * flechas lo que se jugó y lo que había que jugar (RF-5.3). Sin `revision`
+   * —un bloque sin jugada correcta que mostrar, como el criterio de cálculo—
+   * el tablero no marca nada y el fallo lo dice el panel.
    */
   | { kind: 'error'; move: null; revision?: RevisionDelError | null }
   | null;
@@ -39,24 +39,6 @@ export interface BoardProps {
 }
 
 const toCgColor = (c: Color) => (c === 'w' ? 'white' : 'black');
-
-function kingSquareFromFen(fen: string, color: Color): Key | null {
-  const target = color === 'w' ? 'K' : 'k';
-  const ranks = fen.split(' ')[0]?.split('/');
-  if (!ranks || ranks.length !== 8) return null;
-  const files = 'abcdefgh';
-  for (let rankIndex = 0; rankIndex < ranks.length; rankIndex += 1) {
-    let fileIndex = 0;
-    for (const symbol of ranks[rankIndex]) {
-      if (/\d/.test(symbol)) fileIndex += Number(symbol);
-      else {
-        if (symbol === target && fileIndex < 8) return `${files[fileIndex]}${8 - rankIndex}` as Key;
-        fileIndex += 1;
-      }
-    }
-  }
-  return null;
-}
 
 export function Board(props: BoardProps) {
   const el = useRef<HTMLDivElement>(null);
@@ -122,19 +104,18 @@ export function Board(props: BoardProps) {
     const revision = props.feedback?.kind === 'error' ? props.feedback.revision ?? null : null;
     const fen = revision?.fen ?? props.fen;
     const lastMove = revision ? undefined : ((props.lastMove ?? undefined) as [Key, Key] | undefined);
-    const errorSquare = props.feedback?.kind === 'error'
-      ? kingSquareFromFen(fen, props.orientation) ?? (props.lastMove?.[1] as Key | undefined)
-      : undefined;
-    const customHighlights = new Map<Key, string>();
-    if (errorSquare) customHighlights.set(errorSquare, 'feedback-error');
 
+    // El fallo no pinta ninguna casilla: el error no tiene casilla propia, y el
+    // velo rojo que se usaba (bajo el rey del lado que resolvía) era el mismo
+    // rojo que el aro de jaque y sobre la misma casilla, así que se leía como
+    // un jaque inexistente. Lo que se jugó y lo que había que jugar ya lo dicen
+    // las dos flechas; el resto lo dice el panel (RF-5.3, RNF-6).
     api.current?.set({
       fen,
       orientation: toCgColor(props.orientation),
       turnColor: toCgColor(props.turn),
       check: revision ? revision.jaque : props.check,
       lastMove,
-      highlight: { custom: customHighlights },
       movable: {
         free: false,
         color: props.movableColor ? toCgColor(props.movableColor) : undefined,
