@@ -485,6 +485,19 @@ export const es = {
     lineaCompleta: 'Línea completa',
     continuar: 'Siguiente',
   },
+  tablero: {
+    dibujar: 'Dibujar',
+    dibujarActivo: 'Dibujando · tocá para mover',
+    colorAnotacion: 'Color de la marca',
+    colores: {
+      green: 'Verde',
+      red: 'Rojo',
+      blue: 'Azul',
+      yellow: 'Amarillo',
+    },
+    borrarAnotaciones: 'Borrar marcas',
+  },
+
   calculo: {
     // Un solo ejercicio desde ADR-0016: el título nombra la pantalla y el
     // subtítulo describe el ejercicio, sin modo que elegir. El nombre visible

@@ -238,9 +238,21 @@ test.describe('sesión simple: Radar', () => {
     });
     expect(alcanzable).toEqual({ mainScrollea: true, botonSobreLaBarra: true });
 
+    // Una marca propia dibujada sobre el feedback (RF-5.10): las flechas del
+    // usuario valen para esta posición y no pueden viajar a la siguiente, donde
+    // señalarían casillas que ya no significan nada.
+    const caja = (await page.locator('cg-board').boundingBox())!;
+    const lado = caja.width / 8;
+    await page.mouse.move(caja.x + 0.5 * lado, caja.y + 7.5 * lado);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(caja.x + 0.5 * lado, caja.y + 5.5 * lado, { steps: 8 });
+    await page.mouse.up({ button: 'right' });
+    await expect(page.locator('.cg-shapes g[cgHash]')).not.toHaveCount(0);
+
     await page.getByRole('button', { name: 'Siguiente' }).click();
     await page.getByText('¿Cómo está la posición?').waitFor({ timeout: 10_000 });
     await expect(page.locator('.cg-shapes line')).toHaveCount(0);
+    await expect(page.locator('.cg-shapes g[cgHash]')).toHaveCount(0);
     await expect(page.getByText('Posición 2 de')).toBeVisible();
   });
 

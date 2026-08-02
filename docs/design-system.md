@@ -229,3 +229,20 @@ lleva signo y usa el menos tipográfico (−), el mismo de los símbolos +−/±
 el costo de una jugada va sin signo, porque es una magnitud. Un costo se informa
 siempre junto al salto de evaluación que lo produjo: la magnitud sola no dice si
 la partida se entregó o si seguía ganada.
+
+## Anotaciones sobre el tablero
+
+Flechas y círculos del usuario (RF-5.10), en los cuatro colores de chessground
+(verde, rojo, azul, amarillo; tokens `--anotacion-*` en `board.css`, que existen
+para que el punto del selector táctil sea exactamente el color que después se
+dibuja). Son **borrador**: no se persisten, se limpian al cambiar de posición y
+conviven con las flechas de feedback, que van por `setAutoShapes` y usan sus
+propios pinceles.
+
+El gesto de escritorio es el botón derecho, resuelto por chessground. El táctil
+se implementa a mano —chessground solo escucha el mouse— con un interruptor
+visible, y **solo se monta con `pointer: coarse`**: en un dispositivo con mouse
+el botón sería ruido. Mientras el modo está activo el arrastre dibuja y no mueve
+piezas; se prefirió un interruptor explícito antes que mantener apretado o dos
+dedos, que compiten con el arrastre de piezas y con el scroll de la página y
+fallan de maneras que el usuario no puede diagnosticar.

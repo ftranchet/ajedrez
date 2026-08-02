@@ -1,11 +1,14 @@
 // Envoltorio React de chessground (design system §5, componente Board).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chessground } from 'chessground';
 import type { Api } from 'chessground/api';
 import type { Key } from 'chessground/types';
 import type { Color } from '../../core/types';
 import type { RevisionDelError } from '../../core/revision';
+import { COLORES_ANOTACION, alternarAnotacion, type Anotacion, type ColorAnotacion } from '../../core/anotaciones';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { usePunteroGrueso } from '../hooks/usePunteroGrueso';
+import { t } from '../i18n/es';
 
 export type BoardFeedback =
   | { kind: 'success'; move: [string, string] | null }
@@ -36,6 +39,12 @@ export interface BoardProps {
   blindMode?: 'normal' | 'fantasma' | 'coordenadas';
   /** Revelación post-respuesta. Nunca se pasa durante la fase de confianza. */
   feedback?: BoardFeedback;
+  /**
+   * Anotaciones del usuario: flechas y círculos para pensar sobre el tablero
+   * (RF-5.10). Activadas por defecto — marcar es útil en cualquier ejercicio—;
+   * se apagan solo donde el tablero es decorativo.
+   */
+  anotaciones?: boolean;
 }
 
 const toCgColor = (c: Color) => (c === 'w' ? 'white' : 'black');
@@ -46,6 +55,18 @@ export function Board(props: BoardProps) {
   const onMoveRef = useRef(props.onMove);
   const reducedMotion = useReducedMotion();
   const initialReducedMotion = useRef(reducedMotion);
+  const anotacionesActivas = props.anotaciones !== false;
+  const punteroGrueso = usePunteroGrueso();
+  // Modo dibujo del camino táctil. Solo existe con el dedo: con mouse el botón
+  // derecho ya alcanza y un botón de más sería ruido en la pantalla. No hace
+  // falta apagarlo cuando dejan de darse esas condiciones — `dibujando` las
+  // exige todas, y los controles ni se montan—, así que no hay efecto que lo
+  // resetee.
+  const [modoDibujo, setModoDibujo] = useState(false);
+  const [colorAnotacion, setColorAnotacion] = useState<ColorAnotacion>('green');
+  const origenTactil = useRef<Key | null>(null);
+  const fenPrevio = useRef(props.fen);
+  const dibujando = anotacionesActivas && punteroGrueso && modoDibujo;
 
   useEffect(() => {
     onMoveRef.current = props.onMove;
@@ -59,7 +80,12 @@ export function Board(props: BoardProps) {
         duration: initialReducedMotion.current ? 0 : 200,
       }, // §2.4: deslizamiento de piezas, salvo preferencia del sistema
       coordinates: true,
-      drawable: { enabled: false, visible: true },
+      // Botón derecho (y shift+arrastrar) para dibujar flechas y círculos, como
+      // en Lichess y chess.com: es el gesto que ya tiene en los dedos cualquiera
+      // que haya analizado en una pantalla. chessground lo trae resuelto,
+      // incluido suprimir el menú contextual del navegador. El camino táctil no
+      // lo cubre —solo escucha el mouse— y se agrega abajo.
+      drawable: { enabled: true, visible: true },
       events: {
         move: (from: Key, to: Key) => onMoveRef.current(from, to),
       },
@@ -98,6 +124,10 @@ export function Board(props: BoardProps) {
   }, [reducedMotion]);
 
   useEffect(() => {
+    api.current?.set({ drawable: { enabled: anotacionesActivas } });
+  }, [anotacionesActivas]);
+
+  useEffect(() => {
     // Al revelar un error el tablero rebobina hasta la posición en la que se
     // decidió: una flecha que sale de la casilla que la pieza ya dejó no
     // enseña nada. La jugada equivocada se sigue viendo, pero como flecha.
@@ -122,8 +152,11 @@ export function Board(props: BoardProps) {
         dests: props.dests as Map<Key, Key[]>,
         showDests: true,
       },
-      draggable: { enabled: true },
-      selectable: { enabled: true }, // toque-toque (RF-1.1)
+      // En modo dibujo el dedo dibuja en vez de mover: si no, cada trazo
+      // arrastraría la pieza de la casilla de origen. Con mouse esto nunca se
+      // apaga, porque dibujar va por el botón derecho y mover por el izquierdo.
+      draggable: { enabled: !dibujando },
+      selectable: { enabled: !dibujando }, // toque-toque (RF-1.1)
     });
     // Una sola flecha limpia por jugada: el halo de contraste lo da un filtro
     // CSS (board.css), no una segunda flecha superpuesta —que dibujaba una
@@ -141,7 +174,48 @@ export function Board(props: BoardProps) {
     } else {
       api.current?.setAutoShapes([]);
     }
-  }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor, props.feedback]);
+
+    // Las marcas del usuario valen para **esta** posición: arrastrarlas a la
+    // siguiente dejaría flechas que ya no significan nada sobre un tablero
+    // distinto. Se limpian cuando cambia la posición, no en cada render, para
+    // que revelar el feedback no borre lo que el usuario dibujó mientras
+    // pensaba —que es justo cuando quiere compararlo con la respuesta—.
+    if (fenPrevio.current !== props.fen) {
+      fenPrevio.current = props.fen;
+      api.current?.setShapes([]);
+    }
+  }, [props.fen, props.orientation, props.turn, props.check, props.lastMove, props.dests, props.movableColor, props.feedback, dibujando]);
+
+  /** Casilla bajo el dedo, o null si el toque cayó fuera del tablero. */
+  function casillaEn(e: React.PointerEvent): Key | null {
+    return api.current?.getKeyAtDomPos([e.clientX, e.clientY]) ?? null;
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (!dibujando) return;
+    origenTactil.current = casillaEn(e);
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    if (!dibujando || !api.current) return;
+    const orig = origenTactil.current;
+    origenTactil.current = null;
+    if (!orig) return;
+    const destino = casillaEn(e);
+    if (!destino) return;
+    // Mismo origen y destino: es un círculo sobre la casilla. Distinto: flecha.
+    const nueva: Anotacion = destino === orig
+      ? { orig, brush: colorAnotacion }
+      : { orig, dest: destino, brush: colorAnotacion };
+    // La fuente de verdad son las marcas que ya tiene chessground, para que el
+    // camino táctil y el del botón derecho se pisen bien entre sí.
+    const previas = api.current.state.drawable.shapes as Anotacion[];
+    api.current.setShapes(alternarAnotacion(previas, nueva) as never);
+  }
+
+  function borrarAnotaciones() {
+    api.current?.setShapes([]);
+  }
 
   // 40% de opacidad para piezas fantasma, design system §3.4/§6.5. El marco
   // externo reserva la franja de coordenadas (§3.2) sin que chessground la
@@ -152,6 +226,12 @@ export function Board(props: BoardProps) {
   return (
     <div className="board-frame">
       <div
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => { origenTactil.current = null; }}
+        // En modo dibujo el navegador no debe interpretar el arrastre como
+        // scroll de la página: sin esto, el trazo mueve la pantalla.
+        style={dibujando ? { touchAction: 'none' } : undefined}
         ref={el}
         data-blind-mode={props.blindMode ?? 'normal'}
         data-feedback={props.feedback?.kind ?? 'none'}
@@ -164,6 +244,73 @@ export function Board(props: BoardProps) {
         data-reduced-motion={reducedMotion ? 'true' : 'false'}
         className="cg-wrap aspect-square w-full"
       />
+      {anotacionesActivas && punteroGrueso && (
+        <ControlesAnotacion
+          activo={modoDibujo}
+          color={colorAnotacion}
+          onToggle={() => setModoDibujo((v) => !v)}
+          onColor={setColorAnotacion}
+          onBorrar={borrarAnotaciones}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Controles del camino táctil (RF-5.10). chessground dibuja con el botón
+ * derecho, que en una pantalla táctil no existe: los reemplazos habituales
+ * —mantener apretado, dos dedos— compiten con el arrastre de piezas y con el
+ * scroll de la página, y fallan de maneras que el usuario no puede diagnosticar.
+ * Un interruptor explícito es más aburrido y siempre funciona.
+ *
+ * El selector de color aparece solo con el modo activo, y existe porque sin
+ * teclado no hay modificadores: sin él, en el celular todas las marcas serían
+ * verdes, que es perder la mitad de para qué sirven —distinguir tu plan de la
+ * respuesta del rival—.
+ */
+function ControlesAnotacion(props: {
+  activo: boolean;
+  color: ColorAnotacion;
+  onToggle: () => void;
+  onColor: (c: ColorAnotacion) => void;
+  onBorrar: () => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={props.onToggle}
+        aria-pressed={props.activo}
+        className={props.activo ? 'btn-primary min-h-11 px-3 text-sm' : 'btn-secondary min-h-11 px-3 text-sm'}
+      >
+        {props.activo ? t.tablero.dibujarActivo : t.tablero.dibujar}
+      </button>
+
+      {props.activo && (
+        <>
+          <fieldset className="m-0 flex items-center gap-1.5 border-0 p-0">
+            <legend className="sr-only">{t.tablero.colorAnotacion}</legend>
+            {COLORES_ANOTACION.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => props.onColor(color)}
+                aria-pressed={props.color === color}
+                aria-label={t.tablero.colores[color]}
+                title={t.tablero.colores[color]}
+                className={`size-9 rounded-full border-2 ${
+                  props.color === color ? 'border-primary' : 'border-transparent'
+                }`}
+                style={{ backgroundColor: `var(--anotacion-${color})` }}
+              />
+            ))}
+          </fieldset>
+          <button type="button" onClick={props.onBorrar} className="btn-secondary min-h-11 px-3 text-sm">
+            {t.tablero.borrarAnotaciones}
+          </button>
+        </>
+      )}
     </div>
   );
 }

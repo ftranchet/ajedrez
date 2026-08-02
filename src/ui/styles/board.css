@@ -163,3 +163,14 @@ cg-board {
 .cg-wrap[data-blind-mode='coordenadas'] piece {
   opacity: 0;
 }
+
+/* Anotaciones del usuario (RF-5.10). chessground trae sus propios verdes y
+   rojos cableados en el paquete; estos tokens son los que usa el selector de
+   color del camino táctil, para que el punto que se toca sea exactamente el
+   color que después se dibuja. */
+:root {
+  --anotacion-green: #15781b;
+  --anotacion-red: #882020;
+  --anotacion-blue: #003088;
+  --anotacion-yellow: #e68f00;
+}
