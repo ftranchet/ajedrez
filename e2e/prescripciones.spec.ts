@@ -30,7 +30,7 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
-  // La partida lenta y el Stoyko son semanales por definición: van en "Esta
+  // La partida lenta y el cálculo son semanales por definición: van en "Esta
   // semana", no en la lista de hoy. Pedirlos todos los días es lo que hacía
   // que el primer día sumara ~83 minutos, casi el plan semanal completo.
   await page.getByRole('heading', { name: 'Esta semana' }).waitFor();
@@ -40,7 +40,7 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await expect(page.getByRole('link', { name: /Tu partida lenta de la semana/ })).toBeVisible();
   // Encabeza igual dentro de su lista: es el ejercicio con más respaldo.
   await expect(seccionSemanal.locator('li').first()).toContainText('Tu partida lenta de la semana');
-  await expect(seccionSemanal).toContainText('Stoyko de la semana');
+  await expect(seccionSemanal).toContainText('Cálculo de la semana');
 
   // Lo que sí vence día a día —las técnicas de final— queda en la lista de
   // hoy, topeada al presupuesto: dos técnicas, no el catálogo entero.
@@ -51,32 +51,31 @@ test('Hoy prescribe los ejercicios que se hacen en otra pantalla, con su porqué
   await expect(seccionHoy).toContainText('2 técnica(s)');
   await expect(seccionHoy).not.toContainText('Tu partida lenta de la semana');
 
-  // Stoyko deja de descubrirse solo entrando a la pestaña Cálculo. El enlace
-  // tiene que aterrizar en el modo Stoyko visible, no en Línea comprometida
+  // El ejercicio deja de descubrirse solo entrando a la pestaña Cálculo. El
+  // enlace tiene que aterrizar en el ejercicio, que desde ADR-0016 es único
   // (el modo por defecto de la pantalla): comprobar solo la URL dejaba pasar
   // ese bug.
-  const stoyko = page.getByRole('link', { name: /Stoyko de la semana/ });
-  await expect(stoyko).toBeVisible();
-  await stoyko.click();
-  await expect(page).toHaveURL(/#\/calculo\/stoyko$/);
-  await expect(page.getByRole('radio', { name: 'Stoyko semanal' })).toBeChecked();
-  await expect(page.getByText('Stoyko semanal: anotás todas tus candidatas', { exact: false })).toBeVisible();
+  const calculo = page.getByRole('link', { name: /Cálculo de la semana/ });
+  await expect(calculo).toBeVisible();
+  await calculo.click();
+  await expect(page).toHaveURL(/#\/calculo$/);
+  await expect(page.getByText('Anotás todas tus candidatas', { exact: false })).toBeVisible();
 });
 
-// El primer Stoyko se escalonaba tres días desde el diagnóstico y la tarjeta
+// El primer cálculo se escalonaba tres días desde el diagnóstico y la tarjeta
 // solo mostraba una fecha. Como la espera se medía contra el instante exacto
 // del diagnóstico y el texto anuncia el día, el día anunciado seguía en espera
 // hasta esa hora (reporte de uso 2026-07-29). Se prescribe desde el día uno.
-test('el primer Stoyko se ofrece desde el día uno, no escalonado', async ({ page }) => {
+test('el primer cálculo se ofrece desde el día uno, no escalonado', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
-  // Diagnóstico de hoy mismo y ningún Stoyko hecho.
+  // Diagnóstico de hoy mismo y ningún cálculo hecho.
   await seedProfileDiagnosticado(page);
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
   await page.getByRole('heading', { name: 'Esta semana' }).waitFor();
-  await expect(page.getByRole('link', { name: /Stoyko de la semana/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Cálculo de la semana/ })).toBeVisible();
   await expect(page.getByText(/Se suma a tu plan el /)).toHaveCount(0);
 });
 
@@ -96,7 +95,7 @@ test('el plan semanal gobierna la carga: con poco tiempo declarado, los finales 
   await expect(page.getByRole('heading', { name: 'También te toca hoy' })).toHaveCount(0);
 });
 
-test('Stoyko ya hecho esta semana sigue listado, con la fecha en que vuelve', async ({ page }) => {
+test('el cálculo ya hecho esta semana sigue listado, con la fecha en que vuelve', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await seedProfileDiagnosticado(page, { stoykoUltimaCompletadaEn: new Date().toISOString() });
@@ -105,9 +104,9 @@ test('Stoyko ya hecho esta semana sigue listado, con la fecha en que vuelve', as
 
   // En enfriamiento no invita a entrar (no es un enlace), pero se ve: el
   // usuario tiene que poder saber que el ejercicio existe y cuándo vuelve.
-  await expect(page.getByText('Stoyko de la semana')).toBeVisible();
+  await expect(page.getByText('Cálculo de la semana')).toBeVisible();
   await expect(page.getByText(/Vuelve el /)).toBeVisible();
-  await expect(page.getByRole('link', { name: /Stoyko de la semana/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Cálculo de la semana/ })).toHaveCount(0);
 });
 
 test('Ajustes explica qué ejercicios existen y qué dispara cada uno', async ({ page }) => {

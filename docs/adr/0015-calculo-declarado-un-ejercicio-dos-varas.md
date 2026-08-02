@@ -1,6 +1,6 @@
 # ADR-0015 — Un solo ejercicio de cálculo declarado, con dos varas de medición
 
-- **Estado:** Aceptado
+- **Estado:** Aceptado; el punto 2 (dos presets) y la vara del preset forzado del punto 3 fueron reemplazados por ADR-0016
 - **Fecha:** 2026-07-30
 - **Requisitos relacionados:** RF-7.1, RF-7.2, RF-7.3, RF-10.2, RF-11.3a, RF-12.4
 

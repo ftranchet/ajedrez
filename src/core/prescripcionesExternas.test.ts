@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { prescripcionesDe, prescripcionesExternas, prescripcionesPendientes } from './prescripcionesExternas';
-import type { AjusteFugaCalculo } from './prescriptor';
-import type { CalculoAttempt, GameRecord } from './types';
+import type { GameRecord } from './types';
 
 const AHORA = new Date(2026, 6, 22, 20); // miércoles 22/07
-const SIN_FUGA: AjusteFugaCalculo = { activa: false, fallos: 0, total: 0 };
 
 function game(overrides: Partial<GameRecord> = {}): GameRecord {
   return {
@@ -25,8 +23,6 @@ function entrada(overrides: Partial<Parameters<typeof prescripcionesExternas>[0]
     games: [],
     finalesPendientes: 0,
     profile: {},
-    calculoAttempts: [],
-    fugaCalculo: SIN_FUGA,
     now: AHORA,
     ...overrides,
   };
@@ -117,48 +113,6 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
     expect(uno.find((p) => p.tipo === 'finales')).toMatchObject({ cantidad: 1, minutos: 8 });
   });
 
-  it('el cálculo comprometido solo aparece con señal, y con el porcentaje que la explica', () => {
-    expect(tipos(prescripcionesExternas(entrada()))).not.toContain('compromiso');
-
-    const conFuga = prescripcionesExternas(
-      entrada({ fugaCalculo: { activa: true, fallos: 6, total: 10 } }),
-    );
-    expect(conFuga.find((p) => p.tipo === 'compromiso')).toMatchObject({ estado: 'pendiente', cantidad: 60 });
-  });
-
-  it('un ejercicio de cálculo hecho hoy queda cumplido; el de ayer no cuenta', () => {
-    const attempt = (fecha: Date): CalculoAttempt => ({
-      id: crypto.randomUUID(),
-      preset: 'forzado',
-      itemId: 'x',
-      ramas: [{ linea: ['e2e4', 'e7e5', 'g1f3'] }],
-      correcta: true,
-      primerErrorEn: null,
-      fecha: fecha.toISOString(),
-    });
-    const fuga: AjusteFugaCalculo = { activa: true, fallos: 5, total: 10 };
-
-    const hoy = prescripcionesExternas(
-      entrada({ fugaCalculo: fuga, calculoAttempts: [attempt(new Date(2026, 6, 22, 9))] }),
-    );
-    expect(hoy.find((p) => p.tipo === 'compromiso')!.estado).toBe('cumplida');
-
-    const ayer = prescripcionesExternas(
-      entrada({ fugaCalculo: fuga, calculoAttempts: [attempt(new Date(2026, 6, 21, 23))] }),
-    );
-    expect(ayer.find((p) => p.tipo === 'compromiso')!.estado).toBe('pendiente');
-
-    // Los dos presets comparten el ejercicio, pero no la prescripción: el
-    // semanal largo no da por hecha la tarea corta del día (ADR-0015, punto 2).
-    const soloElLargo = prescripcionesExternas(
-      entrada({
-        fugaCalculo: fuga,
-        calculoAttempts: [{ ...attempt(new Date(2026, 6, 22, 9)), preset: 'abierto' }],
-      }),
-    );
-    expect(soloElLargo.find((p) => p.tipo === 'compromiso')!.estado).toBe('pendiente');
-  });
-
   it('cuenta solo las pendientes: el enfriamiento no es una tarea atrasada', () => {
     const lista = prescripcionesExternas(
       entrada({
@@ -225,8 +179,8 @@ describe('cadencia y presupuesto (RF-11.3)', () => {
   });
 
   it('prescripcionesDe separa las dos listas sin perder el orden por valor', () => {
-    const lista = prescripcionesExternas(entrada({ finalesPendientes: 2, fugaCalculo: { activa: true, fallos: 6, total: 10 } }));
-    expect(tipos(prescripcionesDe(lista, 'hoy'))).toEqual(['finales', 'compromiso']);
+    const lista = prescripcionesExternas(entrada({ finalesPendientes: 2 }));
+    expect(tipos(prescripcionesDe(lista, 'hoy'))).toEqual(['finales']);
     expect(tipos(prescripcionesDe(lista, 'esta-semana'))).toEqual(['partida-lenta', 'stoyko']);
   });
 });
