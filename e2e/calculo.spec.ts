@@ -128,3 +128,37 @@ test('cálculo: ya hecho esta semana, avisa el enfriamiento en vez de servir una
 
   await page.getByText('Ya hiciste tu cálculo de esta semana').waitFor({ timeout: 10_000 });
 });
+
+// RNF-9: las dos notaciones son correctas según la FIDE y cuál se usa depende
+// de con qué aprendió a anotar cada uno, así que es preferencia. Lo que no
+// puede pasar es que convivan: "Re1" es rey en español y torre en inglés.
+test('la notación se elige en Ajustes y cambia lo que la app muestra y acepta', async ({ page }) => {
+  await page.goto('./');
+  await page.getByText('Tu sesión de hoy').waitFor();
+  await seedStoykoFixture(page);
+  await page.reload();
+  await page.getByText('Tu sesión de hoy').waitFor();
+
+  // Por defecto, español: acepta Ac4 y rechaza la inglesa enseñando la equivalencia.
+  await page.goto('./#/calculo');
+  await page.getByPlaceholder('p. ej. Cf3').fill('Bc4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Esa es la notación inglesa', { exact: false })).toBeVisible();
+  await page.getByPlaceholder('p. ej. Cf3').fill('Ac4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Ac4', { exact: false }).first()).toBeVisible();
+
+  // Cambiada la preferencia, la simetría se invierte. La recarga además
+  // comprueba que la elección persiste y deja el ejercicio desde cero.
+  await page.goto('./#/ajustes');
+  await page.getByRole('radio', { name: 'Inglés (Nf3)' }).click();
+  await page.goto('./#/calculo');
+  await page.reload();
+  await page.getByPlaceholder('p. ej. Nf3').waitFor({ timeout: 15_000 });
+  await page.getByPlaceholder('p. ej. Nf3').fill('Ac4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Esa es la notación española', { exact: false })).toBeVisible();
+  await page.getByPlaceholder('p. ej. Nf3').fill('Bc4');
+  await page.getByRole('button', { name: 'Sumar jugada' }).click();
+  await expect(page.getByText('Bc4', { exact: false }).first()).toBeVisible();
+});

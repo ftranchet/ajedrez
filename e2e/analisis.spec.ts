@@ -101,7 +101,8 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
   // (RF-3.1a): acá se marcó Ba6, que es justo donde el motor ubica el vuelco.
   await expect(page.getByText('Tu lectura de la partida')).toBeVisible();
   await expect(page.getByText(/Le acertaste/)).toBeVisible();
-  await expect(page.getByText(/peones de evaluación/)).toBeVisible();
+  // El costo se dice en peones y con el salto de evaluación, no en centipeones.
+  await expect(page.getByText(/costó .* peones: la evaluación pasó de/)).toBeVisible();
 
   await page.getByRole('button', { name: /Revisar errores/ }).click();
   await page.getByText('Confirmá y categorizá').waitFor();

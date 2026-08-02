@@ -17,6 +17,7 @@ import { SensoryPreferencesCard } from '../components/SensoryPreferencesCard';
 import { DataBackupCard } from '../components/DataBackupCard';
 import { AppearanceCard } from '../components/AppearanceCard';
 import { BlindTrainingCard } from '../components/BlindTrainingCard';
+import { NotacionCard } from '../components/NotacionCard';
 import { SectionHeading } from '../components/SectionHeading';
 import { t } from '../i18n/es';
 
@@ -85,6 +86,7 @@ export function AjustesScreen() {
           <AppearanceCard />
           <LichessCard />
           <EjerciciosCard />
+          <NotacionCard />
           <BlindTrainingCard />
           <SensoryPreferencesCard preferences={profile.preferenciasSensoriales} onSave={saveSensoryPreferences} />
           <DataBackupCard onImported={() => void handleImported()} />

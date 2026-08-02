@@ -257,8 +257,15 @@ Interfaz en español rioplatense desde el día uno; textos externalizados (i18n)
 ### RNF-8 — Licencia (P0)
 El proyecto es de código abierto bajo **GPLv3** (formalizado en ADR-0006, coherente con la dependencia de Stockfish — ver ADR-0002). El texto oficial vive en `LICENSE` en la raíz del repositorio. Los datos de puzzles son CC0 con atribución de fuente en la documentación; los pesos de Maia son de investigación abierta; el set de piezas Staunty es CC BY-NC-SA 4.0 con atribución (ver `public/piece/staunty/README.md`).
 
-### RNF-9 — Una sola notación de jugadas (P0)
-Toda jugada que la app **muestre** o **pida escribir** va en notación algebraica en español: R (rey), D (dama), T (torre), A (alfil), C (caballo). Es lo que fija el Apéndice C de las Leyes del Ajedrez de la FIDE, que además dice que la inicial de cada pieza es la de su nombre **en el idioma del jugador** — es la contracara natural de RNF-7. UCI (`e2e4`) es formato de almacenamiento y de diálogo con el motor, nunca de pantalla. Al validar entrada no se aceptan las dos notaciones a la vez: "Re1" es rey en español y torre en inglés, y las dos pueden ser legales en la misma posición. Detalle en `docs/design-system.md`.
+### RNF-9 — Una sola notación de jugadas, con idioma elegible (P0)
+Toda jugada que la app **muestre** o **pida escribir** va en notación algebraica. UCI (`e2e4`) es formato de almacenamiento y de diálogo con el motor, nunca de pantalla; se sigue aceptando al escribir porque no se confunde con ninguna jugada algebraica.
+
+El **idioma de las iniciales de pieza es una preferencia** (Ajustes), con español por defecto: español (R, D, T, A, C) o inglés (K, Q, R, B, N). Las dos son correctas — el Apéndice C de las Leyes del Ajedrez de la FIDE dice que la inicial es la del nombre de la pieza **en el idioma del jugador**— y cuál se usa depende de con qué aprendió a anotar cada uno: mucha gente que juega en español anota en inglés porque así lo vio siempre en Lichess o chess.com. Imponer una sería pelearse con la costumbre de media base de usuarios.
+
+Lo que **no** se admite es que convivan: al validar entrada se acepta solo el idioma configurado, porque "Re1" es rey en español y torre en inglés y las dos pueden ser legales en la misma posición. La entrada en el otro idioma se rechaza con un mensaje que enseña la equivalencia y señala dónde cambiarla. Ajustes explica además cómo se lee la notación, porque la app pasa a **pedir** jugadas escritas y quien nunca anotó una partida quedaría afuera del ejercicio de cálculo. Detalle en `docs/design-system.md`.
+
+### RNF-10 — Las cantidades se dicen en la unidad del usuario (P1)
+Las evaluaciones y los costos de una jugada se muestran en **peones con un decimal**, nunca en centipeones: el centipeón es la unidad del motor y obliga a dividir por cien mentalmente. Una evaluación lleva signo (`+1,2`, `−0,8`, `0,0`); lo que **costó** una jugada va sin signo, porque es una magnitud y "perdiste −2,5" es una doble negación. Cuando se informa un costo se acompaña del salto de evaluación (`de +1,2 a −1,3`): perder dos peones desde +6 deja la partida ganada y perderlos desde +1 la entrega, así que la magnitud sola no ubica la jugada.
 
 ---
 

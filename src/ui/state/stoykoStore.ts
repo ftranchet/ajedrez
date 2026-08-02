@@ -37,6 +37,7 @@ import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
 import { interpretarJugada } from '../../core/notacion';
+import { readIdiomaNotacion } from '../notacionPrefs';
 import { t } from '../i18n/es';
 
 
@@ -139,10 +140,14 @@ async function elegirPosicion(): Promise<{ origen: OrigenPosicion; pool: StoykoI
   return { origen: { tipo: 'catalogo', item: pool[Math.floor(Math.random() * pool.length)] }, pool };
 }
 
+/** El ejemplo del mensaje de error va en el idioma que el usuario eligió: uno
+ * que muestra "Cf3" cuando la app está en inglés enseña lo contrario. */
+const ejemploDeJugada = (): string => (readIdiomaNotacion() === 'es' ? 'Cf3' : 'Nf3');
+
 const MENSAJE_POR_ERROR = {
-  formato: t.stoyko.errorFormato,
-  ilegal: t.stoyko.errorIlegal,
-  'notacion-inglesa': t.stoyko.errorNotacionInglesa,
+  formato: () => t.stoyko.errorFormato.replace('{ejemplo}', ejemploDeJugada()),
+  ilegal: () => t.stoyko.errorIlegal,
+  'otro-idioma': () => (readIdiomaNotacion() === 'es' ? t.stoyko.errorOtroIdiomaEs : t.stoyko.errorOtroIdiomaEn),
 } as const;
 
 export const useStoykoStore = create<StoykoState>((set, get) => ({
@@ -229,9 +234,9 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     // la valida contra la posición que deja el ply anterior —una línea
     // declarada tiene que ser jugable, si no no es una línea— y devuelve el
     // UCI, que es lo que se guarda.
-    const interpretada = interpretarJugada(s.fen, s.ramaEnCurso.linea, s.inputActual);
+    const interpretada = interpretarJugada(s.fen, s.ramaEnCurso.linea, s.inputActual, readIdiomaNotacion());
     if ('error' in interpretada) {
-      set({ inputError: MENSAJE_POR_ERROR[interpretada.error] });
+      set({ inputError: MENSAJE_POR_ERROR[interpretada.error]() });
       return;
     }
     const jugada = interpretada.uci;

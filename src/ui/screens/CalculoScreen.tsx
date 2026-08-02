@@ -18,8 +18,9 @@ import { ConfidenceSlider } from '../components/ConfidenceSlider';
 import { useStoykoStore } from '../state/stoykoStore';
 import { useSlowLoading } from '../hooks/useSlowLoading';
 import { PLIES_MIN_LINEA, declaracionCompleta, ramaPideLinea } from '../../core/calculo';
-import { lineaAEspanol } from '../../core/notacion';
-import { formatDecimal, formatDuracion } from '../format';
+import { lineaANotacion } from '../../core/notacion';
+import { readIdiomaNotacion } from '../notacionPrefs';
+import { formatDuracion, formatPeones, formatVentaja } from '../format';
 import { t } from '../i18n/es';
 
 // La sub-ruta #/calculo/stoyko sigue entrando acá (el router resuelve por el
@@ -176,7 +177,10 @@ function OrigenDeLaPosicion() {
   const texto = origen.tipo === 'catalogo'
     ? t.stoyko.origenCatalogo
     : origen.posicion.motivo === 'mas-centipeones'
-      ? t.stoyko.origenPropiaPeones.replace('{peones}', formatDecimal(origen.posicion.cpPerdidos / 100, 1))
+      ? t.stoyko.origenPropiaPeones
+          .replace('{antes}', formatVentaja(origen.posicion.ventajaAntes))
+          .replace('{despues}', formatVentaja(origen.posicion.ventajaDespues))
+          .replace('{peones}', formatPeones(origen.posicion.cpPerdidos))
       : t.stoyko.origenPropiaTiempo.replace('{duracion}', formatDuracion(origen.posicion.tiempoMs ?? 0));
   return <p className="m-0 rounded-md border border-info/40 bg-info-subtle px-3 py-2 text-xs text-secondary">{texto}</p>;
 }
@@ -203,7 +207,7 @@ function Analizando() {
             {s.ramas.map((rama, i) => (
               <li key={`${rama.linea.join('-')}-${i}`} className="flex items-start justify-between gap-2">
                 <span className="min-w-0 font-mono text-sm break-words text-primary">
-                  {lineaAEspanol(s.fen, rama.linea).join(' ')}{' '}
+                  {lineaANotacion(s.fen, rama.linea, readIdiomaNotacion()).join(' ')}{' '}
                   <span className="text-tertiary">({rama.evaluacion ? EVAL_LABELS[rama.evaluacion] : ''})</span>
                 </span>
                 <button onClick={() => s.quitarRama(i)} className="shrink-0 text-xs text-secondary underline">
@@ -222,7 +226,7 @@ function Analizando() {
           {(pideLinea ? t.stoyko.ramaConLinea : t.stoyko.ramaSuelta).replace('{n}', String(s.ramas.length + 1))}
         </p>
         <p className="m-0 font-mono text-sm text-primary">
-          {s.ramaEnCurso.linea.length > 0 ? lineaAEspanol(s.fen, s.ramaEnCurso.linea).join(' ') : t.stoyko.ramaVacia}
+          {s.ramaEnCurso.linea.length > 0 ? lineaANotacion(s.fen, s.ramaEnCurso.linea, readIdiomaNotacion()).join(' ') : t.stoyko.ramaVacia}
         </p>
 
         <form
@@ -236,7 +240,7 @@ function Analizando() {
             type="text"
             value={s.inputActual}
             onChange={(e) => s.setInputActual(e.target.value)}
-            placeholder={t.stoyko.placeholder}
+            placeholder={readIdiomaNotacion() === 'es' ? t.stoyko.placeholder : t.stoyko.placeholderEn}
             className="min-h-11 rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm text-primary"
             autoFocus
           />

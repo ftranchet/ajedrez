@@ -215,7 +215,17 @@ inequívoco y no depende del idioma; la traducción ocurre en los dos bordes
 único de UCI → notación).
 
 chess.js emite algebraica **inglesa**; nada la muestra sin pasar antes por
-`aEspanol`. Al validar lo que escribe el usuario no se aceptan las dos
-notaciones a la vez: "Re1" es rey en español y torre en inglés, y las dos pueden
-ser legales en la misma posición, así que admitir ambas sería elegir en silencio
-por él. La entrada en inglés se rechaza con un mensaje que enseña la equivalencia.
+`aNotacion`, que recibe el idioma elegido. Al validar lo que escribe el usuario
+no se aceptan los dos idiomas a la vez: "Re1" es rey en español y torre en
+inglés, y las dos pueden ser legales en la misma posición, así que admitir ambas
+sería elegir en silencio por él. La entrada en el otro idioma se rechaza con un
+mensaje que enseña la equivalencia y señala dónde cambiar la preferencia.
+
+## Cantidades del motor
+
+Evaluaciones y costos se muestran en **peones con un decimal**, nunca en
+centipeones (`formatVentaja` y `formatPeones` en `ui/format.ts`). La evaluación
+lleva signo y usa el menos tipográfico (−), el mismo de los símbolos +−/±/=/∓/−+;
+el costo de una jugada va sin signo, porque es una magnitud. Un costo se informa
+siempre junto al salto de evaluación que lo produjo: la magnitud sola no dice si
+la partida se entregó o si seguía ganada.

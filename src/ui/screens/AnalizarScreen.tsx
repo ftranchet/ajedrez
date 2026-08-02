@@ -9,9 +9,10 @@ import { Chip } from '../components/Chip';
 import { useAnalysisStore } from '../state/analysisStore';
 import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
 import type { CategoriaError } from '../../core/types';
-import { formatDecimal } from '../format';
+import { formatPeones, formatVentaja } from '../format';
 import { t } from '../i18n/es';
-import { aEspanol } from '../../core/notacion';
+import { aNotacion } from '../../core/notacion';
+import { readIdiomaNotacion } from '../notacionPrefs';
 
 export function AnalizarScreen() {
   const phase = useAnalysisStore((s) => s.phase);
@@ -89,7 +90,7 @@ function MomentoCritico() {
               {enTablero
                 ? t.analisis.momentoJugadaActual
                     .replace('{n}', String(Math.floor(enTablero.ply / 2) + 1))
-                    .replace('{san}', aEspanol(enTablero.san))
+                    .replace('{san}', aNotacion(enTablero.san, readIdiomaNotacion()))
                 : t.analisis.momentoPosicionInicial}
             </p>
             <button
@@ -321,7 +322,10 @@ function LecturaDelMomento() {
       <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.analisis.momentoLecturaTitulo}</h2>
       <p className="m-0 text-primary">{texto}</p>
       <p className="m-0 text-sm text-secondary">
-        {t.analisis.momentoLecturaCosto.replace('{cp}', formatDecimal(lectura.cpPerdidos / 100, 1))}
+        {t.analisis.momentoLecturaCosto
+          .replace('{cp}', formatPeones(lectura.cpPerdidos))
+          .replace('{antes}', formatVentaja(lectura.ventajaAntes))
+          .replace('{despues}', formatVentaja(lectura.ventajaDespues))}
       </p>
     </section>
   );
@@ -352,7 +356,7 @@ function ConfirmarErrores() {
             <p className="m-0 font-mono text-xs text-tertiary">
               {t.analisis.confirmarProgreso.replace('{actual}', String(s.erroresConfirmados + 1)).replace('{total}', String(total))}
             </p>
-            <p className="m-0 mt-1 font-display text-xl">{aEspanol(entry.san)}</p>
+            <p className="m-0 mt-1 font-display text-xl">{aNotacion(entry.san, readIdiomaNotacion())}</p>
             <p className="m-0 mt-2 text-sm text-secondary">
               {t.analisis.confirmarJugadaJugada}: <span className="font-mono text-primary">{entry.jugadaUsuario}</span>
             </p>

@@ -199,6 +199,9 @@ export interface LecturaMomentoCritico {
   /** Media jugada donde el motor ubica el vuelco, y cuánto costó. */
   plyMotor: number;
   cpPerdidos: number;
+  /** Evaluación antes y después, desde la perspectiva de quien movió. */
+  ventajaAntes: number;
+  ventajaDespues: number;
   sanMotor: string;
   /** ¿Le acertó, dentro de una jugada completa de tolerancia? */
   coincide: boolean;
@@ -220,6 +223,9 @@ export function lecturaMomentoCritico(analysis: GameAnalysis, fase1: PhaseOneDat
     plyUsuario: fase1.momentoCriticoPly,
     plyMotor: motor.ply,
     cpPerdidos: motor.cpPerdidos,
+    // Perspectiva de quien movió: la ventaja que se pierde es la suya.
+    ventajaAntes: motor.ladoQueMueve === 'w' ? motor.cpAntes : -motor.cpAntes,
+    ventajaDespues: motor.ladoQueMueve === 'w' ? motor.cpDespues : -motor.cpDespues,
     sanMotor: motor.san,
     coincide: distanciaPlies <= TOLERANCIA_PLIES,
     distanciaJugadas: Math.round(distanciaPlies / 2),
