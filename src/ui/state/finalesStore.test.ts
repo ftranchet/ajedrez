@@ -25,6 +25,8 @@ function deps(item: CurriculumItem, enginePort: EnginePort) {
       enginePort,
       items: { async ensureSeeded() {}, async list() { return [item]; } },
       progress: { async list() { return []; }, async save(progress: CurriculumProgress) { savedProgress.push(progress); } },
+      games: { list: async () => [] },
+      trainingEvents: { list: async () => [] },
       errors: { async list() { return []; }, async save(card: ErrorCard) { savedErrors.push(card); } },
     },
   };

@@ -14,7 +14,10 @@ import { engine } from '../../services/engine/stockfishEngine';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
-import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
+import { registrarTiempoEntrenado, trainingEventRepo } from '../../services/storage/trainingEventRepo';
+import { gameRepo } from '../../services/storage/gameRepo';
+import { finalesDeTusPartidas } from '../../core/finalesEnPartidas';
+import { priorizarFinales, type FinalPriorizado } from '../../core/finalesPrioridad';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
 
 const FINAL_ENGINE_DEPTH = 18;
@@ -24,6 +27,8 @@ type Phase = 'lista' | 'cargando' | 'jugando' | 'feedback';
 export interface FinalesState {
   phase: Phase;
   items: CurriculumItem[];
+  /** Los mismos finales con su puntaje y su motivo, en el orden sugerido. */
+  priorizados: FinalPriorizado[];
   progressById: Map<string, CurriculumProgress>;
   item: CurriculumItem | null;
   fen: string;
@@ -71,6 +76,10 @@ interface FinalesDeps {
   items: typeof curriculumItemRepo;
   progress: typeof curriculumProgressRepo;
   errors: typeof errorCardRepo;
+  /** Para saber qué finales aparecen de verdad en las partidas del usuario. */
+  games: Pick<typeof gameRepo, 'list'>;
+  /** Tramos medidos, para saber cuánto tarda en cada final (RF-13.4). */
+  trainingEvents: Pick<typeof trainingEventRepo, 'list'>;
 }
 
 export function createFinalesStore(deps: FinalesDeps) {
@@ -180,6 +189,7 @@ export function createFinalesStore(deps: FinalesDeps) {
     return {
       phase: 'lista',
       items: [],
+      priorizados: [],
       progressById: new Map(),
       item: null,
       fen: chess.fen(),
@@ -199,11 +209,24 @@ export function createFinalesStore(deps: FinalesDeps) {
 
       async load() {
         await deps.items.ensureSeeded();
-        const [items, progress] = await Promise.all([deps.items.list(), deps.progress.list()]);
+        const [items, progress, games, eventos] = await Promise.all([
+          deps.items.list(),
+          deps.progress.list(),
+          // Un fallo leyendo partidas o tramos no puede dejar sin finales: se
+          // degrada a ordenar con lo que haya (la repetición espaciada sola).
+          deps.games.list().catch(() => []),
+          deps.trainingEvents.list().catch(() => []),
+        ]);
+        const progressById = new Map(progress.map((entry) => [entry.id, entry] as const));
+        const priorizados = priorizarFinales(items, progressById, {
+          partidasPorPatron: finalesDeTusPartidas(games),
+          eventos,
+        });
         set({
           phase: 'lista',
-          items: items.filter((item) => item.tipo === 'final'),
-          progressById: new Map(progress.map((entry) => [entry.id, entry] as const)),
+          items: priorizados.map((final) => final.item),
+          priorizados,
+          progressById,
         });
       },
 
@@ -298,6 +321,8 @@ export function createFinalesStore(deps: FinalesDeps) {
 export const useFinalesStore = createFinalesStore({
   enginePort: engine,
   items: curriculumItemRepo,
+  games: gameRepo,
+  trainingEvents: trainingEventRepo,
   progress: curriculumProgressRepo,
   errors: errorCardRepo,
 });

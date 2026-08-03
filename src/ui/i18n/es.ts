@@ -321,6 +321,15 @@ export const es = {
     progreso: '{n} de 3 demostraciones limpias',
     programado: '{n} de 3 demostraciones limpias · vuelve el {fecha}',
     automatizado: 'Técnica automatizada',
+    ordenAyuda:
+      'El orden es una sugerencia, no un filtro: primero lo que te aparece en tus partidas, lo que te sale mal, lo que nunca practicaste y lo que te lleva más tiempo. Podés jugar cualquiera cuando quieras.',
+    motivoPartidas: 'Llegaste a este final en {n} de tus últimas partidas.',
+    motivoPartidasUna: 'Llegaste a este final en una de tus últimas partidas.',
+    motivoUltimaFallada: 'La última vez se te escapó.',
+    motivoFalla: 'Se te escapó {fallos} de {total} veces.',
+    motivoSinPracticar: 'Todavía no lo demostraste ninguna vez.',
+    motivoLento: 'Te lleva unos {n} segundos, más que tus otros finales.',
+    motivoVencido: 'Toca repasarlo hoy.',
     espaciadoAyuda:
       'Cada técnica se automatiza con tres demostraciones limpias separadas en el tiempo, no seguidas: repetir hoy lo que ya te salió no te lo fija. Podés practicar igual las que están programadas, pero esas repeticiones no cuentan para la racha.',
     empezar: 'Jugar este final',

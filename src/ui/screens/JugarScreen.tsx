@@ -13,10 +13,11 @@ import { BOTS_MAIA, botParaBanda } from '../../core/maia';
 import { readLichessToken } from '../lichessToken';
 import { useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
-import type { Color, CurriculumItem, CurriculumProgress } from '../../core/types';
+import type { Color, CurriculumItem } from '../../core/types';
 import { isAutomatizado } from '../../core/curriculum';
 import { FINAL_DRAW_HOLD_MOVES, objetivoDeFinal } from '../../core/finales';
 import { isDue } from '../../core/scheduler';
+import type { FinalPriorizado } from '../../core/finalesPrioridad';
 import { formatDecimal } from '../format';
 import { t } from '../i18n/es';
 
@@ -341,15 +342,48 @@ function objetivoTexto(item: CurriculumItem): string {
  * acumula) y automatizada (RF-6.3: tres demostraciones limpias espaciadas, deja
  * de aparecer).
  */
-function FinalRow({ item, progress }: { item: CurriculumItem; progress: CurriculumProgress | undefined }) {
+/**
+ * El motivo en una línea, con el dato que lo respalda. Sin dato no hay frase:
+ * "practicá este" sin decir por qué es exactamente lo que la lista no hacía.
+ */
+function textoMotivo(final: FinalPriorizado): string | null {
+  const { motivo, señales } = final;
+  if (motivo === 'aparece-en-tus-partidas') {
+    return señales.partidas === 1
+      ? t.finales.motivoPartidasUna
+      : t.finales.motivoPartidas.replace('{n}', String(señales.partidas));
+  }
+  if (motivo === 'te-sale-mal') {
+    // "La última se te escapó" es exacto y se entiende sin explicación; el
+    // porcentaje acumulado solo aparece cuando es lo único que hay.
+    return señales.ultimaFallada
+      ? t.finales.motivoUltimaFallada
+      : t.finales.motivoFalla
+          .replace('{fallos}', String(señales.fallos))
+          .replace('{total}', String(señales.practicas));
+  }
+  if (motivo === 'sin-practicar') return t.finales.motivoSinPracticar;
+  if (motivo === 'tardas-mucho') {
+    return t.finales.motivoLento.replace('{n}', String(Math.round(señales.segundosTipicos ?? 0)));
+  }
+  if (motivo === 'toca-repasarlo') return t.finales.motivoVencido;
+  return null;
+}
+
+function FinalRow({ final }: { final: FinalPriorizado }) {
+  const { item, progress } = final;
   const automatizado = progress !== undefined && isAutomatizado(progress);
   const vencido = !automatizado && (progress === undefined || isDue(progress.fsrs));
   const proxima = progress ? new Date(progress.fsrs.due) : null;
+  const motivo = textoMotivo(final);
 
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
       <div className="min-w-0">
         <p className="m-0 text-primary">{item.nombre}</p>
+        {/* Por qué está en este lugar de la lista: el orden es una sugerencia
+            y tiene que poder discutirse, no imponerse en silencio. */}
+        {motivo && <p className="m-0 mt-1 text-xs text-accent">{motivo}</p>}
         <p className="m-0 mt-1 text-xs text-tertiary">
           {automatizado
             ? t.finales.automatizado
@@ -405,9 +439,10 @@ function FinalesScreen() {
         ) : (
           <>
             <p className="m-0 text-sm text-secondary">{t.finales.espaciadoAyuda}</p>
+            <p className="m-0 text-sm text-secondary">{t.finales.ordenAyuda}</p>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {s.items.map((item) => (
-                <FinalRow key={item.id} item={item} progress={s.progressById.get(item.id)} />
+              {s.priorizados.map((final) => (
+                <FinalRow key={final.item.id} final={final} />
               ))}
             </ul>
           </>
