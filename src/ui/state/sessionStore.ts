@@ -34,7 +34,7 @@ import { decisionCorrecta, type DecisionTriage } from '../../core/triage';
 import { shouldSampleConfidence } from '../../core/calibration';
 import { clasificarCambioCandidata, shouldSampleCandidata } from '../../core/candidatas';
 import { clasificarRespuestaDobleSolucion, feedbackConformismo } from '../../core/dobleSolucion';
-import { abandonSessionRecord, completeSessionRecord, recordSessionItem, startSessionRecord, transitionSessionBlock } from '../../core/session';
+import { abandonSessionRecord, cerrarSesionColgada, completeSessionRecord, recordSessionItem, startSessionRecord, transitionSessionBlock } from '../../core/session';
 import {
   bloqueAsignado,
   buildDailyAssignment,
@@ -285,6 +285,25 @@ export const useSessionStore = create<SessionState>((set, get) => {
       .then(() => sessionRepo.save(record));
     sessionWriteQueue = write.catch(() => undefined);
     return write;
+  }
+
+  /**
+   * Cierra los registros que quedaron `en_curso` sin cierre y los persiste.
+   *
+   * Solo corre desde `loadSummary`, que se ejecuta cuando **no** hay sesión
+   * activa en esta pestaña: cualquier registro abierto que se vea desde acá es
+   * de una corrida que ya terminó de hecho —recarga, pestaña cerrada, el
+   * service worker tomando control— y sin cerrarlo sus minutos no cuentan en
+   * ninguna lectura de carga.
+   */
+  async function cerrarSesionesColgadas(records: SessionRecord[]): Promise<SessionRecord[]> {
+    const colgadas = records.filter((record) => record.estado === 'en_curso');
+    if (colgadas.length === 0) return records;
+    const cerradas = new Map(colgadas.map((record) => [record.id, cerrarSesionColgada(record)] as const));
+    // Un fallo de escritura no puede tumbar la portada: la lectura ya queda
+    // corregida en memoria y el cierre se reintenta en la próxima visita.
+    await Promise.all([...cerradas.values()].map((record) => persistSession(record).catch(() => undefined)));
+    return records.map((record) => cerradas.get(record.id) ?? record);
   }
 
   function updateTrackedSession(update: (record: SessionRecord) => SessionRecord): void {
@@ -612,7 +631,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
 
           await Promise.all([curriculumItemRepo.ensureSeeded(), radarItemRepo.ensureSeeded()]);
-          const [allCards, curriculumItems, curriculumProgressList, sessions, games, radarItems, radarAttempts] =
+          const [allCards, curriculumItems, curriculumProgressList, sessionsCrudas, games, radarItems, radarAttempts] =
             await Promise.all([
               errorCardRepo.list(),
               curriculumItemRepo.list(),
@@ -623,6 +642,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
               radarAttemptRepo.list(),
             ]);
           if (generation !== summaryGeneration) return;
+          // Sesiones que quedaron colgadas `en_curso` porque nadie las cerró
+          // —recarga, pestaña cerrada, service worker tomando control—. Se
+          // cierran acá, con la duración hasta su último instante observado:
+          // si no, sus minutos no cuentan en ninguna lectura de carga y el plan
+          // semanal informa una fracción de lo entrenado.
+          const sessions = await cerrarSesionesColgadas(sessionsCrudas);
           const progressById = new Map(curriculumProgressList.map((p) => [p.id, p] as const));
           const due = dueCurriculumItems(curriculumItems, progressById);
           const finalesPendientes = due.filter((item) => item.tipo === 'final').length;

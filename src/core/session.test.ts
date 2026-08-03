@@ -3,11 +3,13 @@ import {
   abandonSessionRecord,
   activitySummary,
   bloquesHechosHoy,
+  cerrarSesionColgada,
   completeSessionRecord,
   recordSessionItem,
   processStreak,
   startSessionRecord,
   transitionSessionBlock,
+  ultimoInstanteObservado,
 } from './session';
 import type { SessionRecord } from './types';
 
@@ -86,16 +88,22 @@ describe('registro de sesión', () => {
     ]);
   });
 
-  it('marca abandonada una sesión anterior sin convertirla en adherencia', () => {
-    const abandoned = abandonSessionRecord(
-      startSessionRecord([{ tipo: 'radar', planificados: 8 }], START, 's3'),
-      new Date('2026-07-19T10:03:00.000Z'),
+  it('una sesión abandonada no es adherencia, pero su trabajo sí es actividad', () => {
+    // `sesiones` y la racha son adherencia y no las mueve un abandono. Los
+    // minutos y las respuestas describen actividad: descartarlos borraba
+    // trabajo que de verdad ocurrió y quedó registrado en los bloques.
+    const abandoned = recordSessionItem(
+      abandonSessionRecord(
+        startSessionRecord([{ tipo: 'radar', planificados: 8 }], START, 's3'),
+        new Date('2026-07-19T10:03:00.000Z'),
+      ),
+      'radar',
     );
     expect(abandoned.estado).toBe('abandonada');
     expect(activitySummary([abandoned], new Date('2026-07-19T12:00:00.000Z'))).toEqual({
       sesiones: 0,
-      minutos: 0,
-      items: 0,
+      minutos: 3,
+      items: 1,
       racha: 0,
     });
   });
@@ -140,5 +148,46 @@ describe('registro de sesión', () => {
     );
     expect(processStreak([yesterday], new Date('2026-07-19T08:00:00.000Z'))).toBe(1);
     expect(processStreak([yesterday], new Date('2026-07-20T08:00:00.000Z'))).toBe(0);
+  });
+});
+
+describe('cerrarSesionColgada', () => {
+  // Una sesión que la app no llegó a cerrar —recarga, pestaña cerrada, el
+  // service worker tomando control a mitad de camino— quedaba `en_curso` para
+  // siempre y **sin duración**, así que sus minutos no contaban en ninguna
+  // lectura de carga: el plan semanal informaba 3 minutos de media hora
+  // entrenada (reporte de uso 2026-08-04).
+  const colgada: SessionRecord = {
+    id: 'colgada',
+    fechaInicio: '2026-08-03T10:00:00.000Z',
+    estado: 'en_curso',
+    bloques: [
+      { tipo: 'cola', planificados: 10, completados: 10, estado: 'completado', inicio: '2026-08-03T10:00:00.000Z', fin: '2026-08-03T10:22:00.000Z' },
+      { tipo: 'radar', planificados: 8, completados: 3, estado: 'en_curso', inicio: '2026-08-03T10:22:00.000Z' },
+    ],
+  };
+
+  it('la cierra con la duración hasta el último instante registrado', () => {
+    const cerrada = cerrarSesionColgada(colgada);
+    expect(cerrada.estado).toBe('abandonada');
+    // 10:00 → 10:22, el último instante del que hay registro. No hasta "ahora":
+    // una sesión colgada el lunes no puede sumar los días que estuvo abierta.
+    expect(cerrada.duracionMs).toBe(22 * 60_000);
+    expect(cerrada.fechaFin).toBe('2026-08-03T10:22:00.000Z');
+  });
+
+  it('sin ninguna marca de bloque no inventa duración', () => {
+    const reciennacida: SessionRecord = { ...colgada, bloques: [{ tipo: 'radar', planificados: 8, completados: 0, estado: 'pendiente' }] };
+    expect(cerrarSesionColgada(reciennacida).duracionMs).toBe(0);
+  });
+
+  it('no toca una sesión ya cerrada', () => {
+    const completa: SessionRecord = { ...colgada, estado: 'completada', fechaFin: '2026-08-03T11:00:00.000Z', duracionMs: 3_600_000 };
+    expect(cerrarSesionColgada(completa)).toBe(completa);
+  });
+
+  it('el último instante es el más reciente, sin depender del orden de los bloques', () => {
+    const desordenada: SessionRecord = { ...colgada, bloques: [...colgada.bloques].reverse() };
+    expect(ultimoInstanteObservado(desordenada)).toBe('2026-08-03T10:22:00.000Z');
   });
 });

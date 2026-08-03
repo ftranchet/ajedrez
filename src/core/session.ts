@@ -77,6 +77,37 @@ export function abandonSessionRecord(record: SessionRecord, now: Date = new Date
   };
 }
 
+/**
+ * El último instante del que la sesión dejó registro: el `fin`/`inicio` de
+ * bloque más reciente, o su propio comienzo si no llegó a haber ninguno.
+ */
+export function ultimoInstanteObservado(record: SessionRecord): string {
+  const marcas = [record.fechaInicio, ...record.bloques.flatMap((b) => [b.inicio, b.fin])];
+  return marcas.reduce<string>(
+    // Las fechas ISO en UTC se ordenan como texto.
+    (max, marca) => (typeof marca === 'string' && marca > max ? marca : max),
+    record.fechaInicio,
+  );
+}
+
+/**
+ * Cierra una sesión que quedó `en_curso` sin que nadie la cerrara: la app se
+ * recargó, la pestaña se fue o el service worker tomó control a mitad de
+ * camino. Sin esto el registro se queda colgado para siempre y **sin
+ * `duracionMs`**, así que esos minutos no cuentan en ninguna lectura de carga:
+ * el usuario entrena media hora, la app se recarga sola y su plan semanal dice
+ * 3 minutos.
+ *
+ * La duración se corta en el último instante observado, no en "ahora": una
+ * sesión abandonada el martes no puede sumar los días que estuvo colgada. Es
+ * una cota inferior —lo que pasó dentro del último bloque no quedó registrado—
+ * y ese es el lado correcto para equivocarse.
+ */
+export function cerrarSesionColgada(record: SessionRecord): SessionRecord {
+  if (record.estado !== 'en_curso') return record;
+  return abandonSessionRecord(record, new Date(ultimoInstanteObservado(record)));
+}
+
 export interface ActivitySummary {
   sesiones: number;
   minutos: number;
@@ -141,14 +172,17 @@ export function activitySummary(
   days = 30,
 ): ActivitySummary {
   const since = now.getTime() - days * 24 * 60 * 60 * 1000;
-  const completed = records.filter(
-    (r) => r.estado === 'completada' && new Date(r.fechaInicio).getTime() >= since,
-  );
-  const durationMs = completed.reduce((sum, r) => sum + (r.duracionMs ?? 0), 0);
+  const enVentana = records.filter((r) => new Date(r.fechaInicio).getTime() >= since);
+  // `sesiones` es la unidad de adherencia y solo la mueve una sesión terminada.
+  // Minutos y respuestas describen actividad: contarlos solo de las sesiones
+  // completadas borraba el trabajo real de las que se cortaron —los repasos ya
+  // resueltos quedaron registrados en sus bloques igual—, así que los totales
+  // informaban menos de lo entrenado.
+  const conDuracionMedida = enVentana.filter((r) => r.estado !== 'en_curso');
   return {
-    sesiones: completed.length,
-    minutos: Math.round(durationMs / 60_000),
-    items: completed.reduce(
+    sesiones: enVentana.filter((r) => r.estado === 'completada').length,
+    minutos: Math.round(conDuracionMedida.reduce((sum, r) => sum + (r.duracionMs ?? 0), 0) / 60_000),
+    items: conDuracionMedida.reduce(
       (sum, r) => sum + r.bloques.reduce((blockSum, b) => blockSum + b.completados, 0),
       0,
     ),

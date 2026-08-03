@@ -84,17 +84,27 @@ export function weeklyPlanProgress(
   const finSemana = new Date(inicioSemana);
   finSemana.setDate(finSemana.getDate() + 7);
 
-  const completed = records.filter((record) => {
-    if (record.estado !== 'completada') return false;
+  const enLaSemana = (record: SessionRecord): boolean => {
     const timestamp = new Date(record.fechaFin ?? record.fechaInicio);
     return Number.isFinite(timestamp.getTime()) && timestamp >= inicioSemana && timestamp < finSemana && timestamp <= now;
-  });
+  };
+
+  // La META se mide en sesiones completadas, una por día como mucho (ADR-0013).
+  const completed = records.filter((record) => record.estado === 'completada' && enLaSemana(record));
   const completedDays = new Set(
     completed.map((record) => localDayKey(new Date(record.fechaFin ?? record.fechaInicio))),
   );
   const sesionesCompletadas = completedDays.size;
+
+  // Los MINUTOS son otra cosa: carga observada, no una segunda barrera
+  // (ADR-0013, "una segunda sesión suma minutos observados"). Contaban solo las
+  // sesiones completadas, así que entrenar media hora y salir antes del último
+  // bloque —o que la app se recargue sola a mitad de camino— borraba esos
+  // minutos del total de la semana. El tiempo se observó igual: si el registro
+  // tiene una duración medida, cuenta.
+  const conDuracionMedida = records.filter((record) => record.estado !== 'en_curso' && enLaSemana(record));
   const minutosCompletados = Math.round(
-    completed.reduce((total, record) => total + Math.max(0, record.duracionMs ?? 0), 0) / 60_000,
+    conDuracionMedida.reduce((total, record) => total + Math.max(0, record.duracionMs ?? 0), 0) / 60_000,
   );
 
   return {

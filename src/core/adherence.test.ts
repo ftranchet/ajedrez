@@ -31,7 +31,12 @@ describe('plan semanal', () => {
     expect(weeklyPlanPreset({ sesionesObjetivo: 4, minutosObjetivo: 100 })).toBe('personalizado');
   });
 
-  it('mide la semana local de lunes a domingo y excluye abandonos', () => {
+  it('mide la semana local de lunes a domingo; el abandono no cuenta como sesión pero sus minutos sí', () => {
+    // La meta se mide en sesiones completadas (ADR-0013), así que un abandono
+    // no acerca a cumplir la semana. Los minutos son otra cosa —carga
+    // observada— y descartarlos hacía que entrenar media hora y salir antes
+    // del último bloque no dejara rastro: el plan informaba una fracción de lo
+    // entrenado (reporte de uso 2026-08-04).
     const now = new Date(2026, 6, 19, 20); // domingo local
     const records = [
       completed('lunes', new Date(2026, 6, 13, 10), 20),
@@ -44,9 +49,21 @@ describe('plan semanal', () => {
     ];
     const summary = weeklyPlanProgress(records, DEFAULT_WEEKLY_PLAN, now);
     expect(summary.sesionesCompletadas).toBe(2);
-    expect(summary.minutosCompletados).toBe(45);
+    expect(summary.minutosCompletados).toBe(75);
     expect(summary.sesionesRestantes).toBe(1);
     expect(summary.cumplido).toBe(false);
+  });
+
+  it('una sesión todavía en curso no suma minutos: no tiene duración medida', () => {
+    const now = new Date(2026, 6, 15, 20);
+    const enCurso: SessionRecord = {
+      id: 'ahora',
+      fechaInicio: new Date(2026, 6, 15, 19).toISOString(),
+      estado: 'en_curso',
+      bloques: [{ tipo: 'radar', planificados: 8, completados: 3, estado: 'en_curso' }],
+    };
+    const summary = weeklyPlanProgress([completed('previa', new Date(2026, 6, 15, 9), 20), enCurso], PLAN_2, now);
+    expect(summary.minutosCompletados).toBe(20);
   });
 
   it('cuenta como máximo una sesión por día, aunque informa todos los minutos reales', () => {
