@@ -433,10 +433,7 @@ function PrescripcionesExternasCard({
 function PrescripcionRow({ prescripcion }: { prescripcion: PrescripcionExterna }) {
   const textos = t.hoy.prescripciones[prescripcion.tipo];
   const cumplida = prescripcion.estado === 'cumplida';
-  const enEspera = prescripcion.estado === 'en-espera';
-  const motivo = (cumplida ? textos.cumplida : enEspera ? textos.enEspera : textos.pendiente)
-    .replace('{n}', String(prescripcion.cantidad ?? 0))
-    .replace('{fecha}', prescripcion.fecha ? new Date(prescripcion.fecha).toLocaleDateString('es-AR') : '');
+  const motivo = (cumplida ? textos.cumplida : textos.pendiente).replace('{n}', String(prescripcion.cantidad ?? 0));
 
   const contenido = (
     <>
@@ -463,13 +460,6 @@ function PrescripcionRow({ prescripcion }: { prescripcion: PrescripcionExterna }
     </>
   );
 
-  // En espera (el enfriamiento semanal de Stoyko) no es una acción: se muestra
-  // para que el usuario sepa que existe y cuándo vuelve, sin invitar a entrar.
-  if (enEspera) {
-    return (
-      <li className="flex items-center gap-3 rounded-md border border-subtle bg-surface p-3 opacity-70">{contenido}</li>
-    );
-  }
   return (
     <li>
       <a

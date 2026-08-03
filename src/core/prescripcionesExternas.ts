@@ -18,7 +18,7 @@
 // falta persistir nada nuevo.
 import type { GameRecord, Profile } from './types';
 import { partidaLentaSemanal } from './slowGame';
-import { stoykoDisponible, stoykoProximaDisponibleEn } from './stoyko';
+import { stoykoDisponible } from './stoyko';
 import { presupuestoPorSesion } from './duracion';
 
 // El tipo 'compromiso' —el ejercicio corto de cálculo— se retiró con ADR-0016
@@ -29,10 +29,17 @@ export type PrescripcionExternaTipo = 'partida-lenta' | 'finales' | 'stoyko';
 export type PrescripcionEstado =
   /** Corresponde hacerla hoy. */
   | 'pendiente'
-  /** Ya cumplida en su período; se muestra igual, en segundo plano. */
-  | 'cumplida'
-  /** No corresponde todavía (Stoyko en enfriamiento). */
-  | 'en-espera';
+  /**
+   * Ya cumplida en su período; se muestra igual, en segundo plano.
+   *
+   * El cálculo semanal tenía un tercer estado, `en-espera`, para su
+   * enfriamiento. Sobraba: `stoykoDisponible` da `true` cuando nunca se hizo,
+   * así que la espera **solo** existe después de haberlo hecho. Era "cumplida"
+   * con otro nombre, pero se pintaba en gris al 70% y con la fecha exacta de
+   * reaparición, así que haber cumplido el plan de la semana se leía como una
+   * penitencia con fecha de vencimiento en vez de como un logro.
+   */
+  | 'cumplida';
 
 /**
  * Cuándo toca hacerla. Separar "hoy" de "esta semana" es la diferencia entre
@@ -51,10 +58,9 @@ export interface PrescripcionExterna {
   minutos: number;
   /** Ruta hash a la pantalla donde se hace. */
   ruta: string;
-  /** Dato que acompaña el texto: finales que faltan hoy —o los ya hechos, si
-   * está cumplida—, porcentaje de fallos en cálculo, día de reaparición. */
+  /** Dato que acompaña el texto: finales que faltan hoy, o los ya hechos si
+   * está cumplida. */
   cantidad?: number;
-  fecha?: string;
   /** Se movió a "esta semana" porque hoy no entra en el presupuesto declarado. */
   fueraDePresupuesto?: boolean;
 }
@@ -141,7 +147,6 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
     });
   }
 
-  const proximoStoyko = stoykoProximaDisponibleEn(entrada.profile, now);
   // El cálculo es semanal por definición ("Cálculo de la semana") y está disponible
   // desde el primer día: se hace cuando el usuario quiera dentro de la semana.
   //
@@ -152,18 +157,19 @@ export function prescripcionesExternas(entrada: EntradaPrescripciones): Prescrip
   // el día ("se suma a tu plan el 29/7") pero la comparación era contra el
   // instante exacto del diagnóstico, así que ese mismo día seguía en espera
   // hasta la hora en que se había completado (bug reportado 2026-07-29).
-  prescripciones.push(
-    stoykoDisponible(entrada.profile, now)
-      ? { tipo: 'stoyko', estado: 'pendiente', cadencia: 'esta-semana', minutos: MINUTOS.stoyko, ruta: '#/calculo' }
-      : {
-          tipo: 'stoyko',
-          estado: 'en-espera',
-          cadencia: 'esta-semana',
-          minutos: MINUTOS.stoyko,
-          ruta: '#/calculo',
-          ...(proximoStoyko ? { fecha: proximoStoyko } : {}),
-        },
-  );
+  //
+  // Haberlo hecho es `cumplida`, no una espera: el enfriamiento no es un
+  // castigo sino la cadencia del ejercicio, y la semana que viene vuelve solo.
+  // Tampoco lleva la fecha exacta —"vuelve el 10/8/2026" es una precisión que
+  // nadie necesita para algo semanal— ni deja de ser accesible: desde la
+  // pantalla se puede practicar suelto durante el enfriamiento, sin medir.
+  prescripciones.push({
+    tipo: 'stoyko',
+    estado: stoykoDisponible(entrada.profile, now) ? 'pendiente' : 'cumplida',
+    cadencia: 'esta-semana',
+    minutos: MINUTOS.stoyko,
+    ruta: '#/calculo',
+  });
 
   return prescripciones;
 }

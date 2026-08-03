@@ -95,18 +95,19 @@ test('el plan semanal gobierna la carga: con poco tiempo declarado, los finales 
   await expect(page.getByRole('heading', { name: 'También te toca hoy' })).toHaveCount(0);
 });
 
-test('el cálculo ya hecho esta semana sigue listado, con la fecha en que vuelve', async ({ page }) => {
+test('el cálculo ya hecho esta semana se ve cumplido, sin fecha de reaparición', async ({ page }) => {
   await page.goto('./');
   await page.getByText('Tu sesión de hoy').waitFor();
   await seedProfileDiagnosticado(page, { stoykoUltimaCompletadaEn: new Date().toISOString() });
   await page.reload();
   await page.getByText('Tu sesión de hoy').waitFor();
 
-  // En enfriamiento no invita a entrar (no es un enlace), pero se ve: el
-  // usuario tiene que poder saber que el ejercicio existe y cuándo vuelve.
+  // Haberlo hecho es cumplirlo: se ve como las demás cumplidas y sigue siendo
+  // accesible, porque durante el enfriamiento se puede practicar suelto.
   await expect(page.getByText('Cálculo de la semana')).toBeVisible();
-  await expect(page.getByText(/Vuelve el /)).toBeVisible();
-  await expect(page.getByRole('link', { name: /Cálculo de la semana/ })).toHaveCount(0);
+  await expect(page.getByText('Ya lo hiciste esta semana. Vuelve la semana que viene.')).toBeVisible();
+  await expect(page.getByText(/Vuelve el /)).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Cálculo de la semana/ })).toBeVisible();
 });
 
 test('Ajustes explica qué ejercicios existen y qué dispara cada uno', async ({ page }) => {

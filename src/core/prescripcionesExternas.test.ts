@@ -78,17 +78,29 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
     expect(lista.filter((p) => p.estado === 'pendiente').map((p) => p.tipo)).not.toContain('finales');
   });
 
-  it('Stoyko aparece disponible o en enfriamiento, nunca oculto', () => {
+  it('haber hecho el cálculo de la semana es cumplirlo, no esperar', () => {
+    // Tenía un estado propio, `en-espera`, que se pintaba en gris y anunciaba
+    // la fecha exacta de reaparición ("Vuelve el 10/8/2026"). Sobraba: la
+    // espera solo existe *después* de haberlo hecho, así que es cumplida —y se
+    // ve como tal, en verde y con el tilde— (reporte de uso 2026-08-04).
     const disponible = prescripcionesExternas(entrada());
     expect(disponible.find((p) => p.tipo === 'stoyko')!.estado).toBe('pendiente');
 
-    // Hecho anteayer: sigue listado, con la fecha en que vuelve.
     const enfriando = prescripcionesExternas(
       entrada({ profile: { stoykoUltimaCompletadaEn: new Date(2026, 6, 20, 10).toISOString() } }),
     );
     const stoyko = enfriando.find((p) => p.tipo === 'stoyko')!;
-    expect(stoyko.estado).toBe('en-espera');
-    expect(stoyko.fecha).toBeDefined();
+    expect(stoyko.estado).toBe('cumplida');
+    // Sigue listado y sigue siendo accesible: durante el enfriamiento se puede
+    // practicar suelto, sin medir.
+    expect(stoyko.ruta).toBe('#/calculo');
+  });
+
+  it('nunca haberlo hecho es pendiente, no cumplido', () => {
+    // La distinción que hace que "cumplida" signifique algo: sin
+    // `stoykoUltimaCompletadaEn` el ejercicio está disponible desde el día uno.
+    const nuevo = prescripcionesExternas(entrada({ profile: {} }));
+    expect(nuevo.find((p) => p.tipo === 'stoyko')!.estado).toBe('pendiente');
   });
 
   // El primer Stoyko se escalonaba tres días desde el diagnóstico, y la única
@@ -102,7 +114,6 @@ describe('prescripcionesExternas (E11, principio 1)', () => {
     const stoyko = reciénDiagnosticado.find((p) => p.tipo === 'stoyko')!;
     expect(stoyko.estado).toBe('pendiente');
     expect(stoyko.cadencia).toBe('esta-semana');
-    expect(stoyko.fecha).toBeUndefined();
   });
 
   it('los finales se topean por día y los minutos son por final, no totales', () => {
