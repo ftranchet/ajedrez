@@ -169,6 +169,47 @@ export function sincronizarColaConVencidas(assignment: DailyAssignment, dueIds: 
   };
 }
 
+/** Posición dentro de un bloque, tal como se muestra: "Repaso {actual} de {total}". */
+export interface ProgresoBloque {
+  actual: number;
+  total: number;
+}
+
+/**
+ * Progreso de un bloque **contra el plan del día**, no contra la corrida.
+ *
+ * **El problema que corrige.** Cada panel contaba su propia tanda: el total era
+ * la cantidad de ítems que quedaban al arrancar esa corrida y el actual, la
+ * posición dentro de ella. Cualquier interrupción que termine la corrida
+ * —volver a Hoy, recargar, la actualización automática de la PWA— hacía que la
+ * siguiente sirviera solo lo que faltaba y el contador volviera a empezar
+ * contra un total más chico: "Repaso 17 de 23" pasaba a "Repaso 5 de 7" sin
+ * que el usuario hubiera hecho nada raro. Parecía aleatorio y era una resta.
+ *
+ * El plan del día ya sabe cuántos ítems se asignaron y cuántos van hechos, así
+ * que el contador sale de ahí: es monótono y sobrevive a reanudar.
+ *
+ * `enFeedback` distingue "estoy resolviendo el ítem N" de "ya lo resolví": el
+ * ítem se registra en el plan al responder, antes de mostrar el feedback.
+ *
+ * Sin plan utilizable —práctica libre, o un bloque ya completado que se repite—
+ * no hay contra qué medir y se informa la corrida, que es exactamente lo que
+ * esa repetición es.
+ */
+export function progresoDelBloque(
+  bloque: DailyAssignmentBlock | null,
+  corrida: { indice: number; total: number },
+  enFeedback: boolean,
+): ProgresoBloque {
+  if (!bloque || bloque.estado === 'completado') {
+    return { actual: Math.min(corrida.indice + 1, corrida.total), total: corrida.total };
+  }
+  return {
+    actual: Math.min(bloque.completados + (enFeedback ? 0 : 1), bloque.planificados),
+    total: bloque.planificados,
+  };
+}
+
 /** ¿Se empezó algo del plan? Distingue "Empezar sesión" de "Continuar la sesión". */
 export function planEmpezado(assignment: DailyAssignment): boolean {
   return assignment.bloques.some((bloque) => bloque.completados > 0 || bloque.estado === 'completado');

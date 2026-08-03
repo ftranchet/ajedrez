@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
 import type { DailyAssignment, SessionBlockType, TipoRadar } from '../../core/types';
 import { bloquesHechosHoy } from '../../core/session';
-import { planEmpezado } from '../../core/dailyAssignment';
+import { bloqueAsignado, planEmpezado, progresoDelBloque } from '../../core/dailyAssignment';
 import { minutosDeBloque } from '../../core/duracion';
 import type { DietaSesion } from '../../core/prescriptor';
 import { prescripcionesDe } from '../../core/prescripcionesExternas';
@@ -760,8 +760,13 @@ function SessionHeader() {
 
 function ColaPanel() {
   const s = useSessionStore();
-  const total = s.colaCards.length;
-  const actual = Math.min(s.colaIndex + 1, total);
+  // Contra el plan del día, no contra esta corrida: reanudar no puede hacer
+  // que "17 de 23" pase a "5 de 7" (ver core/dailyAssignment.ts).
+  const { actual, total } = progresoDelBloque(
+    s.assignment ? bloqueAsignado(s.assignment, 'cola') : null,
+    { indice: s.colaIndex, total: s.colaCards.length },
+    s.colaSubPhase === 'feedback',
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -786,8 +791,11 @@ function ColaPanel() {
 
 function CurriculumPanel() {
   const s = useSessionStore();
-  const total = s.curriculumQueue.length;
-  const actual = Math.min(s.curriculumIndex + 1, total);
+  const { actual, total } = progresoDelBloque(
+    s.assignment ? bloqueAsignado(s.assignment, 'curriculo') : null,
+    { indice: s.curriculumIndex, total: s.curriculumQueue.length },
+    s.curriculumSubPhase === 'feedback',
+  );
   const item = s.curriculumQueue[s.curriculumIndex];
   const nivel = readBlindTrainingEnabled() && s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(s.curriculumProgressById.get(item.id)) : 'normal';
 
@@ -820,8 +828,11 @@ function CurriculumPanel() {
 
 function TriagePanel() {
   const s = useSessionStore();
-  const total = s.triageQueue.length;
-  const actual = Math.min(s.triageIndex + 1, total);
+  const { actual, total } = progresoDelBloque(
+    s.assignment ? bloqueAsignado(s.assignment, 'triage') : null,
+    { indice: s.triageIndex, total: s.triageQueue.length },
+    s.triageSubPhase === 'feedback',
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -858,16 +869,19 @@ function TriagePanel() {
 
 function RadarPanel() {
   const s = useSessionStore();
-  // radarServidos ya cuenta la posición actual cuando se está en feedback
-  // (se incrementa al resolver); antes de eso, la posición en curso es la
-  // siguiente al contador.
-  const actual = Math.min(s.radarSubPhase === 'feedback' ? s.radarServidos : s.radarServidos + 1, s.dieta.radarCount);
+  // `radarServidos` cuenta solo esta corrida: al reanudar volvía a arrancar de
+  // cero contra el total del día. El plan lleva la cuenta que sobrevive.
+  const { actual, total } = progresoDelBloque(
+    s.assignment ? bloqueAsignado(s.assignment, 'radar') : null,
+    { indice: s.radarServidos - (s.radarSubPhase === 'feedback' ? 1 : 0), total: s.dieta.radarCount },
+    s.radarSubPhase === 'feedback',
+  );
 
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-subtle bg-surface p-4">
         <p className="m-0 font-mono text-xs text-tertiary">
-          {t.radar.progreso.replace('{actual}', String(actual)).replace('{total}', String(s.dieta.radarCount))}
+          {t.radar.progreso.replace('{actual}', String(actual)).replace('{total}', String(total))}
         </p>
         <p className="m-0 mt-1 font-display text-xl">{t.radar.titulo}</p>
       </div>

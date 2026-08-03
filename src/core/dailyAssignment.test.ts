@@ -8,6 +8,7 @@ import {
   idsRestantes,
   planCompletado,
   planEmpezado,
+  progresoDelBloque,
   registrarItemAsignado,
   sincronizarColaConVencidas,
 } from './dailyAssignment';
@@ -168,5 +169,59 @@ describe('planEmpezado / planCompletado', () => {
       plan = completarBloqueAsignado(plan, tipo);
     }
     expect(planCompletado(plan)).toBe(true);
+  });
+});
+
+describe('progresoDelBloque', () => {
+  // El bug reportado: "Repaso 5 de 7 cuando íbamos 17 de 23". No era aleatorio.
+  // El contador medía la corrida —los ítems que faltaban al arrancarla— así que
+  // al reanudar volvía a empezar contra un total más chico.
+  const bloqueCola = (planificados: number, completados: number) => ({
+    tipo: 'cola' as const,
+    planificados,
+    completados,
+    estado: 'pendiente' as const,
+  });
+
+  it('cuenta contra el plan del día, no contra la corrida', () => {
+    // 23 asignados, 16 hechos, y la corrida actual sirve los 7 que faltan.
+    const reanudada = progresoDelBloque(bloqueCola(23, 16), { indice: 0, total: 7 }, false);
+    expect(reanudada).toEqual({ actual: 17, total: 23 });
+  });
+
+  it('reanudar no hace retroceder el contador', () => {
+    // La secuencia exacta del reporte: 17 de 23, corte, y las cuatro
+    // siguientes. Antes daba 1..5 de 7; ahora sigue de largo hasta 21 de 23.
+    const vistos = [0, 1, 2, 3, 4].map((i) =>
+      progresoDelBloque(bloqueCola(23, 16 + i), { indice: i, total: 7 }, false),
+    );
+    expect(vistos.map((v) => v.actual)).toEqual([17, 18, 19, 20, 21]);
+    expect(vistos.every((v) => v.total === 23)).toBe(true);
+  });
+
+  it('el feedback no adelanta el número: el ítem ya se registró al responder', () => {
+    // Resolviendo el 17.º: jugando dice 17 y su feedback también.
+    expect(progresoDelBloque(bloqueCola(23, 16), { indice: 0, total: 7 }, false).actual).toBe(17);
+    expect(progresoDelBloque(bloqueCola(23, 17), { indice: 0, total: 7 }, true).actual).toBe(17);
+  });
+
+  it('nunca pasa del total planificado', () => {
+    expect(progresoDelBloque(bloqueCola(23, 23), { indice: 0, total: 0 }, false)).toEqual({ actual: 23, total: 23 });
+  });
+
+  it('un plan recién empezado arranca en 1', () => {
+    expect(progresoDelBloque(bloqueCola(23, 0), { indice: 0, total: 23 }, false)).toEqual({ actual: 1, total: 23 });
+  });
+
+  it('la práctica libre cuenta su propia corrida: no hay plan contra el cual medir', () => {
+    // Bloque ya completado (repetir un bloque hecho) y ausencia de plan.
+    const completado = { ...bloqueCola(23, 23), estado: 'completado' as const };
+    expect(progresoDelBloque(completado, { indice: 2, total: 9 }, false)).toEqual({ actual: 3, total: 9 });
+    expect(progresoDelBloque(null, { indice: 2, total: 9 }, false)).toEqual({ actual: 3, total: 9 });
+  });
+
+  it('sirve igual para los bloques por cantidad, que no llevan ids', () => {
+    const radar = { tipo: 'radar' as const, planificados: 12, completados: 8, estado: 'pendiente' as const };
+    expect(progresoDelBloque(radar, { indice: 0, total: 4 }, false)).toEqual({ actual: 9, total: 12 });
   });
 });
