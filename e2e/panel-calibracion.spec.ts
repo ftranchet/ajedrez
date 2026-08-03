@@ -11,7 +11,7 @@ test('Panel: curva de calibración y actividad de los últimos 30 días', async 
       const request = indexedDB.open('elomax');
       request.onsuccess = () => {
         const database = request.result;
-        const transaction = database.transaction(['calibrationRecords', 'sessions'], 'readwrite');
+        const transaction = database.transaction(['calibrationRecords', 'sessions', 'trainingEvents'], 'readwrite');
         const calibration = transaction.objectStore('calibrationRecords');
         [true, false, false].forEach((acierto, index) =>
           calibration.put({
@@ -29,6 +29,16 @@ test('Panel: curva de calibración y actividad de los últimos 30 días', async 
           estado: 'completada',
           duracionMs: 15 * 60_000,
           bloques: [{ tipo: 'radar', planificados: 8, completados: 8, estado: 'completado' }],
+        });
+        // Los minutos salen del registro de tiempo entrenado (RF-13.4), no de
+        // la sesión: sembrar la sesión sin su tramo dejaría el total en cero,
+        // igual que en la app.
+        transaction.objectStore('trainingEvents').put({
+          id: 'sesion:e2e-session',
+          modalidad: 'sesion',
+          fecha: new Date().toISOString(),
+          ms: 15 * 60_000,
+          refId: 'e2e-session',
         });
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);

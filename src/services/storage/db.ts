@@ -24,10 +24,12 @@ import type {
   StoykoAttempt,
   StoykoDatasetMeta,
   StoykoItem,
+  TrainingEvent,
   TriageAttempt,
   TransferMeasurement,
 } from '../../core/types';
 import { unificarIntentosDeCalculo } from '../../core/calculoMigracion';
+import { eventosDesdeHistorial } from '../../core/trainingEvents';
 // Las transformaciones de datos de cada migración viven en `core` y las usan
 // también los respaldos importados (core/importMigrations.ts): actualizar la
 // base in situ y restaurar un respaldo viejo tienen que dar el mismo
@@ -71,6 +73,7 @@ export class ElomaxDB extends Dexie {
   transferMeasurements!: Table<TransferMeasurement, string>;
   n1Experiments!: Table<N1Experiment, string>;
   dailyAssignments!: Table<DailyAssignment, string>;
+  trainingEvents!: Table<TrainingEvent, string>;
 
   constructor(name: string = DB_NAME) {
     super(name);
@@ -538,6 +541,26 @@ export class ElomaxDB extends Dexie {
       const corregidos = games.filter((game) => game.analisis?.jugadas?.length).map(recalcularPerdidas);
       if (corregidos.length > 0) await tx.table('games').bulkPut(corregidos);
     });
+
+    // v20 — registro único de tiempo entrenado (core/trainingEvents.ts). Hasta
+    // acá "minutos entrenados" era `SessionRecord.duracionMs` y nada más, así
+    // que el cálculo de la semana, los finales, la partida lenta y el análisis
+    // no sumaban un solo minuto al plan. La tabla nueva es puramente aditiva.
+    //
+    // Se siembra con lo que ya estaba medido —las sesiones y los intentos de
+    // cálculo, que siempre cronometraron— para que el historial no aparezca
+    // vacío al estrenar la funcionalidad. Los finales, partidas y análisis
+    // anteriores no midieron nada y no se pueden reconstruir: su tiempo viejo
+    // se pierde, y decirlo es más honesto que estimarlo.
+    this.version(20)
+      .stores({ trainingEvents: 'id, fecha, modalidad' })
+      .upgrade(async (tx) => {
+        const eventos = eventosDesdeHistorial({
+          sessions: (await tx.table('sessions').toArray()) as SessionRecord[],
+          calculoAttempts: (await tx.table('calculoAttempts').toArray()) as CalculoAttempt[],
+        });
+        if (eventos.length > 0) await tx.table('trainingEvents').bulkPut(eventos);
+      });
   }
 }
 

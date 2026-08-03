@@ -760,3 +760,33 @@ export interface N1Experiment {
   fases: N1ExperimentPhase[];
   completadoEn?: string;
 }
+
+/**
+ * Modalidad de un tramo de entrenamiento medido. Son las actividades que el
+ * Prescriptor pide: la sesión diaria y las cuatro que se hacen fuera de ella.
+ */
+export type ModalidadEntrenamiento = 'sesion' | 'calculo' | 'final' | 'partida' | 'analisis';
+
+/**
+ * Tiempo entrenado, medido y con su modalidad (RF-13.4).
+ *
+ * Antes solo la sesión diaria registraba duración, así que el plan semanal
+ * informaba una fracción de lo entrenado: hacer el cálculo de la semana, jugar
+ * un final o analizar una partida no sumaba ningún minuto. Cada actividad
+ * larga escribe acá su tramo al terminarlo, y toda lectura de carga —el plan
+ * semanal, los totales del Panel— sale de esta única fuente en vez de recorrer
+ * cada tabla adivinando cuánto duró cada cosa.
+ *
+ * El `id` es determinista (`modalidad:refId`) para que reintentar, remontar en
+ * StrictMode o repetir una escritura no cuenten el mismo tramo dos veces.
+ */
+export interface TrainingEvent {
+  id: string;
+  modalidad: ModalidadEntrenamiento;
+  /** Fin del tramo, en ISO 8601: es lo que lo ubica en un día y una semana. */
+  fecha: string;
+  /** Duración medida. Nunca estimada: si no se midió, no se escribe el evento. */
+  ms: number;
+  /** Qué lo produjo (sesión, partida, ítem, intento), para poder rastrearlo. */
+  refId?: string;
+}

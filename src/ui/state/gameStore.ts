@@ -8,6 +8,7 @@ import { buildGameRecord, deriveResult } from '../../core/game';
 import { engine } from '../../services/engine/stockfishEngine';
 import { gameRepo } from '../../services/storage/gameRepo';
 import levelsConfig from '../../config/engine-levels.json';
+import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 import { computeDests } from './chessBoardUtils';
 
 export const ENGINE_LEVELS: EngineLevel[] = levelsConfig.levels;
@@ -49,6 +50,8 @@ interface GameState {
 }
 
 const chess = new Chess();
+/** Cuándo arrancó la partida en curso, para medir su tiempo (RF-13.4). */
+let inicioMs: number | null = null;
 
 function levelById(id: string): EngineLevel {
   return ENGINE_LEVELS.find((l) => l.id === id) ?? ENGINE_LEVELS[0];
@@ -104,6 +107,13 @@ export const useGameStore = create<GameState>((set, get) => {
       ...(contexto ? { contexto } : {}),
     });
     await gameRepo.save(record);
+    // La partida es el tramo más largo que prescribe el plan y no sumaba
+    // minutos: `tiemposPorJugadaMs` se guarda vacío, así que no había ninguna
+    // medición de cuánto duró (RF-13.4).
+    if (inicioMs !== null) {
+      registrarTiempoEntrenado('partida', record.id, Date.now() - inicioMs);
+      inicioMs = null;
+    }
     snapshot({ phase: 'ended', resultado, endReason, saved: true, savedGameId: record.id, thinking: false });
   }
 
@@ -158,6 +168,7 @@ export const useGameStore = create<GameState>((set, get) => {
         set({ phase: 'setup', engineError: true });
         return;
       }
+      inicioMs = Date.now();
       snapshot({ phase: 'playing', thinking: false });
       if (playerColor === 'b') {
         await engineTurn();

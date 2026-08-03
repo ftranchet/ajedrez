@@ -1,6 +1,7 @@
 // Registro de la sesión diaria (RF-11.1, RF-12.1, RF-13.1). Dominio puro:
 // construye snapshots persistibles sin conocer Dexie ni la interfaz.
-import type { SessionBlockRecord, SessionBlockType, SessionRecord } from './types';
+import type { SessionBlockRecord, SessionBlockType, SessionRecord, TrainingEvent } from './types';
+import { eventosEnVentana, minutosDeEventos } from './trainingEvents';
 
 export interface PlannedSessionBlock {
   tipo: SessionBlockType;
@@ -170,6 +171,8 @@ export function activitySummary(
   records: SessionRecord[],
   now: Date = new Date(),
   days = 30,
+  /** Tramos medidos de todas las modalidades (RF-13.4): de acá salen los minutos. */
+  eventos: TrainingEvent[] = [],
 ): ActivitySummary {
   const since = now.getTime() - days * 24 * 60 * 60 * 1000;
   const enVentana = records.filter((r) => new Date(r.fechaInicio).getTime() >= since);
@@ -181,7 +184,8 @@ export function activitySummary(
   const conDuracionMedida = enVentana.filter((r) => r.estado !== 'en_curso');
   return {
     sesiones: enVentana.filter((r) => r.estado === 'completada').length,
-    minutos: Math.round(conDuracionMedida.reduce((sum, r) => sum + (r.duracionMs ?? 0), 0) / 60_000),
+    // Los minutos son de TODO el entrenamiento, no solo de la sesión diaria.
+    minutos: minutosDeEventos(eventosEnVentana(eventos, new Date(since), now, now)),
     items: conDuracionMedida.reduce(
       (sum, r) => sum + r.bloques.reduce((blockSum, b) => blockSum + b.completados, 0),
       0,

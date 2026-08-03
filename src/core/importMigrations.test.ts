@@ -43,6 +43,8 @@ function datos(over: Partial<DatosMigrables> = {}): DatosMigrables {
     compromisoAttempts: [],
     stoykoAttempts: [],
     calculoAttempts: [],
+    sessions: [],
+    trainingEvents: [],
     profile: { diagnosticoCompletadoEn: CIERRE },
     ...over,
   };
@@ -58,16 +60,60 @@ describe('migrarDatosImportados', () => {
 
   it('aplica en orden todos los pasos que le faltan a un respaldo v15', () => {
     const { aplicadas } = migrarDatosImportados(datos(), 15);
-    expect(aplicadas).toEqual([16, 18, 19]);
+    expect(aplicadas).toEqual([16, 18, 19, 20]);
   });
 
   it('un respaldo v17 recibe solo los pasos posteriores', () => {
     const { aplicadas } = migrarDatosImportados(datos(), 17);
-    expect(aplicadas).toEqual([18, 19]);
+    expect(aplicadas).toEqual([18, 19, 20]);
   });
 
-  it('un respaldo v18 recibe solo la corrección de pérdidas', () => {
-    expect(migrarDatosImportados(datos(), 18).aplicadas).toEqual([19]);
+  it('un respaldo v18 recibe la corrección de pérdidas y el registro de tiempo', () => {
+    expect(migrarDatosImportados(datos(), 18).aplicadas).toEqual([19, 20]);
+  });
+
+  describe('v20 — registro de tiempo entrenado', () => {
+    it('reconstruye los tramos de lo que ya venía medido', () => {
+      // Sin esto, restaurar un respaldo dejaba el plan semanal en cero pese a
+      // tener las sesiones y los intentos de cálculo con su duración adentro.
+      const salida = migrarDatosImportados(
+        datos({
+          sessions: [
+            {
+              id: 'ses-1',
+              fechaInicio: '2026-03-10T10:00:00.000Z',
+              fechaFin: '2026-03-10T10:25:00.000Z',
+              estado: 'completada',
+              duracionMs: 25 * 60_000,
+              bloques: [],
+            },
+          ],
+          calculoAttempts: [
+            { id: 'calc-1', preset: 'abierto', ramas: [], tiempoMs: 15 * 60_000, fecha: '2026-03-11T10:00:00.000Z' },
+          ],
+        }),
+        19,
+      ).datos;
+      expect(salida.trainingEvents.map((e) => [e.modalidad, e.ms])).toEqual([
+        ['sesion', 25 * 60_000],
+        ['calculo', 15 * 60_000],
+      ]);
+    });
+
+    it('no duplica los tramos que el respaldo ya trae', () => {
+      const salida = migrarDatosImportados(
+        datos({
+          sessions: [
+            { id: 'ses-1', fechaInicio: '2026-03-10T10:00:00.000Z', fechaFin: '2026-03-10T10:25:00.000Z', estado: 'completada', duracionMs: 25 * 60_000, bloques: [] },
+          ],
+          trainingEvents: [
+            { id: 'sesion:ses-1', modalidad: 'sesion', fecha: '2026-03-10T10:25:00.000Z', ms: 25 * 60_000, refId: 'ses-1' },
+          ],
+        }),
+        19,
+      ).datos;
+      expect(salida.trainingEvents).toHaveLength(1);
+    });
   });
 
   describe('v16 — atribución del diagnóstico', () => {

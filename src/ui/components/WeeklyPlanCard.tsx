@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PlanSemanal, Profile, SessionRecord } from '../../core/types';
+import type { PlanSemanal, Profile, SessionRecord, TrainingEvent } from '../../core/types';
 import {
   adherenceHistory,
   isValidWeeklyPlan,
@@ -73,11 +73,14 @@ function AdherenceHistorySection({ records, plan }: { records: SessionRecord[]; 
 
 export function WeeklyPlanCard({
   records,
+  eventos = [],
   profile,
   editable = false,
   onSave,
 }: {
   records: SessionRecord[];
+  /** Tramos medidos de todas las modalidades: de acá salen los minutos (RF-13.4). */
+  eventos?: TrainingEvent[];
   profile: Profile;
   editable?: boolean;
   onSave?: (plan: PlanSemanal) => Promise<void>;
@@ -86,7 +89,7 @@ export function WeeklyPlanCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PlanSemanal>(savedPlan);
   const [saving, setSaving] = useState(false);
-  const progress = weeklyPlanProgress(records, savedPlan);
+  const progress = weeklyPlanProgress(records, savedPlan, new Date(), eventos);
 
   const remainingText = progress.cumplido
     ? t.adherencia.planCumplido

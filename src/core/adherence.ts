@@ -1,7 +1,8 @@
 // Adherencia honesta: el plan se mide por semana calendario local y como
 // máximo cuenta una sesión completada por día. Los minutos acompañan la
 // lectura de carga, pero no reemplazan la constancia (ADR-0013).
-import type { PlanSemanal, SessionRecord } from './types';
+import type { PlanSemanal, SessionRecord, TrainingEvent } from './types';
+import { eventosEnVentana, minutosDeEventos } from './trainingEvents';
 
 export const DEFAULT_WEEKLY_PLAN: PlanSemanal = {
   sesionesObjetivo: 3,
@@ -78,6 +79,8 @@ export function weeklyPlanProgress(
   records: SessionRecord[],
   rawPlan: PlanSemanal | undefined,
   now: Date = new Date(),
+  /** Tramos medidos de todas las modalidades (RF-13.4). */
+  eventos: TrainingEvent[] = [],
 ): WeeklyPlanProgress {
   const plan = normalizeWeeklyPlan(rawPlan);
   const inicioSemana = startOfLocalWeek(now);
@@ -97,15 +100,12 @@ export function weeklyPlanProgress(
   const sesionesCompletadas = completedDays.size;
 
   // Los MINUTOS son otra cosa: carga observada, no una segunda barrera
-  // (ADR-0013, "una segunda sesión suma minutos observados"). Contaban solo las
-  // sesiones completadas, así que entrenar media hora y salir antes del último
-  // bloque —o que la app se recargue sola a mitad de camino— borraba esos
-  // minutos del total de la semana. El tiempo se observó igual: si el registro
-  // tiene una duración medida, cuenta.
-  const conDuracionMedida = records.filter((record) => record.estado !== 'en_curso' && enLaSemana(record));
-  const minutosCompletados = Math.round(
-    conDuracionMedida.reduce((total, record) => total + Math.max(0, record.duracionMs ?? 0), 0) / 60_000,
-  );
+  // (ADR-0013, "una segunda sesión suma minutos observados"). Salen del
+  // registro de tiempo entrenado (core/trainingEvents.ts) y no de las sesiones,
+  // porque la sesión diaria es una de cinco modalidades: el cálculo de la
+  // semana, los finales, la partida lenta y el análisis también son tiempo
+  // entrenado y antes no sumaban ni un minuto.
+  const minutosCompletados = minutosDeEventos(eventosEnVentana(eventos, inicioSemana, finSemana, now));
 
   return {
     inicioSemana,

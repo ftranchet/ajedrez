@@ -10,6 +10,7 @@ import { analyzeGameWithEngine } from '../../services/analysis/gameAnalyzer';
 import { engine } from '../../services/engine/stockfishEngine';
 import { gameRepo } from '../../services/storage/gameRepo';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
+import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 
 type Phase =
   | 'inactivo'
@@ -101,6 +102,9 @@ function movesFromPgn(pgn: string): MoveInfo[] {
   return moves;
 }
 
+/** Cuándo arrancó el análisis en curso, para medir su tiempo (RF-13.4). */
+let inicioMs: number | null = null;
+
 const initialState = {
   phase: 'inactivo' as Phase,
   game: null as GameRecord | null,
@@ -132,6 +136,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       return;
     }
     const moves = movesFromPgn(game.pgn);
+    inicioMs = Date.now();
     set({ game, moves, phase: 'fase1-momento' });
   },
 
@@ -251,6 +256,12 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       const analysis = buildGameAnalysis(evals, game.fase1);
       const gameFinal: GameRecord = { ...game, analisis: analysis, analizada: true };
       await gameRepo.save(gameFinal);
+      // Analizar una partida en dos fases es de los tramos más largos del plan
+      // —la fase 1 se hace a mano, jugada por jugada— y no medía nada (RF-13.4).
+      if (inicioMs !== null) {
+        registrarTiempoEntrenado('analisis', gameFinal.id, Date.now() - inicioMs);
+        inicioMs = null;
+      }
       set({ game: gameFinal, analysis, phase: 'fase2-resultado' });
     } catch {
       set({ phase: 'fase2-error', progreso: null });

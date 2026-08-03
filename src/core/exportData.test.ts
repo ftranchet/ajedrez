@@ -21,6 +21,7 @@ const empty = {
   transferMeasurements: [],
   n1Experiments: [],
   dailyAssignments: [],
+  trainingEvents: [],
 };
 
 describe('buildExportBundle', () => {
@@ -171,6 +172,7 @@ describe('la exportación no transporta credenciales', () => {
       dailyAssignments: [],
       transferMeasurements: [],
       n1Experiments: [],
+      trainingEvents: [],
     });
     const serializado = JSON.stringify(bundle);
     expect(serializado).not.toMatch(/lip_/);

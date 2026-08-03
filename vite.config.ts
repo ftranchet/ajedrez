@@ -14,7 +14,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' y no 'autoUpdate': autoUpdate hace skipWaiting en cuanto baja
+      // la versión nueva y recarga la pestaña, aunque estés a mitad de una
+      // sesión. La actualización sigue siendo automática, pero la aplica
+      // ui/pwaUpdate.ts cuando la app está ociosa.
+      registerType: 'prompt',
       manifest: {
         name: 'ELOmax — entrenador de ajedrez',
         short_name: 'ELOmax',

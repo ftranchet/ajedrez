@@ -19,9 +19,12 @@ import type {
   CompromisoAttempt,
   GameRecord,
   RadarAttempt,
+  SessionRecord,
   StoykoAttempt,
+  TrainingEvent,
 } from './types';
 import { unificarIntentosDeCalculo } from './calculoMigracion';
+import { eventosDesdeHistorial } from './trainingEvents';
 import { classifyMoveLoss, computeCpLoss } from './analysis';
 import { SCHEMA_VERSION } from './schemaVersion';
 
@@ -116,6 +119,8 @@ export interface DatosMigrables {
   compromisoAttempts: CompromisoAttempt[];
   stoykoAttempts: StoykoAttempt[];
   calculoAttempts: CalculoAttempt[];
+  sessions: SessionRecord[];
+  trainingEvents: TrainingEvent[];
   profile?: { diagnosticoCompletadoEn?: string | null } | undefined;
 }
 
@@ -190,6 +195,22 @@ const PASOS: PasoMigracion[] = [
     version: 19,
     descripcion: 'corrección de las pérdidas de centipeones imposibles',
     aplicar: (datos) => ({ ...datos, games: datos.games.map(recalcularPerdidas) }),
+  },
+  {
+    version: 20,
+    descripcion: 'registro de tiempo entrenado',
+    aplicar: (datos) => {
+      // Se reconstruye de lo que ya venía medido —sesiones e intentos de
+      // cálculo— igual que la migración de la base, para que restaurar un
+      // respaldo viejo no deje el plan semanal en cero. Los finales, partidas
+      // y análisis anteriores nunca midieron nada y no se pueden recuperar.
+      const yaPresentes = new Set(datos.trainingEvents.map((evento) => evento.id));
+      const reconstruidos = eventosDesdeHistorial({
+        sessions: datos.sessions,
+        calculoAttempts: datos.calculoAttempts,
+      }).filter((evento) => !yaPresentes.has(evento.id));
+      return { ...datos, trainingEvents: [...datos.trainingEvents, ...reconstruidos] };
+    },
   },
 ];
 

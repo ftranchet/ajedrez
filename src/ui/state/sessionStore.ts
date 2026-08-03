@@ -5,7 +5,7 @@
 // (calibración muestreada).
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
-import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, DailyAssignment, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord, TipoRadar } from '../../core/types';
+import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, DailyAssignment, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord, TipoRadar, TrainingEvent } from '../../core/types';
 import { fugasPrincipales, perfilVigente, sesgoPorFugas } from '../../core/leakProfile';
 import { minutosPendientesDelPlan } from '../../core/duracion';
 import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
@@ -59,8 +59,10 @@ import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
+import { trainingEventRepo } from '../../services/storage/trainingEventRepo';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
 import { singleFlight } from './singleFlight';
+import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 
 /** Ventana para la tasa de acierto reciente que ajusta la dificultad (RF-5.5). */
 const VENTANA_TASA_ACIERTO = 8;
@@ -123,6 +125,8 @@ interface SessionState {
   sessionRecord: SessionRecord | null;
   /** Historial necesario para mostrar el plan semanal en Hoy. */
   sessions: SessionRecord[] | null;
+  /** Tramos de tiempo entrenado de todas las modalidades (RF-13.4). */
+  trainingEvents: TrainingEvent[] | null;
 
   // Cola (E4)
   colaCards: ErrorCard[];
@@ -276,7 +280,18 @@ function progressFromState(selection: RadarSelectionState, aciertosRecientes: bo
 }
 
 export const useSessionStore = create<SessionState>((set, get) => {
+  /**
+   * Anota el tramo de una sesión ya cerrada en el registro de tiempo
+   * entrenado (RF-13.4). Es idempotente por el id determinista del evento, así
+   * que persistir el mismo registro dos veces no duplica minutos.
+   */
+  function registrarTiempoDeSesion(record: SessionRecord): void {
+    if (record.estado === 'en_curso' || !record.duracionMs) return;
+    registrarTiempoEntrenado('sesion', record.id, record.duracionMs, record.fechaFin ?? record.fechaInicio);
+  }
+
   function persistSession(record: SessionRecord): Promise<void> {
+    registrarTiempoDeSesion(record);
     // El llamador necesita recibir el fallo de SU escritura, pero la cola
     // compartida no puede quedar rechazada para siempre: si no, cualquier
     // reintento posterior falla antes de tocar IndexedDB.
@@ -549,6 +564,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     soloBloque: null,
     sessionRecord: null,
     sessions: null,
+    trainingEvents: null,
     colaCards: [],
     colaIndex: 0,
     colaSubPhase: 'jugando',
@@ -625,18 +641,20 @@ export const useSessionStore = create<SessionState>((set, get) => {
               finalesPendientes: 0,
               prescripcionesExternas: [],
               sessions: [],
+              trainingEvents: [],
               summaryStatus: 'ready',
             });
             return;
           }
 
           await Promise.all([curriculumItemRepo.ensureSeeded(), radarItemRepo.ensureSeeded()]);
-          const [allCards, curriculumItems, curriculumProgressList, sessionsCrudas, games, radarItems, radarAttempts] =
+          const [allCards, curriculumItems, curriculumProgressList, sessionsCrudas, trainingEvents, games, radarItems, radarAttempts] =
             await Promise.all([
               errorCardRepo.list(),
               curriculumItemRepo.list(),
               curriculumProgressRepo.list(),
               sessionRepo.list(),
+              trainingEventRepo.list(),
               gameRepo.list(),
               radarItemRepo.list(),
               radarAttemptRepo.list(),
@@ -702,6 +720,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             dieta,
             assignment,
             sessions,
+            trainingEvents,
             // La portada explica por qué el Radar va a insistir con un tipo,
             // antes de empezar (el mismo cálculo que hace `start`).
             radarFugas: fugasPrincipales(perfilVigente(profile.perfilDeFugas, radarAttempts)).map((fuga) => fuga.tipo),

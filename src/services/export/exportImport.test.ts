@@ -27,6 +27,7 @@ beforeEach(async () => {
   await db.sessions.clear();
   await db.transferMeasurements.clear();
   await db.n1Experiments.clear();
+  await db.trainingEvents.clear();
 });
 
 describe('exportAllData / importAllData', () => {
@@ -323,7 +324,7 @@ describe('exportAllData / importAllData', () => {
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     expect(outcome.resumen.esquemaOrigen).toBe(17);
-    expect(outcome.resumen.migraciones).toEqual([18, 19]);
+    expect(outcome.resumen.migraciones).toEqual([18, 19, 20]);
 
     // Lo que el Panel lee: los dos intentos, ya convertidos.
     const unificados = await db.calculoAttempts.toArray();
@@ -331,6 +332,51 @@ describe('exportAllData / importAllData', () => {
     expect(unificados.find((a) => a.id === 'comp-viejo')!.ramas[0]!.linea).toEqual(['a5c3', 'b2c3']);
     // Y el original tampoco se pierde.
     expect(await db.compromisoAttempts.count()).toBe(1);
+  });
+
+  it('un respaldo v19 recupera su tiempo entrenado al restaurarse', async () => {
+    // El plan semanal salía en cero tras restaurar, aunque el respaldo trajera
+    // las sesiones con su duración: el registro de tiempo no existía todavía.
+    const { zipSync, strToU8 } = await import('fflate');
+    const zip = zipSync({
+      'manifest.json': strToU8(JSON.stringify({ esquema: 19, exportadoEn: '2026-08-01T00:00:00.000Z', app: 'elomax' })),
+      'games.json': strToU8('[]'),
+      'errorCards.json': strToU8('[]'),
+      'calibrationRecords.json': strToU8('[]'),
+      'sessions.json': strToU8(
+        JSON.stringify([
+          { id: 'ses-vieja', fechaInicio: '2026-08-01T10:00:00.000Z', fechaFin: '2026-08-01T10:25:00.000Z', estado: 'completada', duracionMs: 1_500_000, bloques: [] },
+        ]),
+      ),
+      'calculoAttempts.json': strToU8(
+        JSON.stringify([{ id: 'calc-viejo', preset: 'abierto', ramas: [], tiempoMs: 900_000, fecha: '2026-08-01T18:00:00.000Z' }]),
+      ),
+    });
+
+    const outcome = await importAllData(zip);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.resumen.migraciones).toContain(20);
+
+    const eventos = await db.trainingEvents.toArray();
+    expect(eventos.map((e) => e.modalidad).sort()).toEqual(['calculo', 'sesion']);
+    expect(eventos.reduce((sum, e) => sum + e.ms, 0)).toBe(2_400_000);
+  });
+
+  it('exporta y restaura el registro de tiempo entrenado sin duplicarlo', async () => {
+    await db.trainingEvents.clear();
+    await db.trainingEvents.put({ id: 'final:f1:1', modalidad: 'final', fecha: '2026-08-04T10:00:00.000Z', ms: 480_000 });
+    const zip = await exportAllData();
+    await db.trainingEvents.clear();
+
+    expect((await importAllData(zip)).ok).toBe(true);
+    const eventos = await db.trainingEvents.toArray();
+    expect(eventos).toHaveLength(1);
+    expect(eventos[0]).toMatchObject({ modalidad: 'final', ms: 480_000 });
+
+    // Importar de nuevo no duplica: el id es determinista.
+    expect((await importAllData(zip)).ok).toBe(true);
+    expect(await db.trainingEvents.count()).toBe(1);
   });
 
   it('rechaza un manifiesto con una versión de esquema que ninguna migración cubre', async () => {

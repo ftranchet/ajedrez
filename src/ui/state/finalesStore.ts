@@ -14,6 +14,7 @@ import { engine } from '../../services/engine/stockfishEngine';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { curriculumProgressRepo } from '../../services/storage/curriculumProgressRepo';
 import { errorCardRepo } from '../../services/storage/errorCardRepo';
+import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
 
 const FINAL_ENGINE_DEPTH = 18;
@@ -76,6 +77,8 @@ export function createFinalesStore(deps: FinalesDeps) {
   let chess = new Chess();
   let lastUserFen = '';
   let lastUserMove = '';
+  /** Cuándo arrancó la demostración en curso, para medir su tiempo (RF-13.4). */
+  let inicioMs: number | null = null;
 
   return create<FinalesState>((set, get) => {
     function snapshot(partial: Partial<FinalesState> = {}) {
@@ -140,6 +143,12 @@ export function createFinalesStore(deps: FinalesDeps) {
           // El progreso del final ya quedó guardado; una falla secundaria del
           // motor no debe impedir mostrar el resultado de la demostración.
         }
+      }
+      // Un final jugado entero contra el motor es de los tramos más largos que
+      // pide el plan y no sumaba ningún minuto: no se medía en ninguna parte.
+      if (inicioMs !== null) {
+        registrarTiempoEntrenado('final', `${item.id}:${inicioMs}`, Date.now() - inicioMs);
+        inicioMs = null;
       }
       snapshot({ phase: 'feedback', limpia, thinking: false, progressById, pendingPromotion: null, revision, jugadaCorrecta });
     }
@@ -215,6 +224,7 @@ export function createFinalesStore(deps: FinalesDeps) {
           snapshot({ phase: 'lista', engineError: true });
           return;
         }
+        inicioMs = Date.now();
         snapshot({ phase: 'jugando', thinking: false });
         if (chess.turn() !== item.ladoUsuario) await engineTurn();
       },

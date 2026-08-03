@@ -17,6 +17,7 @@ import type {
   RadarProgress,
   SessionRecord,
   StoykoAttempt,
+  TrainingEvent,
   TriageAttempt,
   TransferMeasurement,
 } from './types';
@@ -26,6 +27,7 @@ import { DEFAULT_PROFILE } from './prescriptor';
 import { isValidWeeklyPlan } from './adherence';
 import { isValidReminder } from './reminder';
 import { TIPOS_RADAR } from './leakProfile';
+import { esTrainingEventValido } from './trainingEvents';
 
 export interface ExportManifest {
   esquema: number;
@@ -52,6 +54,8 @@ export interface ExportBundle {
   transferMeasurements: TransferMeasurement[];
   n1Experiments: N1Experiment[];
   dailyAssignments: DailyAssignment[];
+  /** Tramos de tiempo entrenado (RF-13.4). */
+  trainingEvents: TrainingEvent[];
 }
 
 export interface ExportSourceData {
@@ -72,6 +76,7 @@ export interface ExportSourceData {
   transferMeasurements: TransferMeasurement[];
   n1Experiments: N1Experiment[];
   dailyAssignments: DailyAssignment[];
+  trainingEvents: TrainingEvent[];
 }
 
 /** Arma el paquete de exportación completo, en un solo archivo (RF-14.1). */
@@ -95,6 +100,7 @@ export function buildExportBundle(data: ExportSourceData, now: Date = new Date()
     transferMeasurements: data.transferMeasurements,
     n1Experiments: data.n1Experiments,
     dailyAssignments: data.dailyAssignments,
+    trainingEvents: data.trainingEvents,
   };
 }
 
@@ -392,6 +398,11 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.dailyAssignments !== undefined && !Array.isArray(obj.dailyAssignments)) {
     return { ok: false, error: 'Los planes diarios no tienen la forma esperada.' };
   }
+  // Los respaldos anteriores al registro de tiempo entrenado (esquema v20) no
+  // lo traen; la migración lo reconstruye de lo que sí midieron.
+  if (obj.trainingEvents !== undefined && !Array.isArray(obj.trainingEvents)) {
+    return { ok: false, error: 'El registro de tiempo entrenado no tiene la forma esperada.' };
+  }
   // Validación por-registro de las entidades críticas (RF-14.2): como la
   // restauración reemplaza el estado local entero, un solo registro corrupto
   // rechaza el paquete en vez de escribirse sobre datos buenos.
@@ -416,6 +427,9 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (!((obj.dailyAssignments ?? []) as unknown[]).every(esDailyAssignmentValida)) {
     return { ok: false, error: 'Algún plan diario del respaldo está corrupto o incompleto.' };
   }
+  if (!((obj.trainingEvents ?? []) as unknown[]).every(esTrainingEventValido)) {
+    return { ok: false, error: 'Algún tramo de tiempo entrenado del respaldo está corrupto o incompleto.' };
+  }
   return {
     ok: true,
     bundle: {
@@ -437,6 +451,7 @@ export function validateImportBundle(raw: unknown): ImportResult {
       transferMeasurements: (obj.transferMeasurements ?? []) as TransferMeasurement[],
       n1Experiments: (obj.n1Experiments ?? []) as N1Experiment[],
       dailyAssignments: (obj.dailyAssignments ?? []) as DailyAssignment[],
+      trainingEvents: (obj.trainingEvents ?? []) as TrainingEvent[],
     },
   };
 }

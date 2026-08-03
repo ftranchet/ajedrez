@@ -37,6 +37,7 @@ import { profileRepo } from '../../services/storage/profileRepo';
 import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { sanDeLinea } from './chessBoardUtils';
 import { singleFlight } from './singleFlight';
+import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 import { interpretarJugada } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
 import { t } from '../i18n/es';
@@ -360,8 +361,10 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     // Persistir el intento entero (RF-7.2/7.3) en el formato unificado: las
     // ramas con su evaluación, las tres varas del ejercicio, el tiempo
     // (cronómetro silencioso) y la confianza.
+    const idIntento = crypto.randomUUID();
+    const tiempoMs = s.inicioMs !== null ? Date.now() - s.inicioMs : 0;
     await calculoAttemptRepo.save({
-      id: crypto.randomUUID(),
+      id: idIntento,
       preset: 'abierto',
       ...(origen.tipo === 'catalogo'
         ? { itemId: origen.item.id }
@@ -371,9 +374,12 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
       profundidadVista: resultado.profundidadVista,
       brechaEvaluacion: resultado.brechaEvaluacion,
       confianzaDeclarada: valor,
-      tiempoMs: s.inicioMs !== null ? Date.now() - s.inicioMs : 0,
+      tiempoMs,
       fecha: ahora,
     });
+    // El tiempo del ejercicio suma al plan semanal (RF-13.4): antes se medía
+    // —el cronómetro silencioso de RF-7.3— pero no lo contaba nadie.
+    registrarTiempoEntrenado('calculo', idIntento, tiempoMs, ahora);
     const profile = await profileRepo.get();
     await profileRepo.save({ ...profile, stoykoUltimaCompletadaEn: ahora });
   }),

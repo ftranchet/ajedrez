@@ -20,6 +20,7 @@ import {
 import { buildGameRecord } from '../../core/game';
 import { LichessError, lichessClient } from '../../services/lichess/lichessClient';
 import { gameRepo } from '../../services/storage/gameRepo';
+import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 import { computeDests } from './chessBoardUtils';
 
 type Phase = 'inactivo' | 'desafiando' | 'jugando' | 'terminada' | 'error';
@@ -54,6 +55,9 @@ interface MaiaDeps {
   lichess: LichessPort;
   games: Pick<typeof gameRepo, 'save'>;
 }
+
+/** Cuándo arrancó la partida en curso, para medir su tiempo (RF-13.4). */
+let inicioMs: number | null = null;
 
 export function createMaiaStore(deps: MaiaDeps) {
   let chess = new Chess();
@@ -110,8 +114,7 @@ export function createMaiaStore(deps: MaiaDeps) {
       if (!s.gameId || s.guardada) return;
       try {
         const pgn = await deps.lichess.pgn(tokenActual, s.gameId);
-        await deps.games.save(
-          buildGameRecord({
+        const record = buildGameRecord({
             pgn,
             resultado,
             tiemposPorJugadaMs: [],
@@ -120,8 +123,13 @@ export function createMaiaStore(deps: MaiaDeps) {
             // al compromiso semanal (RF-11.7) y al detector de sobreajuste.
             ritmo: 'clasica',
             jugadorColor: s.playerColor,
-          }),
-        );
+        });
+        await deps.games.save(record);
+        // Igual que la partida local: el tiempo jugado suma al plan (RF-13.4).
+        if (inicioMs !== null) {
+          registrarTiempoEntrenado('partida', record.id, Date.now() - inicioMs);
+          inicioMs = null;
+        }
         set({ guardada: true });
       } catch {
         // No poder traer el PGN no borra la partida de Lichess: se avisa y el
@@ -162,6 +170,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         });
         try {
           const partida = await deps.lichess.desafiarBot(token, bot, CONTROL_LENTO, abort.signal);
+          inicioMs = Date.now();
           set({ phase: 'jugando', gameId: partida.gameId, playerColor: partida.color, rival: partida.rival });
           aplicarEstado(partida.estadoInicial);
           // El seguimiento queda corriendo: cada `gameState` reescribe el tablero.

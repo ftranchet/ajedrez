@@ -4,7 +4,7 @@
 // en 2 toques desde Hoy (Hoy → Panel → Exportar), dentro del límite de
 // RF-14.1 (≤3 toques).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { CalculoAttempt, CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TransferMeasurement, TriageAttempt } from '../../core/types';
+import type { CalculoAttempt, CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TrainingEvent, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
 import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas, serieErroresGraves, tendenciaSerie } from '../../core/panel';
@@ -24,6 +24,7 @@ import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { dobleSolucionAttemptRepo } from '../../services/storage/dobleSolucionAttemptRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
+import { trainingEventRepo } from '../../services/storage/trainingEventRepo';
 import { transferMeasurementRepo } from '../../services/storage/transferMeasurementRepo';
 import { triageAttemptRepo } from '../../services/storage/triageAttemptRepo';
 import { calculoAttemptRepo } from '../../services/storage/calculoAttemptRepo';
@@ -75,6 +76,7 @@ interface PanelResources {
   profile: PanelResource<Profile>;
   dobleSolucionAttempts: PanelResource<DobleSolucionAttempt[]>;
   sessions: PanelResource<SessionRecord[]>;
+  trainingEvents: PanelResource<TrainingEvent[]>;
   transferMeasurements: PanelResource<TransferMeasurement[]>;
   triageAttempts: PanelResource<TriageAttempt[]>;
   curriculumProgress: PanelResource<CurriculumProgress[]>;
@@ -88,6 +90,7 @@ const PANEL_LOADERS = {
   profile: () => profileRepo.get(),
   dobleSolucionAttempts: () => dobleSolucionAttemptRepo.list(),
   sessions: () => sessionRepo.list(),
+  trainingEvents: () => trainingEventRepo.list(),
   transferMeasurements: () => transferMeasurementRepo.list(),
   triageAttempts: () => triageAttemptRepo.list(),
   curriculumProgress: () => curriculumProgressRepo.list(),
@@ -167,6 +170,7 @@ export function PanelScreen() {
     profile: usePanelResource(PANEL_LOADERS.profile, importVersion, panelVisible),
     dobleSolucionAttempts: usePanelResource(PANEL_LOADERS.dobleSolucionAttempts, importVersion, panelVisible),
     sessions: usePanelResource(PANEL_LOADERS.sessions, importVersion, panelVisible),
+    trainingEvents: usePanelResource(PANEL_LOADERS.trainingEvents, importVersion, panelVisible),
     transferMeasurements: usePanelResource(PANEL_LOADERS.transferMeasurements, importVersion, panelVisible),
     triageAttempts: usePanelResource(PANEL_LOADERS.triageAttempts, importVersion, panelVisible),
     curriculumProgress: usePanelResource(PANEL_LOADERS.curriculumProgress, importVersion, panelVisible),
@@ -335,6 +339,7 @@ function ResumenView({
     calibraciones,
     profile,
     sessions,
+    trainingEvents,
     radarAttempts,
     dobleSolucionAttempts,
     triageAttempts,
@@ -375,8 +380,8 @@ function ResumenView({
             <NextStepPanel games={games.data!} profile={profile.data!} onView={onView} />
           </PanelResourceSlot>
         </div>
-        <PanelResourceSlot resources={[sessions, profile]} className="min-h-64">
-          <ActivityPanel records={sessions.data} profile={profile.data!} />
+        <PanelResourceSlot resources={[sessions, trainingEvents, profile]} className="min-h-64">
+          <ActivityPanel records={sessions.data} eventos={trainingEvents.data ?? []} profile={profile.data!} />
         </PanelResourceSlot>
         <PanelResourceSlot resources={[games, triageAttempts]}>
           <CriterioReportPanel attempts={triageAttempts.data} />
@@ -776,12 +781,12 @@ function CalibrationPanel({ records }: { records: CalibrationRecord[] | null }) 
   );
 }
 
-function ActivityPanel({ records, profile }: { records: SessionRecord[] | null; profile: Profile }) {
+function ActivityPanel({ records, eventos, profile }: { records: SessionRecord[] | null; eventos: TrainingEvent[]; profile: Profile }) {
   if (records === null) return null;
-  const summary = activitySummary(records);
+  const summary = activitySummary(records, new Date(), 30, eventos);
   return (
     <div className="flex flex-col gap-3">
-      <WeeklyPlanCard records={records} profile={profile} />
+      <WeeklyPlanCard records={records} eventos={eventos} profile={profile} />
       <section className="flex flex-col gap-2 rounded-md border border-subtle bg-surface p-3">
         <div>
           <SectionHeading>{t.panel.actividadTitulo}</SectionHeading>

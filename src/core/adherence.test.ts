@@ -8,6 +8,7 @@ import {
   weeklyPlanPreset,
   weeklyPlanProgress,
 } from './adherence';
+import { eventosDesdeHistorial } from './trainingEvents';
 
 const PLAN_2 = { sesionesObjetivo: 2, minutosObjetivo: 30 };
 
@@ -47,7 +48,9 @@ describe('plan semanal', () => {
         estado: 'abandonada' as const,
       },
     ];
-    const summary = weeklyPlanProgress(records, DEFAULT_WEEKLY_PLAN, now);
+    // Los minutos salen del registro de tiempo entrenado, que es lo que la
+    // migración v20 reconstruye de estas mismas sesiones.
+    const summary = weeklyPlanProgress(records, DEFAULT_WEEKLY_PLAN, now, eventosDesdeHistorial({ sessions: records }));
     expect(summary.sesionesCompletadas).toBe(2);
     expect(summary.minutosCompletados).toBe(75);
     expect(summary.sesionesRestantes).toBe(1);
@@ -62,16 +65,18 @@ describe('plan semanal', () => {
       estado: 'en_curso',
       bloques: [{ tipo: 'radar', planificados: 8, completados: 3, estado: 'en_curso' }],
     };
-    const summary = weeklyPlanProgress([completed('previa', new Date(2026, 6, 15, 9), 20), enCurso], PLAN_2, now);
+    const records = [completed('previa', new Date(2026, 6, 15, 9), 20), enCurso];
+    const summary = weeklyPlanProgress(records, PLAN_2, now, eventosDesdeHistorial({ sessions: records }));
     expect(summary.minutosCompletados).toBe(20);
   });
 
   it('cuenta como máximo una sesión por día, aunque informa todos los minutos reales', () => {
     const now = new Date(2026, 6, 15, 20);
-    const summary = weeklyPlanProgress([
+    const records = [
       completed('mañana', new Date(2026, 6, 15, 9), 20),
       completed('tarde', new Date(2026, 6, 15, 18), 15),
-    ], { sesionesObjetivo: 1, minutosObjetivo: 30 }, now);
+    ];
+    const summary = weeklyPlanProgress(records, { sesionesObjetivo: 1, minutosObjetivo: 30 }, now, eventosDesdeHistorial({ sessions: records }));
     expect(summary.sesionesCompletadas).toBe(1);
     expect(summary.minutosCompletados).toBe(35);
     expect(summary.proporcionSesiones).toBe(1);

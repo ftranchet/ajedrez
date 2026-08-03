@@ -10,9 +10,13 @@ import 'chessground/assets/chessground.base.css';
 import './ui/styles/tokens.css';
 import './ui/styles/board.css';
 import { injectPieceTheme } from './ui/styles/pieceTheme';
+import { observarOcioParaActualizar } from './ui/pwaIdle';
 import App from './App';
 
 injectPieceTheme();
+// La versión nueva del service worker entra cuando no hay nada en curso, no a
+// mitad de un bloque (ver ui/pwaUpdate.ts).
+observarOcioParaActualizar();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

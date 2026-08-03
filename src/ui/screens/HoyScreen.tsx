@@ -388,7 +388,7 @@ function Portada() {
           <p className="m-0 text-sm text-secondary">{t.hoy.constanciaTexto}</p>
         </div>
 
-        <WeeklyPlanCard records={s.sessions ?? []} profile={s.profile} />
+        <WeeklyPlanCard records={s.sessions ?? []} eventos={s.trainingEvents ?? []} profile={s.profile} />
       </aside>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   transitionSessionBlock,
   ultimoInstanteObservado,
 } from './session';
+import { eventosDesdeHistorial } from './trainingEvents';
 import type { SessionRecord } from './types';
 
 const START = new Date('2026-07-19T10:00:00.000Z');
@@ -100,7 +101,7 @@ describe('registro de sesión', () => {
       'radar',
     );
     expect(abandoned.estado).toBe('abandonada');
-    expect(activitySummary([abandoned], new Date('2026-07-19T12:00:00.000Z'))).toEqual({
+    expect(activitySummary([abandoned], new Date('2026-07-19T12:00:00.000Z'), 30, eventosDesdeHistorial({ sessions: [abandoned] }))).toEqual({
       sesiones: 0,
       minutos: 3,
       items: 1,
@@ -117,7 +118,9 @@ describe('registro de sesión', () => {
       startSessionRecord([{ tipo: 'radar', planificados: 2 }], new Date('2026-05-01T10:00:00.000Z'), 's5'),
       new Date('2026-05-01T10:20:00.000Z'),
     );
-    expect(activitySummary([reciente, vieja], new Date('2026-07-19T12:00:00.000Z'))).toEqual({
+    expect(
+      activitySummary([reciente, vieja], new Date('2026-07-19T12:00:00.000Z'), 30, eventosDesdeHistorial({ sessions: [reciente, vieja] })),
+    ).toEqual({
       sesiones: 1,
       minutos: 15,
       items: 1,
