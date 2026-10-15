@@ -27,8 +27,11 @@ export interface GameRecord {
   ritmo: Ritmo;
   resultado: Resultado;
   /**
-   * Milisegundos consumidos por cada media jugada, indexados por ply (RF-1.5).
-   * Vacío si la partida no tuvo reloj; un 0 es una jugada sin dato.
+   * Milisegundos consumidos por cada media jugada, indexados por ply desde 0
+   * (como `MoveAnalysisEntry.ply`); 0 es "sin dato". Solo vienen de relojes
+   * reales (el de Lichess en las partidas contra Maia, `[%clk]` en un PGN
+   * importado): las partidas locales no se cronometran (RF-1.5) y lo guardan
+   * vacío.
    */
   tiemposPorJugadaMs: number[];
   analizada: boolean;

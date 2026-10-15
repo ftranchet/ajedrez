@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CalculoAttempt, CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TrainingEvent, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
-import { parsePastedPgn, type PgnParseError } from '../../core/pgnImport';
+import { parsePastedPgn, partidaYaGuardada, ritmoDelPgn, type PgnParseResult } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas, serieErroresGraves, tendenciaSerie } from '../../core/panel';
 import { admiteAnalisisExpres } from '../../core/analysis';
 import { brechaCalibracion, brierScore, calibrationCurve, calibrationInsight, serieBrechaCalibracion } from '../../core/calibration';
@@ -1113,10 +1113,11 @@ function CriterioReportPanel({ attempts }: { attempts: TriageAttempt[] | null })
 
 const RITMOS: Ritmo[] = ['rapida', 'clasica', 'blitz', 'bullet', 'sin-reloj'];
 
-function errorMensaje(error: PgnParseError): string {
-  if (error === 'vacio') return t.panel.importarPgnErrorVacio;
-  if (error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
-  if (error === 'posicion-inicial-no-estandar') return t.panel.importarPgnErrorPosicionNoEstandar;
+function errorMensaje(fallo: Extract<PgnParseResult, { ok: false }>): string {
+  if (fallo.error === 'vacio') return t.panel.importarPgnErrorVacio;
+  if (fallo.error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
+  if (fallo.error === 'posicion-inicial-no-estandar') return t.panel.importarPgnErrorPosicionNoEstandar;
+  if (fallo.error === 'varias-partidas') return t.panel.importarPgnErrorVariasPartidas.replace('{n}', String(fallo.partidas));
   return t.panel.importarPgnErrorInvalido;
 }
 
@@ -1149,6 +1150,7 @@ function AnalisisExpresSection({ games }: { games: GameRecord[] }) {
 function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
   const [pgn, setPgn] = useState('');
   const [ritmo, setRitmo] = useState<Ritmo>('rapida');
+  const [ritmoLeido, setRitmoLeido] = useState<ReturnType<typeof ritmoDelPgn>>(null);
   const [jugadorColor, setJugadorColor] = useState<Color | null>(null);
   const [rating, setRating] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -1158,18 +1160,34 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
     Number.isInteger(parsedManualRating) && parsedManualRating >= 100 && parsedManualRating <= 4000
   );
 
+  function handlePgnChange(texto: string) {
+    setPgn(texto);
+    // El ritmo se prellena con el TimeControl del PGN, pero solo cuando cambia
+    // lo leído: si el usuario lo corrige a mano y después retoca el texto, su
+    // elección queda.
+    const leido = ritmoDelPgn(texto);
+    if (leido && leido.timeControl !== ritmoLeido?.timeControl) setRitmo(leido.ritmo);
+    setRitmoLeido(leido);
+  }
+
   async function handleImportar() {
     const resultado = parsePastedPgn(pgn);
     if (!resultado.ok) {
-      setMensaje(errorMensaje(resultado.error));
-      return;
-    }
-    if (jugadorColor === null) {
-      setMensaje(t.panel.importarPgnColorRequerido);
+      setMensaje(errorMensaje(resultado));
       return;
     }
     setGuardando(true);
     try {
+      // B14: una partida importada dos veces contaba doble en errores graves,
+      // sobreajuste, partida lenta de la semana y finales de tus partidas.
+      if (partidaYaGuardada(resultado.pgn, await gameRepo.list())) {
+        setMensaje(t.panel.importarPgnErrorRepetida);
+        return;
+      }
+      if (jugadorColor === null) {
+        setMensaje(t.panel.importarPgnColorRequerido);
+        return;
+      }
       const ratingUsuario = rating.trim() !== ''
         ? parsedManualRating
         : jugadorColor === 'w'
@@ -1178,7 +1196,7 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
       const game = buildGameRecord({
         pgn: resultado.pgn,
         resultado: resultado.resultado,
-        tiemposPorJugadaMs: [],
+        tiemposPorJugadaMs: resultado.tiemposPorJugadaMs,
         fuente: 'manual',
         ritmo,
         jugadorColor,
@@ -1187,6 +1205,7 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
       });
       await gameRepo.save(game);
       setPgn('');
+      setRitmoLeido(null);
       setJugadorColor(null);
       setRating('');
       setMensaje(t.panel.importarPgnOk);
@@ -1206,7 +1225,7 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
       <p className="m-0 text-sm text-secondary">{t.panel.importarPgnConsigna}</p>
       <textarea
         value={pgn}
-        onChange={(e) => setPgn(e.target.value)}
+        onChange={(e) => handlePgnChange(e.target.value)}
         placeholder={t.panel.importarPgnPlaceholder}
         rows={4}
         className="w-full resize-none rounded-lg border border-subtle bg-surface p-3 font-mono text-sm text-primary placeholder:text-tertiary focus-visible:border-accent"
@@ -1220,6 +1239,11 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
             </Chip>
           ))}
         </div>
+        {ritmoLeido && ritmo === ritmoLeido.ritmo && (
+          <p className="m-0 mt-2 text-xs text-tertiary">
+            {t.panel.importarPgnRitmoLeido.replace('{tc}', ritmoLeido.timeControl)}
+          </p>
+        )}
       </fieldset>
       <fieldset className="m-0 border-0 p-0">
         <legend className="mb-2 p-0 text-sm text-secondary">{t.panel.importarPgnColor}</legend>

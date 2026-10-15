@@ -880,6 +880,7 @@ export const es = {
     importarPgnConsigna: 'Pegá el PGN de una partida jugada en otro lado (Lichess, Chess.com, un club) para analizarla acá.',
     importarPgnPlaceholder: '1. e4 e5 2. Nf3 …',
     importarPgnRitmo: 'Ritmo de juego',
+    importarPgnRitmoLeido: 'Leído del encabezado TimeControl del PGN ({tc}).',
     importarPgnColor: '¿Con qué color jugaste?',
     importarPgnColorRequerido: 'Elegí con qué color jugaste para atribuir correctamente la partida.',
     blancas: 'Blancas',
@@ -895,6 +896,10 @@ export const es = {
     importarPgnErrorSinJugadas: 'El PGN no tiene jugadas.',
     importarPgnErrorPosicionNoEstandar:
       'Esa partida no empieza en la posición inicial estándar (PGN con FEN propio, Chess960 o "From Position"). Todavía no se puede analizar bien, así que no se importa.',
+    // Se importa de a una porque el color y el rating son de cada partida, y
+    // el formulario pregunta uno solo.
+    importarPgnErrorVariasPartidas: 'Ese texto trae {n} partidas. Por ahora se importan de a una: pegá solo la que quieras analizar.',
+    importarPgnErrorRepetida: 'Esa partida ya está entre las tuyas (mismas jugadas y encabezados). No se importa de nuevo para que no cuente doble.',
     ritmos: {
       bullet: 'Bullet',
       blitz: 'Blitz',

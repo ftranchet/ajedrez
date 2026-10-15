@@ -30,4 +30,15 @@ test('importar PGN: un texto inválido avisa y un PGN válido aparece en el Pane
   await expect(page.locator('textarea')).toHaveValue('');
   await expect(page.getByText('Tu rating: 1512')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Analizar' })).toBeVisible();
+
+  // B14: pegarla otra vez no la duplica (contaría doble en todas las métricas).
+  await page.locator('textarea').fill(PGN_VALIDO);
+  await page.getByRole('button', { name: 'Importar partida' }).click();
+  await page.getByText('Esa partida ya está entre las tuyas').waitFor();
+  await expect(page.getByText('Tu rating: 1512')).toHaveCount(1);
+
+  // Un texto con dos partidas no es "inválido": se dice cuántas trae.
+  await page.locator('textarea').fill(`${PGN_VALIDO} *\n\n[Event "Otra"]\n\n1. d4 d5 *`);
+  await page.getByRole('button', { name: 'Importar partida' }).click();
+  await page.getByText('Ese texto trae 2 partidas.', { exact: false }).waitFor();
 });
