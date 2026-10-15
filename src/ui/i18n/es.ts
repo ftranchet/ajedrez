@@ -204,6 +204,7 @@ export const es = {
       'No encontramos partidas tuyas con una ventaja clara desperdiciada. Aparecen acá cuando analizás una partida que ganabas por más de tres peones y terminó en tablas o derrota.',
     cargando: 'Preparando el motor…',
     listaVentaja: 'Ventaja de +{ventaja} en la jugada {jugada}',
+    listaMate: 'Tenías mate forzado en la jugada {jugada}',
     listaResultado: 'La partida terminó {resultado}',
     empezar: 'Rejugar desde acá',
     teToca: 'Te toca. Convertí.',
@@ -506,6 +507,13 @@ export const es = {
     },
     borrarAnotaciones: 'Borrar marcas',
   },
+  // Una evaluación que es mate no se muestra como número (RNF-10): el
+  // análisis la guarda como un centinela que, dividido por cien, daba
+  // "+1000,0". "A favor" y "en contra" son el + y el − de las demás ventajas.
+  evaluacion: {
+    mateAFavor: 'mate a favor',
+    mateEnContra: 'mate en contra',
+  },
 
   calculo: {
     // Un solo ejercicio desde ADR-0016: el título nombra la pantalla y el
@@ -553,6 +561,7 @@ export const es = {
     errorDeclaracionIncompleta: 'Faltan candidatas: dos con su línea, y cada una con su evaluación.',
     origenCatalogo: 'Posición del catálogo: rica y sin una jugada claramente mejor.',
     origenPropiaPeones: 'Posición de tu propia partida: acá tu ventaja pasó de {antes} a {despues} — te costó {peones} peones. Volvés a tomar esa decisión.',
+    origenPropiaMate: 'Posición de tu propia partida: acá tu ventaja pasó de {antes} a {despues}. Volvés a tomar esa decisión.',
     origenPropiaTiempo: 'Posición de tu propia partida: acá te tomaste {duracion}. Volvés a tomar esa decisión.',
     ramaConLinea: 'Candidata {n} — con su línea',
     ramaSuelta: 'Candidata {n} — suelta alcanza',
@@ -675,7 +684,8 @@ export const es = {
     momentoLecturaTitulo: 'Tu lectura de la partida',
     momentoLecturaCoincide: 'Le acertaste: marcaste la jugada {jugada} y ahí es donde la partida se dio vuelta.',
     momentoLecturaDifiere: 'Vos sentiste que se definía en la jugada {tuya}. Para el motor se dio vuelta en la {motor}, con {san}.',
-    momentoLecturaCosto: 'Esa jugada costó {cp} peones: la evaluación pasó de {antes} a {despues}.',
+    momentoLecturaCosto: 'Esa jugada costó {peones} peones: la evaluación pasó de {antes} a {despues}.',
+    momentoLecturaMate: 'Con esa jugada la evaluación pasó de {antes} a {despues}.',
     curvaTitulo: 'Curva de evaluación',
     jugadasTitulo: 'Jugadas',
     comparacionTitulo: 'Tus evaluaciones vs. el motor',

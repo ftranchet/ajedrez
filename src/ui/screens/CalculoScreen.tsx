@@ -20,7 +20,7 @@ import { useSlowLoading } from '../hooks/useSlowLoading';
 import { PLIES_MIN_LINEA, declaracionCompleta, ramaPideLinea } from '../../core/calculo';
 import { lineaANotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
-import { formatDuracion, formatPeones, formatVentaja } from '../format';
+import { formatDuracion, fraseSaltoVentaja } from '../format';
 import { t } from '../i18n/es';
 
 // La sub-ruta #/calculo/stoyko sigue entrando acá (el router resuelve por el
@@ -177,10 +177,7 @@ function OrigenDeLaPosicion() {
   const texto = origen.tipo === 'catalogo'
     ? t.stoyko.origenCatalogo
     : origen.posicion.motivo === 'mas-centipeones'
-      ? t.stoyko.origenPropiaPeones
-          .replace('{antes}', formatVentaja(origen.posicion.ventajaAntes))
-          .replace('{despues}', formatVentaja(origen.posicion.ventajaDespues))
-          .replace('{peones}', formatPeones(origen.posicion.cpPerdidos))
+      ? fraseSaltoVentaja({ costo: t.stoyko.origenPropiaPeones, mate: t.stoyko.origenPropiaMate }, origen.posicion)
       : t.stoyko.origenPropiaTiempo.replace('{duracion}', formatDuracion(origen.posicion.tiempoMs ?? 0));
   return <p className="m-0 rounded-md border border-info/40 bg-info-subtle px-3 py-2 text-xs text-secondary">{texto}</p>;
 }

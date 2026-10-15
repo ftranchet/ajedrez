@@ -5,13 +5,18 @@
 import { Chess } from 'chess.js';
 import type { EngineEvaluation, EnginePort } from '../../core/ports';
 import type { EngineEvalAtPly } from '../../core/analysis';
+import { CP_MATE } from '../../core/engineLevels';
 import type { Color } from '../../core/types';
 
 /** Profundidad por defecto para el análisis de partida completa (RNF-3: "profundidad 18 o 3s por posición crítica"; acá se prioriza no bloquear la UI por minutos en partidas largas). */
 export const ANALYSIS_DEPTH = 14;
 
+// El mate se guarda como ±`CP_MATE`, la misma constante con la que la
+// interfaz lo reconoce para nombrarlo (`esMate` en `ui/format.ts`): con el
+// número repetido acá, los dos podían separarse y el mate volver a mostrarse
+// como una ventaja en peones.
 function cpInWhitePerspective(cp: number, mateIn: number | null, sideToMove: Color): number {
-  const value = mateIn !== null ? Math.sign(mateIn) * 100_000 : cp;
+  const value = mateIn !== null ? Math.sign(mateIn) * CP_MATE : cp;
   return sideToMove === 'w' ? value : -value;
 }
 

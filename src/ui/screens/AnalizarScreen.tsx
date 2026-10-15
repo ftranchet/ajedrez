@@ -9,7 +9,7 @@ import { Chip } from '../components/Chip';
 import { useAnalysisStore } from '../state/analysisStore';
 import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
 import type { CategoriaError } from '../../core/types';
-import { formatPeones, formatVentaja } from '../format';
+import { fraseSaltoVentaja } from '../format';
 import { t } from '../i18n/es';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
@@ -322,10 +322,7 @@ function LecturaDelMomento() {
       <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.analisis.momentoLecturaTitulo}</h2>
       <p className="m-0 text-primary">{texto}</p>
       <p className="m-0 text-sm text-secondary">
-        {t.analisis.momentoLecturaCosto
-          .replace('{cp}', formatPeones(lectura.cpPerdidos))
-          .replace('{antes}', formatVentaja(lectura.ventajaAntes))
-          .replace('{despues}', formatVentaja(lectura.ventajaDespues))}
+        {fraseSaltoVentaja({ costo: t.analisis.momentoLecturaCosto, mate: t.analisis.momentoLecturaMate }, lectura)}
       </p>
     </section>
   );
