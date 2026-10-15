@@ -509,13 +509,20 @@ function FinalesScreen() {
             </p>
           )}
         </div>
+        {/* Una caída del motor a mitad del final se reintenta en la misma
+            posición: la única salida era volver a la lista y empezarlo de
+            nuevo (B15). Mientras tanto no se dice "te toca", que no es cierto:
+            la jugada pendiente es la del motor. */}
         {s.engineError && (
-          <div className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
+          <div role="alert" className="flex flex-col gap-2 rounded-md border border-error/35 bg-error-subtle p-3">
             <p className="m-0 text-sm">{t.finales.errorMotor}</p>
+            {s.phase === 'jugando' && (
+              <button className="btn-primary" onClick={() => void s.reintentarMotor()}>{t.finales.reintentar}</button>
+            )}
             <button className="btn-secondary" onClick={() => s.volver()}>{t.finales.volver}</button>
           </div>
         )}
-        {s.phase === 'jugando' && (
+        {s.phase === 'jugando' && !s.engineError && (
           <>
             <p className="m-0 text-secondary">{s.thinking ? t.finales.pensando : t.finales.teToca}</p>
             {/* Antes no había ninguna salida hasta terminar la técnica: entrar

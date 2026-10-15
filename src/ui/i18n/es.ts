@@ -360,6 +360,7 @@ export const es = {
     dejar: 'Dejar este final',
     volver: 'Volver a finales',
     errorMotor: 'Stockfish no pudo cargar o completar la evaluación. Podés volver a intentarlo.',
+    reintentar: 'Reintentar',
   },
   diagnostico: {
     titulo: 'Diagnóstico inicial',

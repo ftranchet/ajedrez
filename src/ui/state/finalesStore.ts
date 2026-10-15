@@ -68,6 +68,13 @@ export interface FinalesState {
   start(itemId: string, practica?: boolean): Promise<void>;
   userMove(from: Square, to: Square, promotion?: string): Promise<void>;
   cancelPromotion(): void;
+  /**
+   * Tras una caída del motor, le vuelve a pedir lo que faltaba sobre la misma
+   * posición. El adaptador re-bootea el worker en la consulta siguiente, así
+   * que no hace falta tirar la demostración: antes la única salida era
+   * volver a la lista (B15).
+   */
+  reintentarMotor(): Promise<void>;
   volver(): void;
 }
 
@@ -88,6 +95,12 @@ export function createFinalesStore(deps: FinalesDeps) {
   let lastUserMove = '';
   /** Cuándo arrancó la demostración en curso, para medir su tiempo (RF-13.4). */
   let inicioMs: number | null = null;
+  /**
+   * La consulta al motor que falló, para repetirla tal cual: no es lo mismo
+   * su primera jugada que la respuesta a una jugada propia, que además juzga
+   * la técnica y necesita saber si esa jugada coronó.
+   */
+  let reintento: (() => Promise<void>) | null = null;
 
   return create<FinalesState>((set, get) => {
     function snapshot(partial: Partial<FinalesState> = {}) {
@@ -168,7 +181,7 @@ export function createFinalesStore(deps: FinalesDeps) {
     async function engineTurn() {
       const item = get().item;
       if (!item || chess.isGameOver()) return;
-      snapshot({ thinking: true });
+      snapshot({ thinking: true, engineError: false });
       try {
         const evaluation = await deps.enginePort.evaluate(chess.fen(), FINAL_ENGINE_DEPTH);
         const from = evaluation.move.slice(0, 2) as Square;
@@ -185,8 +198,39 @@ export function createFinalesStore(deps: FinalesDeps) {
         }
         snapshot({ thinking: false, lastMove: [from, to] });
       } catch {
+        reintento = engineTurn;
         snapshot({ thinking: false, engineError: true });
       }
+    }
+
+    /** La respuesta del motor a la jugada propia, cuya evaluación también juzga la técnica. */
+    async function responder(item: CurriculumItem, corono: boolean) {
+      snapshot({ thinking: true, engineError: false });
+      let evaluation: EngineEvaluation;
+      try {
+        evaluation = await deps.enginePort.evaluate(chess.fen(), FINAL_ENGINE_DEPTH);
+      } catch {
+        reintento = () => responder(item, corono);
+        snapshot({ thinking: false, engineError: true });
+        return;
+      }
+      // La coronación viaja hasta acá: es la evaluación posterior la que dice
+      // si coronar convirtió de verdad o si la dama se cae en la próxima.
+      const verdict = evaluateFinalTechnique(item, positionState(corono), evaluation);
+      if (verdict !== 'continuar') {
+        await finish(verdict === 'demostrado');
+        return;
+      }
+
+      const engineFrom = evaluation.move.slice(0, 2) as Square;
+      const engineTo = evaluation.move.slice(2, 4) as Square;
+      chess.move({ from: engineFrom, to: engineTo, promotion: evaluation.move.slice(4, 5) || undefined });
+      if (chess.isGameOver()) {
+        const afterEngine = evaluateFinalTechnique(item, positionState(), null);
+        await finish(afterEngine === 'demostrado');
+        return;
+      }
+      snapshot({ thinking: false, lastMove: [engineFrom, engineTo] });
     }
 
     return {
@@ -239,6 +283,7 @@ export function createFinalesStore(deps: FinalesDeps) {
         chess = new Chess(item.fen);
         lastUserFen = '';
         lastUserMove = '';
+        reintento = null;
         set({
           phase: 'cargando', item, playerColor: item.ladoUsuario, userMoves: 0,
           limpia: null, engineError: false, pendingPromotion: null, lastMove: null, practica,
@@ -280,34 +325,17 @@ export function createFinalesStore(deps: FinalesDeps) {
           await finish(terminal === 'demostrado');
           return;
         }
-        let evaluation: EngineEvaluation;
-        try {
-          evaluation = await deps.enginePort.evaluate(chess.fen(), FINAL_ENGINE_DEPTH);
-        } catch {
-          snapshot({ thinking: false, engineError: true });
-          return;
-        }
-        // La coronación viaja hasta acá: es la evaluación posterior la que dice
-        // si coronar convirtió de verdad o si la dama se cae en la próxima.
-        const verdict = evaluateFinalTechnique(s.item, positionState(corono), evaluation);
-        if (verdict !== 'continuar') {
-          await finish(verdict === 'demostrado');
-          return;
-        }
-
-        const engineFrom = evaluation.move.slice(0, 2) as Square;
-        const engineTo = evaluation.move.slice(2, 4) as Square;
-        chess.move({ from: engineFrom, to: engineTo, promotion: evaluation.move.slice(4, 5) || undefined });
-        if (chess.isGameOver()) {
-          const afterEngine = evaluateFinalTechnique(s.item, positionState(), null);
-          await finish(afterEngine === 'demostrado');
-          return;
-        }
-        snapshot({ thinking: false, lastMove: [engineFrom, engineTo] });
+        await responder(s.item, corono);
       },
 
       cancelPromotion() {
         snapshot({ pendingPromotion: null });
+      },
+
+      async reintentarMotor() {
+        const s = get();
+        if (s.phase !== 'jugando' || !s.engineError || s.thinking || !reintento) return;
+        await reintento();
       },
 
       volver() {

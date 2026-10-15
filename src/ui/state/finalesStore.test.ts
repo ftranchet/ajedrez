@@ -15,6 +15,27 @@ class FakeFinalEngine implements EnginePort {
   dispose() {}
 }
 
+/** Se cae en la primera consulta y después responde, como el worker re-booteado por el adaptador. */
+class MotorQueSeCaeUnaVez implements EnginePort {
+  private readonly motor: FakeFinalEngine;
+  private cayo = false;
+  readonly consultas: string[] = [];
+  constructor(evaluations: EngineEvaluation[] = []) {
+    this.motor = new FakeFinalEngine(evaluations);
+  }
+  async init() {}
+  async bestMove() { return ''; }
+  async evaluate(fen: string) {
+    this.consultas.push(fen);
+    if (!this.cayo) {
+      this.cayo = true;
+      throw new Error('El motor se cayó; se reinicia en la próxima consulta.');
+    }
+    return this.motor.evaluate();
+  }
+  dispose() {}
+}
+
 function deps(item: CurriculumItem, enginePort: EnginePort) {
   const savedProgress: CurriculumProgress[] = [];
   const savedErrors: ErrorCard[] = [];
@@ -169,5 +190,84 @@ describe('finalesStore', () => {
     expect(store.getState().phase).toBe('jugando');
     expect(store.getState().turn).toBe('w');
     expect(store.getState().lastMove).toEqual(['e7', 'd7']);
+  });
+});
+
+// B15: ante una caída del motor la única salida era volver a la lista, y la
+// demostración se perdía. El adaptador re-bootea el worker en la consulta
+// siguiente, así que reintentar retoma en la misma posición.
+describe('finalesStore — caída del motor', () => {
+  const mate: CurriculumItem = {
+    id: 'mate-torre', tipo: 'final', patternKey: 'final-torre', nombre: 'Mate de torre',
+    fen: '8/8/8/4k3/8/8/8/4K2R w - - 0 1', solucion: [], resultadoEsperado: 'gana', ladoUsuario: 'w',
+    objetivo: 'mate',
+  };
+  const despuesDeTh5 = '8/8/8/4k2R/8/8/8/4K3 b - - 1 1';
+
+  it('reintentar repite la respuesta a la jugada propia sin perder la posición', async () => {
+    const motor = new MotorQueSeCaeUnaVez([{ move: 'e5e6', cp: null, mateIn: -13 }]);
+    const setup = deps(mate, motor);
+    const store = createFinalesStore(setup.value);
+    await store.getState().load();
+    await store.getState().start(mate.id);
+
+    await store.getState().userMove('h1' as never, 'h5' as never);
+    expect(store.getState()).toMatchObject({
+      phase: 'jugando', engineError: true, thinking: false, fen: despuesDeTh5, userMoves: 1,
+    });
+
+    await store.getState().reintentarMotor();
+
+    expect(motor.consultas).toEqual([despuesDeTh5, despuesDeTh5]);
+    expect(store.getState()).toMatchObject({
+      phase: 'jugando', engineError: false, thinking: false, turn: 'w', lastMove: ['e5', 'e6'], userMoves: 1,
+    });
+    expect(setup.savedProgress).toHaveLength(0);
+  });
+
+  it('el reintento juzga la técnica sabiendo que la jugada propia coronó', async () => {
+    // Sin la coronación, la misma evaluación (mate del usuario en 6) se leía
+    // como "falta dar el mate" y el final seguía en vez de darse por demostrado.
+    const setup = deps(promocion, new MotorQueSeCaeUnaVez([{ move: 'e2f2', cp: null, mateIn: -6 }]));
+    const store = createFinalesStore(setup.value);
+    await store.getState().load();
+    await store.getState().start(promocion.id);
+    await store.getState().userMove('a7' as never, 'a8' as never, 'q');
+    expect(store.getState().engineError).toBe(true);
+
+    await store.getState().reintentarMotor();
+
+    expect(store.getState().phase).toBe('feedback');
+    expect(store.getState().limpia).toBe(true);
+    expect(setup.savedProgress).toHaveLength(1);
+    expect(setup.savedProgress[0].demostracionesLimpias).toBe(1);
+  });
+
+  it('si mueve primero el rival, reintentar recupera su primera jugada', async () => {
+    const item: CurriculumItem = {
+      id: 'oposicion', tipo: 'final', patternKey: 'final-rey-peon', nombre: 'Oposición',
+      fen: '8/4k3/8/4K3/4P3/8/8/8 b - - 0 1', solucion: [], resultadoEsperado: 'gana', ladoUsuario: 'w',
+    };
+    const setup = deps(item, new MotorQueSeCaeUnaVez([{ move: 'e7d7', cp: -600, mateIn: null }]));
+    const store = createFinalesStore(setup.value);
+    await store.getState().load();
+    await store.getState().start(item.id);
+    expect(store.getState()).toMatchObject({ phase: 'jugando', engineError: true, turn: 'b' });
+
+    await store.getState().reintentarMotor();
+
+    expect(store.getState()).toMatchObject({ phase: 'jugando', engineError: false, turn: 'w', lastMove: ['e7', 'd7'] });
+  });
+
+  it('sin una caída del motor, reintentar no consulta nada', async () => {
+    const motor = new MotorQueSeCaeUnaVez();
+    const store = createFinalesStore(deps(mate, motor).value);
+    await store.getState().load();
+    await store.getState().start(mate.id);
+
+    await store.getState().reintentarMotor();
+
+    expect(motor.consultas).toEqual([]);
+    expect(store.getState()).toMatchObject({ phase: 'jugando', engineError: false, turn: 'w' });
   });
 });
