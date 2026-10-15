@@ -198,6 +198,14 @@ export interface LecturaMomentoCritico {
   plyUsuario: number;
   /** Media jugada donde el motor ubica el vuelco, y cuánto costó. */
   plyMotor: number;
+  /**
+   * Quién hizo esa jugada. El vuelco no se filtra por lado —una partida
+   * también se define cuando el rival regala—, así que quien muestre la
+   * lectura necesita saberlo: las ventajas de abajo son de quien movió, y
+   * presentadas como propias le harían creer al usuario que él tenía el mate
+   * que en realidad desperdició su rival.
+   */
+  ladoQueMueve: Color;
   cpPerdidos: number;
   /** Evaluación antes y después, desde la perspectiva de quien movió. */
   ventajaAntes: number;
@@ -222,6 +230,7 @@ export function lecturaMomentoCritico(analysis: GameAnalysis, fase1: PhaseOneDat
   return {
     plyUsuario: fase1.momentoCriticoPly,
     plyMotor: motor.ply,
+    ladoQueMueve: motor.ladoQueMueve,
     cpPerdidos: motor.cpPerdidos,
     // Perspectiva de quien movió: la ventaja que se pierde es la suya.
     ventajaAntes: motor.ladoQueMueve === 'w' ? motor.cpAntes : -motor.cpAntes,

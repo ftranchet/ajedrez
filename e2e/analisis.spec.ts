@@ -106,7 +106,7 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
 
   await page.getByRole('button', { name: /Revisar errores/ }).click();
   await page.getByText('Confirmá y categorizá').waitFor();
-  // Las dos jugadas del error se guardan en UCI ("f1a6"), pero en pantalla
+  // Las dos jugadas del error se guardan en UCI ("c4a6"), pero en pantalla
   // van en algebraica del idioma elegido (RNF-9).
   for (const etiqueta of ['Jugaste:', 'El motor prefería:']) {
     const renglon = page.locator('p', { hasText: etiqueta });

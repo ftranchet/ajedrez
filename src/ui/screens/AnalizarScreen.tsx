@@ -10,7 +10,7 @@ import { useAnalysisStore } from '../state/analysisStore';
 import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
 import { TOPE_DIARIO_NUEVAS } from '../../core/errorCard';
 import type { CategoriaError } from '../../core/types';
-import { fraseSaltoVentaja } from '../format';
+import { fraseLecturaMomento } from '../format';
 import { t } from '../i18n/es';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
@@ -325,7 +325,7 @@ function LecturaDelMomento() {
       <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.analisis.momentoLecturaTitulo}</h2>
       <p className="m-0 text-primary">{texto}</p>
       <p className="m-0 text-sm text-secondary">
-        {fraseSaltoVentaja({ costo: t.analisis.momentoLecturaCosto, mate: t.analisis.momentoLecturaMate }, lectura)}
+        {fraseLecturaMomento(lectura, game.jugadorColor)}
       </p>
     </section>
   );

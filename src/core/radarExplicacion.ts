@@ -33,6 +33,10 @@
 // llamador; sin default, el compilador lo marca.
 import { Chess } from 'chess.js';
 import { aNotacion, type IdiomaNotacion } from './notacion';
+// Centinela de mate en `carnada.costoCp`: la carnada no cuesta material, cuesta
+// un mate forzado. Se importa en vez de repetir el número, para que el
+// centinela del catálogo y el del motor no puedan separarse.
+import { CP_MATE } from './engineLevels';
 import type { RadarItem, TipoRadar } from './types';
 
 /** Valor material convencional; el rey no se cuenta. */
@@ -316,11 +320,6 @@ function fraseDesenlace(analisis: AnalisisSolucion): string | null {
     : `La línea recupera ${nombreMaterial(analisis.materialGanado)}.`;
 }
 
-/**
- * Centinela de mate en `carnada.costoCp` (mismo valor que core/engineLevels.ts):
- * la carnada no cuesta material, cuesta un mate forzado.
- */
-const CP_MATE = 100_000;
 
 /**
  * La frase de la carnada, y si ya nombró el mate. El booleano existe para que

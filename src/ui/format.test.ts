@@ -4,7 +4,7 @@ import { posicionPropiaParaCalculo } from '../core/calculoPosicion';
 import { ventajaDesperdiciada } from '../core/conversion';
 import { CP_MATE } from '../core/engineLevels';
 import type { Color, GameRecord, PhaseOneData } from '../core/types';
-import { esMate, formatDecimal, formatDuracion, formatPeones, formatVentaja, fraseSaltoVentaja } from './format';
+import { esMate, formatDecimal, formatDuracion, formatPeones, formatVentaja, fraseLecturaMomento, fraseSaltoVentaja, textoVentajaDesperdiciada } from './format';
 import { t } from './i18n/es';
 
 describe('formato numérico de interfaz', () => {
@@ -72,20 +72,37 @@ describe('fraseSaltoVentaja', () => {
   const analisis = { costo: t.analisis.momentoLecturaCosto, mate: t.analisis.momentoLecturaMate };
 
   it('sin mate dice el salto y lo que costó, en peones', () => {
-    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 150, ventajaDespues: -170, cpPerdidos: 320 })).toBe(
+    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 150, ventajaDespues: -170 })).toBe(
       'Esa jugada costó 3,2 peones: la evaluación pasó de +1,5 a −1,7.',
     );
   });
 
-  // El costo sale de la escala acotada a diez peones, donde el mate vale diez:
-  // "de +2,0 a mate en contra — costó 12,0 peones" es una cifra de esa
-  // convención que el lector no puede reconstruir. Con el mate nombrado, el
-  // salto ya dice qué se perdió.
+  // Regresión de la revisión de B7: el costo salía de `cpPerdidos`, acotado a
+  // diez peones por extremo, y dejaba de cuadrar con el salto que se ve.
+  it('el costo cierra con el salto aunque un extremo pase de diez peones', () => {
+    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 1240, ventajaDespues: -100 })).toBe(
+      'Esa jugada costó 13,4 peones: la evaluación pasó de +12,4 a −1,0.',
+    );
+    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 200, ventajaDespues: -1500 })).toBe(
+      'Esa jugada costó 17,0 peones: la evaluación pasó de +2,0 a −15,0.',
+    );
+  });
+
+  it('el costo se resta con los números ya redondeados, así cierra también el decimal', () => {
+    // 124 → "+1,2" y −5 → "0,0": el costo visible es 1,2, no 1,3.
+    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 124, ventajaDespues: -5 })).toBe(
+      'Esa jugada costó 1,2 peones: la evaluación pasó de +1,2 a 0,0.',
+    );
+  });
+
+  // El mate no tiene valor en peones: "de +2,0 a mate en contra — costó 12,0
+  // peones" sería una cifra de la convención del tope que el lector no puede
+  // reconstruir. Con el mate nombrado, el salto ya dice qué se perdió.
   it('con mate en un extremo dice el salto sin costo en peones', () => {
-    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 200, ventajaDespues: -CP_MATE, cpPerdidos: 1200 })).toBe(
+    expect(fraseSaltoVentaja(analisis, { ventajaAntes: 200, ventajaDespues: -CP_MATE })).toBe(
       'Con esa jugada la evaluación pasó de +2,0 a mate en contra.',
     );
-    expect(fraseSaltoVentaja(analisis, { ventajaAntes: CP_MATE, ventajaDespues: -CP_MATE, cpPerdidos: 2000 })).toBe(
+    expect(fraseSaltoVentaja(analisis, { ventajaAntes: CP_MATE, ventajaDespues: -CP_MATE })).toBe(
       'Con esa jugada la evaluación pasó de mate a favor a mate en contra.',
     );
   });
@@ -139,6 +156,34 @@ describe('una partida cuyo error más caro desperdicia un mate', () => {
     );
   });
 
+  // Revisión de B7: el vuelco no se filtra por lado. Si el que desperdicia el
+  // mate es el rival, "pasó de mate a favor a −5,0" le atribuía el mate al
+  // usuario, que en realidad estaba por recibirlo.
+  const negrasTiranElMate = [
+    evalEn(0, 'w', 20),
+    evalEn(1, 'b', -300),
+    evalEn(2, 'w', -800),
+    evalEn(3, 'b', -CP_MATE),
+    evalEn(4, 'w', 500),
+  ];
+
+  it('si el vuelco lo hizo el rival, lo dice y cuenta la evaluación desde el lado del usuario', () => {
+    const lectura = lecturaMomentoCritico(buildGameAnalysis(negrasTiranElMate, fase1), fase1)!;
+    expect(lectura.plyMotor).toBe(3);
+    expect(lectura.ladoQueMueve).toBe('b');
+    expect(fraseLecturaMomento(lectura, 'w')).toBe('Fue una jugada de tu rival: tu evaluación pasó de mate en contra a +5,0.');
+  });
+
+  it('si el vuelco lo hizo el usuario, la frase es la del salto con su costo', () => {
+    const lectura = lecturaMomentoCritico(buildGameAnalysis(negrasTiranElMate, fase1), fase1)!;
+    expect(fraseLecturaMomento(lectura, 'b')).toBe('Con esa jugada la evaluación pasó de mate a favor a −5,0.');
+  });
+
+  it('sin el color del usuario nombra el bando, para no atribuirle el mate a nadie', () => {
+    const lectura = lecturaMomentoCritico(buildGameAnalysis(negrasTiranElMate, fase1), fase1)!;
+    expect(fraseLecturaMomento(lectura, undefined)).toBe('Jugaban las negras. Con esa jugada la evaluación pasó de mate a favor a −5,0.');
+  });
+
   it('la posición propia de Cálculo, con negras: el mate es de quien movió', () => {
     // Perspectiva blancas: −CP_MATE es mate de las negras; después queda −300,
     // o sea +3 para las negras, que son el usuario.
@@ -155,6 +200,12 @@ describe('una partida cuyo error más caro desperdicia un mate', () => {
     const ventaja = ventajaDesperdiciada(partida('w', blancasTiranElMate, '1/2-1/2'))!;
     expect(ventaja.ventajaCp).toBe(CP_MATE);
     expect(esMate(ventaja.ventajaCp)).toBe(true);
+  });
+
+  it('la lista de Conversión nombra el mate en vez de "Ventaja de +1000,0"', () => {
+    const ventaja = ventajaDesperdiciada(partida('w', blancasTiranElMate, '1/2-1/2'))!;
+    expect(textoVentajaDesperdiciada(ventaja)).toBe('Tenías mate forzado en la jugada 3');
+    expect(textoVentajaDesperdiciada({ ply: 4, ventajaCp: 450 })).toBe('Ventaja de +4,5 en la jugada 3');
   });
 });
 

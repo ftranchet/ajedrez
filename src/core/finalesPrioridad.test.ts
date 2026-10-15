@@ -123,6 +123,27 @@ describe('priorizarFinales', () => {
     expect(torreFallada!.motivo).toBe('te-sale-mal');
   });
 
+  it('un registro viejo que empezó a contar marca que su historial medido es parcial', () => {
+    // Revisión de B4: un final demostrado diez veces antes de los contadores,
+    // que después se falla y se acierta, mide "1 de 2". Sin la marca, la
+    // interfaz decía "se te escapó 1 de 2 veces" como si fuera el total.
+    const viejo = progreso('torre-1', { reps: 10, limpias: 1, due: FUTURO, lapses: 3 });
+    const despues = reviewCurriculumProgress(reviewCurriculumProgress(viejo, false, AHORA), true, AHORA);
+    const [torre] = priorizarFinales([CATALOGO[0]], new Map([['torre-1', despues]]), { ahora: AHORA });
+    expect(torre.señales.fallos).toBe(1);
+    expect(torre.señales.practicas).toBe(2);
+    expect(torre.señales.historialParcial).toBe(true);
+  });
+
+  it('un registro que contó desde el principio no es parcial', () => {
+    const medido = [false, true, true].reduce(
+      (p, limpia) => reviewCurriculumProgress(p, limpia, AHORA),
+      newCurriculumProgress('torre-1', AHORA),
+    );
+    const [torre] = priorizarFinales([CATALOGO[0]], new Map([['torre-1', medido]]), { ahora: AHORA });
+    expect(torre.señales.historialParcial).toBe(false);
+  });
+
   it('"la última se te escapó" no se deduce de una racha mal leída', () => {
     // `demostracionesLimpias` es una racha que vuelve a cero con cada fallo, no
     // un contador de aciertos: leerla como tasa mostraría un porcentaje falso.

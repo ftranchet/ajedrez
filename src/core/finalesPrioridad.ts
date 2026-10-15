@@ -85,6 +85,13 @@ export interface SeñalesFinal {
   ultimaFallada: boolean;
   /** Demostraciones limpias seguidas; 3 automatizan la técnica (RF-6.3). */
   rachaLimpia: number;
+  /**
+   * Los contadores empezaron después de las primeras demostraciones (un
+   * registro anterior a que existieran): `fallos` y `practicas` cuentan solo
+   * las últimas, no todas. Sin esta marca, "se te escapó 1 de 2 veces" se leía
+   * como el total en un final demostrado doce veces.
+   */
+  historialParcial: boolean;
   /** Segundos que tardás típicamente; null si no hay tiempo medido. */
   segundosTipicos: number | null;
   /** Tu tiempo contra tu propia mediana (1 = igual); null sin datos. */
@@ -154,6 +161,7 @@ function señalesDe(
     tasaFallo: medidos && practicas > 0 ? Math.min(1, fallos / practicas) : null,
     ultimaFallada: practicas > 0 && rachaLimpia === 0,
     rachaLimpia,
+    historialParcial: medidos && (progress?.fsrs.reps ?? 0) > (intentos ?? 0),
     segundosTipicos,
     lentitudRelativa:
       segundosTipicos !== null && medianaGlobal !== null && medianaGlobal > 0

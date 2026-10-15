@@ -188,7 +188,7 @@ export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome
     // una sola transacción que IndexedDB deshace entera si algo falla.
     return {
       ok: false,
-      error: 'Ocurrió un error inesperado al restaurar y se canceló todo: tus datos locales no se tocaron.',
+      error: 'Hubo un error inesperado y se canceló todo. Tus datos locales no se tocaron.',
     };
   }
 }

@@ -88,30 +88,46 @@ const REPS_MINIMAS_CIEGAS = 3;
 export type NivelCiegas = 'normal' | 'fantasma' | 'coordenadas';
 
 /**
- * Modificador a ciegas progresivo (RF-6.5): sobre un patrón con más de 80%
- * de acierto histórico (y unos pocos intentos, para no activarlo con una
- * sola casualidad), sube la dificultad deseable (Bjork) ocultando primero
- * las piezas ("fantasma") y, si el usuario sigue acertando limpio camino a
- * la automatización (RF-6.3), también las coordenadas de las piezas.
+ * Modificador a ciegas progresivo (RF-6.5): sobre un **patrón** con más de
+ * 80% de acierto (y unos pocos intentos, para no activarlo con una sola
+ * casualidad), sube la dificultad deseable (Bjork) ocultando primero las
+ * piezas ("fantasma") y, si el usuario sigue acertando limpio esta posición
+ * camino a su automatización (RF-6.3), también las coordenadas.
  *
- * El acierto sale de `aciertos / intentos`, no de FSRS. `(reps − lapses) /
+ * **El acierto es del patrón, no de la posición suelta.** Se suman los
+ * intentos y aciertos de todas las posiciones del mismo `patternKey`,
+ * automatizadas incluidas. Medido por posición, el modo era inalcanzable: una
+ * posición deja de servirse al lograr tres demostraciones limpias seguidas,
+ * así que mientras se sirve nunca supera el 80% con tres intentos o más (el
+ * máximo es 4 de 5). Por patrón es lo que pide RF-6.5 y lo que tiene sentido
+ * ajedrecístico: quien ya domina el mate del pasillo en una posición recibe
+ * las otras posiciones de ese mate a ciegas. Un patrón con una sola posición
+ * no puede demostrar dominio y no activa el modo.
+ *
+ * **El acierto sale de `aciertos / intentos`, no de FSRS.** `(reps − lapses) /
  * reps` parecía lo mismo, pero ts-fsrs solo cuenta un lapso cuando falla un
  * elemento que ya estaba en repaso: tres fallos seguidos desde un patrón
  * nuevo daban "100% de acierto" y el tablero pasaba a piezas fantasma justo
- * después de demostrar que el patrón no estaba.
- *
- * Un registro anterior a los contadores se queda en 'normal' hasta juntar sus
- * propios intentos. El pasado no se reconstruye porque no se puede: FSRS no
- * guarda qué repasos fallaron y la racha solo dice cómo terminó. Esperar unos
- * intentos cuesta poco; subir la dificultad sobre un acierto supuesto es
- * justamente el error que esto corrige.
+ * después de demostrar que el patrón no estaba. Los registros anteriores a los
+ * contadores no aportan nada a la suma: el pasado no se reconstruye porque no
+ * se puede (FSRS no guarda qué repasos fallaron), y subir la dificultad sobre
+ * un acierto supuesto es justamente el error que esto corrige.
  */
-export function nivelCiegas(progress: CurriculumProgress | undefined): NivelCiegas {
-  const intentos = progress?.intentos ?? 0;
-  if (!progress || intentos < REPS_MINIMAS_CIEGAS) return 'normal';
-  const tasaAcierto = (progress.aciertos ?? 0) / intentos;
-  if (tasaAcierto <= UMBRAL_CIEGAS) return 'normal';
-  return progress.demostracionesLimpias >= 2 ? 'coordenadas' : 'fantasma';
+export function nivelCiegas(
+  item: CurriculumItem,
+  items: CurriculumItem[],
+  progressById: Map<string, CurriculumProgress>,
+): NivelCiegas {
+  let intentos = 0;
+  let aciertos = 0;
+  for (const otro of items) {
+    if (otro.tipo !== item.tipo || otro.patternKey !== item.patternKey) continue;
+    const progreso = progressById.get(otro.id);
+    intentos += progreso?.intentos ?? 0;
+    aciertos += progreso?.aciertos ?? 0;
+  }
+  if (intentos < REPS_MINIMAS_CIEGAS || aciertos / intentos <= UMBRAL_CIEGAS) return 'normal';
+  return (progressById.get(item.id)?.demostracionesLimpias ?? 0) >= 2 ? 'coordenadas' : 'fantasma';
 }
 
 function uciAObjeto(uci: string) {

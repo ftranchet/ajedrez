@@ -18,8 +18,7 @@ import { isAutomatizado } from '../../core/curriculum';
 import { FINAL_DRAW_HOLD_MOVES, objetivoDeFinal } from '../../core/finales';
 import { isDue } from '../../core/scheduler';
 import type { FinalPriorizado } from '../../core/finalesPrioridad';
-import type { VentajaDesperdiciada } from '../../core/conversion';
-import { esMate, formatDecimal } from '../format';
+import { textoVentajaDesperdiciada } from '../format';
 import { t } from '../i18n/es';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
@@ -365,7 +364,7 @@ function textoMotivo(final: FinalPriorizado): string | null {
     // porcentaje acumulado solo aparece cuando es lo único que hay.
     return señales.ultimaFallada
       ? t.finales.motivoUltimaFallada
-      : t.finales.motivoFalla
+      : (señales.historialParcial ? t.finales.motivoFallaRecientes : t.finales.motivoFalla)
           .replace('{fallos}', String(señales.fallos))
           .replace('{total}', String(señales.practicas));
   }
@@ -544,17 +543,6 @@ function FinalesScreen() {
 }
 
 /**
- * La ventaja desperdiciada, en una línea. Un mate desperdiciado es justo la
- * ventaja más clara que se puede tirar, y su centinela dividido por cien salía
- * como "Ventaja de +1000,0" (RNF-10): el mate se nombra en vez de contarse.
- */
-function textoVentaja(ventaja: VentajaDesperdiciada): string {
-  const jugada = String(Math.floor(ventaja.ply / 2) + 1);
-  if (esMate(ventaja.ventajaCp)) return t.conversion.listaMate.replace('{jugada}', jugada);
-  return t.conversion.listaVentaja.replace('{ventaja}', formatDecimal(ventaja.ventajaCp / 100, 1)).replace('{jugada}', jugada);
-}
-
-/**
  * Conversión de ventajas (E8, RF-8.1/8.3). El material sale del análisis de las
  * partidas propias, que la app ya produce: no dependía de la red, y la épica
  * figuraba bloqueada porque RF-8.1 pide Maia como defensor. RF-8.3 autoriza el
@@ -592,7 +580,7 @@ function ConversionScreen() {
             {s.ventajas.map((ventaja) => (
               <li key={ventaja.gameId} className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
                 <div className="min-w-0">
-                  <p className="m-0 text-primary tabular-nums">{textoVentaja(ventaja)}</p>
+                  <p className="m-0 text-primary tabular-nums">{textoVentajaDesperdiciada(ventaja)}</p>
                   <p className="m-0 mt-1 text-xs text-tertiary">
                     {t.conversion.listaResultado.replace('{resultado}', ventaja.resultado)}
                     {' · '}
@@ -637,7 +625,7 @@ function ConversionScreen() {
         <div className="rounded-lg border border-subtle bg-surface p-4">
           <p className="m-0 font-display text-xl">{t.conversion.titulo}</p>
           {s.ventaja && (
-            <p className="m-0 mt-2 text-sm text-secondary tabular-nums">{textoVentaja(s.ventaja)}</p>
+            <p className="m-0 mt-2 text-sm text-secondary tabular-nums">{textoVentajaDesperdiciada(s.ventaja)}</p>
           )}
         </div>
         {s.engineError && (

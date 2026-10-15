@@ -1,4 +1,7 @@
 import { CP_MATE } from '../core/engineLevels';
+import type { LecturaMomentoCritico } from '../core/analysis';
+import type { VentajaDesperdiciada } from '../core/conversion';
+import type { Color } from '../core/types';
 import { t } from './i18n/es';
 
 const decimalFormatters = new Map<number, Intl.NumberFormat>();
@@ -64,26 +67,67 @@ export function formatPeones(cp: number): string {
   return formatDecimal(Math.abs(cp) / 100, 1);
 }
 
+/** Décimos de peón tal como los redondea `formatVentaja`. */
+const decimosVisibles = (cp: number): number => Math.round((cp / 100) * 10);
+
 /**
  * Lo que una jugada hizo con la ventaja de quien movió: la plantilla `costo`
  * dice el salto ("pasó de {antes} a {despues}") y lo que costó en {peones}.
  *
+ * El costo se calcula con los mismos números que se muestran, no con
+ * `cpPerdidos`. `cpPerdidos` sale de la escala acotada a ±`CP_TOPE` (diez
+ * peones), que sirve para clasificar y ordenar, pero deja de cuadrar con el
+ * salto apenas un extremo pasa de diez: "costó 11,0 peones: pasó de +12,4 a
+ * −1,0" pide al lector una cuenta que da 13,4. Se resta en décimos ya
+ * redondeados para que también el redondeo cierre.
+ *
  * Con un mate en cualquiera de los dos extremos se usa `mate`, que no lleva
- * costo. `cpPerdidos` sale de la escala acotada a ±`CP_TOPE`, donde el mate
- * vale diez peones: "pasó de mate a favor a +5,0 — te costó 5,0 peones" o "de
- * +2,0 a mate en contra — te costó 12,0 peones" son cifras de esa convención,
- * que el lector no puede reconstruir a partir del salto que ve. Con el mate
- * nombrado, el salto ya dice qué se perdió.
+ * costo: el mate no tiene valor en peones, y nombrado ya dice qué se perdió.
  */
 export function fraseSaltoVentaja(
   plantillas: { costo: string; mate: string },
-  salto: { ventajaAntes: number; ventajaDespues: number; cpPerdidos: number },
+  salto: { ventajaAntes: number; ventajaDespues: number },
 ): string {
   const plantilla = esMate(salto.ventajaAntes) || esMate(salto.ventajaDespues) ? plantillas.mate : plantillas.costo;
+  const costoDecimos = Math.max(0, decimosVisibles(salto.ventajaAntes) - decimosVisibles(salto.ventajaDespues));
   return plantilla
     .replace('{antes}', formatVentaja(salto.ventajaAntes))
     .replace('{despues}', formatVentaja(salto.ventajaDespues))
-    .replace('{peones}', formatPeones(salto.cpPerdidos));
+    .replace('{peones}', formatDecimal(costoDecimos / 10, 1));
+}
+
+/**
+ * La frase del salto en la lectura del momento crítico, contada desde el lado
+ * que corresponde.
+ *
+ * El vuelco de la partida puede ser una jugada del rival, y `lectura` trae las
+ * ventajas desde el lado de quien movió: dichas como propias, "pasó de mate a
+ * favor a −5,0" le hacía creer al usuario que él había tenido el mate que en
+ * realidad desperdició su rival. Si la jugada fue del rival se dice así, con
+ * la evaluación desde el lado del usuario y sin costo. Si no se sabe con qué
+ * color jugó (partidas viejas), se nombra el bando.
+ */
+export function fraseLecturaMomento(lectura: LecturaMomentoCritico, jugadorColor: Color | undefined): string {
+  const salto = fraseSaltoVentaja({ costo: t.analisis.momentoLecturaCosto, mate: t.analisis.momentoLecturaMate }, lectura);
+  if (jugadorColor === undefined) {
+    const lado = lectura.ladoQueMueve === 'w' ? t.analisis.ladoBlancas : t.analisis.ladoNegras;
+    return `${t.analisis.momentoLecturaLado.replace('{lado}', lado)} ${salto}`;
+  }
+  if (lectura.ladoQueMueve === jugadorColor) return salto;
+  return t.analisis.momentoLecturaRival
+    .replace('{antes}', formatVentaja(-lectura.ventajaAntes))
+    .replace('{despues}', formatVentaja(-lectura.ventajaDespues));
+}
+
+/**
+ * La ventaja desperdiciada, en una línea. Un mate desperdiciado es justo la
+ * ventaja más clara que se puede tirar, y su centinela dividido por cien salía
+ * como "Ventaja de +1000,0" (RNF-10): el mate se nombra en vez de contarse.
+ */
+export function textoVentajaDesperdiciada(ventaja: Pick<VentajaDesperdiciada, 'ply' | 'ventajaCp'>): string {
+  const jugada = String(Math.floor(ventaja.ply / 2) + 1);
+  if (esMate(ventaja.ventajaCp)) return t.conversion.listaMate.replace('{jugada}', jugada);
+  return t.conversion.listaVentaja.replace('{ventaja}', formatDecimal(ventaja.ventajaCp / 100, 1)).replace('{jugada}', jugada);
 }
 
 /** Duración legible de un ejercicio ("45 s", "3 min", "12 min"). Redondea a

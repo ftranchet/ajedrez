@@ -127,8 +127,8 @@ describe('altaErrorCard — dedup y tope diario (RF-4.1/4.5)', () => {
 
 // Los instantes se arman en hora local (`new Date(año, mes, día, hora)`): así
 // los tests valen en cualquier zona horaria del proceso. La regresión de B3
-// solo se manifiesta fuera de UTC; correr también con
-// TZ=America/Argentina/Buenos_Aires y TZ=Asia/Tokyo.
+// solo se manifiesta fuera de UTC: la CI corre la suite también en
+// Pacific/Kiritimati (UTC+14) y Pacific/Pago_Pago (UTC−11).
 const local = (dia: number, hora = 12, minuto = 0) => new Date(2026, 6, dia, hora, minuto);
 const inicioDelDia = (dia: number) => new Date(2026, 6, dia);
 const distinta = (i: number, now: Date) => ({ ...base, id: `d${i}`, fen: `fen-${i}`, jugadaCorrecta: `mv${i}`, now });
@@ -254,12 +254,46 @@ describe('altaErrorCard — pasado el tope, difiere; nunca descarta (B2, RF-4.5)
     expect(alta.card.id).toBe(cards[3].id);
   });
 
-  it('volver a fallar una diferida la refuerza y adelanta su repaso, como a cualquier otra', () => {
+  it('volver a fallar una diferida que todavía espera su día no la adelanta a hoy', () => {
+    // El mismo error de apertura en dos partidas de un lote exprés: la segunda
+    // confirmación no puede meterla hoy por encima del cupo (ni dejar
+    // desactualizado el aviso de "entran en los próximos días").
     const { cards } = confirmarSeguidos(11, ahora);
     const alta = altaErrorCard(cards, distinta(10, local(17, 18)));
     expect(alta.accion).toBe('reforzar');
-    expect(alta.card.id).toBe(cards[10].id);
+    expect(alta.card).toEqual(cards[10]);
+    expect(dueErrorCards([alta.card], local(17, 23))).toEqual([]);
+    expect(tarjetasNuevasHoy([...cards.slice(0, 10), alta.card], local(17, 23))).toBe(10);
+  });
+
+  it('una diferida que ya entró se refuerza como cualquier otra', () => {
+    const { cards } = confirmarSeguidos(11, ahora);
+    const alta = altaErrorCard(cards, distinta(10, local(18, 18)));
+    expect(alta.accion).toBe('reforzar');
     expect(alta.card.fsrs.reps).toBe(1);
-    expect(dueErrorCards([alta.card], local(17, 23)).map((c) => c.id)).toEqual([cards[10].id]);
+  });
+
+  it('la diferida guarda su día de entrada', () => {
+    const { altas } = confirmarSeguidos(11, ahora);
+    expect(altas[9].card.entraEn).toBeUndefined();
+    expect(altas[10].card.entraEn).toBe('2026-07-18');
+  });
+
+  it('el día de entrada no depende de si la Cola se hizo antes o después de analizar', () => {
+    // Domingo: 40 errores en un lote → 10 entran cada día de dom a mié.
+    const domingo = confirmarSeguidos(40, local(19, 12));
+    const lunes = local(20, 8);
+    // (A) El lunes analiza 6 errores nuevos antes de repasar.
+    const antes = confirmarSeguidos(6, local(20, 9), domingo.cards, 100);
+    // (B) El lunes primero repasa las 10 diferidas que entraban ese día…
+    const repasadas = domingo.cards.map((card) =>
+      card.entraEn === '2026-07-20' ? reviewErrorCard(card, true, lunes) : card,
+    );
+    expect(repasadas.filter((card) => card.entraEn === '2026-07-20' && card.fsrs.state !== 'new')).toHaveLength(10);
+    // …y después analiza los mismos 6.
+    const despues = confirmarSeguidos(6, local(20, 20), repasadas, 100);
+    const dias = (altas: AltaTarjeta[]) => altas.map((alta) => alta.card.entraEn);
+    expect(dias(despues.altas)).toEqual(dias(antes.altas));
+    expect(dias(antes.altas)).toEqual(Array(6).fill('2026-07-23'));
   });
 });

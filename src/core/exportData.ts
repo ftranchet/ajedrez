@@ -137,6 +137,9 @@ const esId: Predicado = (x) => typeof x === 'string' && x !== '';
 const esTexto: Predicado = (x) => typeof x === 'string';
 const esNumero: Predicado = (x) => typeof x === 'number' && Number.isFinite(x);
 const esBooleano: Predicado = (x) => typeof x === 'boolean';
+const esEnteroNoNegativo: Predicado = (x) => typeof x === 'number' && Number.isInteger(x) && x >= 0;
+/** Clave de día local, la misma forma que `dailyAssignmentId`. */
+const esDiaLocal: Predicado = (x) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x);
 const opcional = (x: unknown, es: Predicado): boolean => x === undefined || es(x);
 const esListaDe = (x: unknown, es: Predicado): boolean => Array.isArray(x) && x.every((elemento) => es(elemento));
 const unoDe = (valores: readonly string[]): Predicado => (x) => typeof x === 'string' && valores.includes(x);
@@ -193,7 +196,9 @@ function esErrorCardValida(x: unknown): boolean {
     esCategoriaError(x.categoria) &&
     esOrigenTarjeta(x.origen) &&
     typeof x.creadaEn === 'string' &&
-    esFsrsValido(x.fsrs)
+    esFsrsValido(x.fsrs) &&
+    // Solo en las diferidas por el tope diario (ADR-0017): fija el día del cupo.
+    opcional(x.entraEn, esDiaLocal)
   );
 }
 
@@ -396,7 +401,13 @@ function esCurriculumProgressValido(x: unknown): boolean {
     esId(x.id) &&
     esFsrsValido(x.fsrs) &&
     esNumero(x.demostracionesLimpias) &&
-    esTexto(x.updatedAt)
+    esTexto(x.updatedAt) &&
+    // Contadores del acierto (RF-6.5): ausentes en registros viejos. Si vienen,
+    // vienen juntos, son enteros y no hay más aciertos que intentos. Un "3"
+    // de texto entraba y después la suma lo concatenaba ("31"), y el modo a
+    // ciegas leía un acierto inventado.
+    ((x.intentos === undefined && x.aciertos === undefined) ||
+      (esEnteroNoNegativo(x.intentos) && esEnteroNoNegativo(x.aciertos) && Number(x.aciertos) <= Number(x.intentos)))
   );
 }
 
@@ -485,9 +496,11 @@ function esTriageAttemptValido(x: unknown): boolean {
  * Validación por registro de cada tabla (RF-14.2), con el mensaje que ve el
  * usuario. Como la restauración reemplaza el estado local entero, un solo
  * registro corrupto rechaza el paquete en vez de escribirse sobre datos
- * buenos. Ningún mensaje nombra "Stoyko" ni "Triage": son identificadores
- * internos; la interfaz llama a esos ejercicios cálculo de la semana y
- * criterio de cálculo.
+ * buenos. Los ejercicios se nombran como los nombra la interfaz ("Cálculo",
+ * "¿Calcular o ya alcanza?", "¿Hay algo mejor?", "Doble solución"), no con
+ * sus identificadores internos ni con nombres retirados ("Stoyko", "Triage",
+ * "cálculo comprometido"): el usuario tiene que poder reconocer qué parte de
+ * sus datos falló.
  */
 const VALIDACION_POR_REGISTRO: ReadonlyArray<readonly [Exclude<keyof ExportBundle, 'manifest' | 'profile'>, Predicado, string]> = [
   ['games', esGameRecordValido, 'Alguna partida del respaldo está corrupta o incompleta.'],
@@ -496,12 +509,12 @@ const VALIDACION_POR_REGISTRO: ReadonlyArray<readonly [Exclude<keyof ExportBundl
   ['radarProgress', esRadarProgressValido, 'El progreso del Radar del respaldo está corrupto o incompleto.'],
   ['radarAttempts', esRadarAttemptValido, 'Alguna respuesta del Radar del respaldo está corrupta o incompleta.'],
   ['curriculumProgress', esCurriculumProgressValido, 'Algún progreso del currículo del respaldo está corrupto o incompleto.'],
-  ['candidataAttempts', esCandidataAttemptValido, 'Algún intento de la regla de candidatas del respaldo está corrupto o incompleto.'],
-  ['compromisoAttempts', esCompromisoAttemptValido, 'Algún intento de cálculo comprometido del respaldo está corrupto o incompleto.'],
-  ['calculoAttempts', esCalculoAttemptValido, 'Algún intento de cálculo declarado del respaldo está corrupto o incompleto.'],
-  ['dobleSolucionAttempts', esDobleSolucionAttemptValido, 'Algún intento de doble solución del respaldo está corrupto o incompleto.'],
-  ['stoykoAttempts', esStoykoAttemptValido, 'Algún intento del cálculo de la semana del respaldo está corrupto o incompleto.'],
-  ['triageAttempts', esTriageAttemptValido, 'Algún ejercicio del criterio de cálculo del respaldo está corrupto o incompleto.'],
+  ['candidataAttempts', esCandidataAttemptValido, 'Alguna respuesta de "¿Hay algo mejor?" del respaldo está corrupta o incompleta.'],
+  ['compromisoAttempts', esCompromisoAttemptValido, 'Algún intento de Cálculo del respaldo (formato anterior) está corrupto o incompleto.'],
+  ['calculoAttempts', esCalculoAttemptValido, 'Algún intento de Cálculo del respaldo está corrupto o incompleto.'],
+  ['dobleSolucionAttempts', esDobleSolucionAttemptValido, 'Algún intento de Doble solución del respaldo está corrupto o incompleto.'],
+  ['stoykoAttempts', esStoykoAttemptValido, 'Algún intento de Cálculo del respaldo (formato anterior) está corrupto o incompleto.'],
+  ['triageAttempts', esTriageAttemptValido, 'Algún ejercicio de "¿Calcular o ya alcanza?" del respaldo está corrupto o incompleto.'],
   ['sessions', esSessionRecordValido, 'Alguna sesión del respaldo está corrupta o incompleta.'],
   ['transferMeasurements', esTransferMeasurementValida, 'Alguna batería de transferencia del respaldo está corrupta o incompleta.'],
   ['n1Experiments', esN1ExperimentValido, 'Algún experimento n=1 del respaldo está corrupto o incompleto.'],
@@ -524,7 +537,10 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (!manifest || typeof manifest.esquema !== 'number') {
     return { ok: false, error: 'Falta el manifiesto o no indica versión de esquema.' };
   }
-  if (manifest.esquema > SCHEMA_VERSION) {
+  // Un esquema que no es entero no existe en ninguna versión: se dice que es
+  // inválido antes de compararlo con el actual, si no un 20.5 recibía "actualizá
+  // la app", que no lo arreglaría.
+  if (manifest.esquema > SCHEMA_VERSION && Number.isInteger(manifest.esquema)) {
     return { ok: false, error: `El archivo es de una versión más nueva (esquema ${manifest.esquema}) que esta app (${SCHEMA_VERSION}). Actualizá la app antes de restaurar.` };
   }
   // Una versión que la cadena de migraciones no cubre (0, negativa, fraccional)
@@ -556,28 +572,28 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   // Los respaldos de antes de Fase 4 no traen la regla de candidatas (RF-5.8).
   if (obj.candidataAttempts !== undefined && !Array.isArray(obj.candidataAttempts)) {
-    return { ok: false, error: 'El historial de la regla de candidatas no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial de "¿Hay algo mejor?" no tiene la forma esperada.' };
   }
   // Tampoco cálculo comprometido (E7, RF-7.1), el formato anterior a ADR-0015.
   if (obj.compromisoAttempts !== undefined && !Array.isArray(obj.compromisoAttempts)) {
-    return { ok: false, error: 'El historial de cálculo comprometido no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial de Cálculo (formato anterior) no tiene la forma esperada.' };
   }
   // Ni el formato unificado de cálculo declarado (ADR-0015, esquema v18): un
   // respaldo anterior no lo trae y se restaura igual — la migración lo
   // reconstruye desde los dos formatos viejos, que sí viajan en el paquete.
   if (obj.calculoAttempts !== undefined && !Array.isArray(obj.calculoAttempts)) {
-    return { ok: false, error: 'El historial de cálculo declarado no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial de Cálculo no tiene la forma esperada.' };
   }
   // Ni doble solución (RF-5.7).
   if (obj.dobleSolucionAttempts !== undefined && !Array.isArray(obj.dobleSolucionAttempts)) {
-    return { ok: false, error: 'El historial de doble solución no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial de Doble solución no tiene la forma esperada.' };
   }
   // Ni el historial de Stoyko (E7) o Triage (E9), agregados en esquema v11.
   if (obj.stoykoAttempts !== undefined && !Array.isArray(obj.stoykoAttempts)) {
-    return { ok: false, error: 'El historial del cálculo de la semana no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial de Cálculo (formato anterior) no tiene la forma esperada.' };
   }
   if (obj.triageAttempts !== undefined && !Array.isArray(obj.triageAttempts)) {
-    return { ok: false, error: 'El historial del criterio de cálculo no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial de "¿Calcular o ya alcanza?" no tiene la forma esperada.' };
   }
   // Los respaldos anteriores a RF-12.1 no traen sesiones persistidas.
   if (obj.sessions !== undefined && !Array.isArray(obj.sessions)) {

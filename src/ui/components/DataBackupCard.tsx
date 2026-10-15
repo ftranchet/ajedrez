@@ -4,6 +4,7 @@
 // estado dependiente (perfil, sesión) sin quedar mostrando datos viejos.
 import { useRef, useState } from 'react';
 import { deleteAllUserData, exportAllData, importAllData } from '../../services/export/exportImport';
+import { dailyAssignmentId } from '../../core/dailyAssignment';
 import { t } from '../i18n/es';
 import { SectionHeading } from './SectionHeading';
 
@@ -25,7 +26,8 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `elomax-export-${new Date().toISOString().slice(0, 10)}.zip`;
+      // Día local: con el UTC, un respaldo de las 22:00 en UTC−3 salía fechado mañana.
+      a.download = `elomax-export-${dailyAssignmentId()}.zip`;
       a.click();
       URL.revokeObjectURL(url);
       setMensaje(t.panel.exportado);
@@ -60,13 +62,13 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
         );
         onImported?.();
       } else {
-        setMensaje(`${t.panel.importadoError}: ${outcome.error}`);
+        setMensaje(t.panel.importadoError.replace('{motivo}', outcome.error));
       }
     } catch {
       // `importAllData` ya devuelve sus fallos como `{ ok: false }`; lo que
       // llega acá es no haber podido leer el archivo elegido, antes de tocar
       // la base. Antes no había `catch` y la pantalla no decía nada (B10).
-      setMensaje(`${t.panel.importadoError}: ${t.panel.importadoErrorLectura}`);
+      setMensaje(t.panel.importadoError.replace('{motivo}', t.panel.importadoErrorLectura));
     } finally {
       setImportando(false);
       if (fileInput.current) fileInput.current.value = '';

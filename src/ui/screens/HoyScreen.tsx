@@ -27,7 +27,7 @@ import { readBlindTrainingEnabled } from '../trainingPrefs';
 import { normalizeSensoryPreferences } from '../../core/sensory';
 import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
 import { useSlowLoading } from '../hooks/useSlowLoading';
-import { porqueCriterio } from '../porqueCriterio';
+import { porqueCriterio, porqueRadar } from '../porques';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
@@ -176,18 +176,6 @@ function BloqueAccordion({
  * fue, marcado como hecho. `bloquesDeLaSesion` queda como respaldo para el
  * instante en que el resumen todavía no trajo el plan.
  */
-/**
- * Por qué el Radar viene como viene. La fuga por tipo (RF-11.2) es más
- * específica que el refuerzo por errores tácticos, así que manda cuando hay
- * las dos; sin ninguna, el porqué de siempre.
- */
-function porqueRadar(dieta: DietaSesion, fugas: TipoRadar[]): string {
-  if (fugas.length > 0) {
-    return t.sesion.bloqueRadarPorqueTipo.replace('{tipo}', t.diagnostico.tiposRadar[fugas[0]].toLowerCase());
-  }
-  return dieta.ajusteFugas.categoria === 'tactico' ? t.sesion.bloqueRadarPorqueFuga : t.sesion.bloqueRadarPorque;
-}
-
 function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion, fugas: TipoRadar[]): Bloque[] {
   return assignment.bloques.map((bloque) => {
     const n = bloque.estado === 'completado'
@@ -642,12 +630,12 @@ function SesionActiva() {
   }
 
   // Modificador a ciegas (RF-6.5): solo mientras se está jugando un patrón
-  // del currículo con acierto sostenido por encima del 80%; en feedback se
-  // ve la posición entera, para poder revisarla.
+  // del currículo cuyo acierto (sumando todas sus posiciones) supera el 80%;
+  // en feedback se ve la posición entera, para poder revisarla.
   const curriculumItemActual = enCurriculo ? s.curriculumQueue[s.curriculumIndex] : null;
   const blindMode =
     readBlindTrainingEnabled() && enCurriculo && s.curriculumSubPhase === 'jugando' && curriculumItemActual
-      ? nivelCiegas(s.curriculumProgressById.get(curriculumItemActual.id))
+      ? nivelCiegas(curriculumItemActual, s.curriculumItemsAll, s.curriculumProgressById)
       : 'normal';
 
   return (
@@ -788,7 +776,7 @@ function CurriculumPanel() {
     s.curriculumSubPhase === 'feedback',
   );
   const item = s.curriculumQueue[s.curriculumIndex];
-  const nivel = readBlindTrainingEnabled() && s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(s.curriculumProgressById.get(item.id)) : 'normal';
+  const nivel = readBlindTrainingEnabled() && s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(item, s.curriculumItemsAll, s.curriculumProgressById) : 'normal';
 
   return (
     <div className="flex flex-col gap-3">

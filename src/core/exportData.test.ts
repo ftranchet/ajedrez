@@ -149,6 +149,18 @@ describe('validateImportBundle', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain('inválida');
   });
+
+  it('un esquema fraccional mayor que el actual también es inválido, no "más nuevo"', () => {
+    // "Actualizá la app" no arreglaría nada: no existe ninguna versión 20,5.
+    const raw = JSON.parse(JSON.stringify(buildExportBundle(empty)));
+    raw.manifest.esquema = SCHEMA_VERSION + 0.5;
+    const result = validateImportBundle(raw);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('inválida');
+      expect(result.error).not.toContain('Actualizá');
+    }
+  });
 });
 
 // B10: de nueve tablas solo se miraba que fueran listas. Un registro sin `id`
@@ -238,9 +250,29 @@ describe('validación por registro de todas las tablas (B10, RF-14.2)', () => {
   it('acepta campos desconocidos: una versión más nueva puede sumarlos sin cambiar de esquema', () => {
     const raw = respaldoCompleto();
     for (const tabla of TABLAS) raw[tabla] = raw[tabla].map((registro) => ({ ...registro, campoNuevo: 'x' }));
-    // Campos opcionales que otra versión puede agregar al progreso del currículo.
+    // Campos opcionales de esta versión: los contadores del acierto (RF-6.5) y
+    // el día de entrada de una tarjeta diferida (ADR-0017).
     raw.curriculumProgress = [{ ...raw.curriculumProgress[0]!, intentos: 4, aciertos: 3 }];
+    raw.errorCards = [{ ...raw.errorCards[0]!, entraEn: '2026-10-16' }];
     expect(validateImportBundle(raw).ok).toBe(true);
+  });
+
+  it.each([
+    ['contadores de texto, que la suma concatena ("3" + 1 = "31")', { intentos: '3', aciertos: '3' }],
+    ['más aciertos que intentos', { intentos: 2, aciertos: 3 }],
+    ['un contador sin el otro', { intentos: 4 }],
+    ['contadores negativos o fraccionarios', { intentos: -1, aciertos: 0.5 }],
+    ['un acierto nulo', { intentos: 4, aciertos: null }],
+  ])('rechaza un progreso del currículo con %s', (_, contadores) => {
+    const raw = respaldoCompleto();
+    raw.curriculumProgress = [{ ...raw.curriculumProgress[0]!, ...contadores }];
+    expect(validateImportBundle(raw).ok).toBe(false);
+  });
+
+  it('rechaza un día de entrada que no tiene forma de día', () => {
+    const raw = respaldoCompleto();
+    raw.errorCards = [{ ...raw.errorCards[0]!, entraEn: '16/10/2026' }];
+    expect(validateImportBundle(raw).ok).toBe(false);
   });
 
   it.each(TABLAS)('rechaza un registro sin id en %s', (tabla) => {
@@ -317,9 +349,9 @@ describe('validación por registro de todas las tablas (B10, RF-14.2)', () => {
 
   it('los mensajes no nombran ejercicios que la interfaz ya no llama así', () => {
     // "Triage" y "Stoyko" son identificadores internos; el usuario conoce
-    // esos ejercicios como el criterio de cálculo y el cálculo de la semana.
+    // esos ejercicios como "¿Calcular o ya alcanza?" y "Cálculo".
     const errores: string[] = [];
-    for (const tabla of ['stoykoAttempts', 'triageAttempts'] as const) {
+    for (const tabla of ['stoykoAttempts', 'triageAttempts', 'compromisoAttempts', 'calculoAttempts', 'candidataAttempts'] as const) {
       const malFormado = respaldoCompleto();
       malFormado[tabla] = [sin(malFormado[tabla][0]!, 'id')];
       const noEsLista = { ...respaldoCompleto(), [tabla]: 'no-es-lista' };
@@ -329,8 +361,10 @@ describe('validación por registro de todas las tablas (B10, RF-14.2)', () => {
         if (!result.ok) errores.push(result.error);
       }
     }
-    expect(errores).toHaveLength(4);
-    for (const error of errores) expect(error).not.toMatch(/stoyko|triage/i);
+    expect(errores).toHaveLength(10);
+    for (const error of errores) {
+      expect(error).not.toMatch(/stoyko|triage|comprometid|declarado|regla de candidatas|criterio de cálculo/i);
+    }
   });
 });
 
