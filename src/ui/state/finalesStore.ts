@@ -340,9 +340,11 @@ export function createFinalesStore(deps: FinalesDeps) {
 
       volver() {
         chess = new Chess();
+        // El aviso de la caída del motor no sobrevive a la salida: quedaba
+        // encima de la lista, con un "Volver a finales" que ya no hacía nada.
         set({
           phase: 'lista', item: null, limpia: null, thinking: false, pendingPromotion: null,
-          practica: false, revision: null, jugadaCorrecta: null,
+          practica: false, revision: null, jugadaCorrecta: null, engineError: false,
         });
       },
     };

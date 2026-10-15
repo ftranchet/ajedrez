@@ -259,6 +259,18 @@ describe('finalesStore — caída del motor', () => {
     expect(store.getState()).toMatchObject({ phase: 'jugando', engineError: false, turn: 'w', lastMove: ['e7', 'd7'] });
   });
 
+  it('volver a la lista tras la caída no deja el aviso de error colgado', async () => {
+    const store = createFinalesStore(deps(mate, new MotorQueSeCaeUnaVez()).value);
+    await store.getState().load();
+    await store.getState().start(mate.id);
+    await store.getState().userMove('h1' as never, 'h5' as never);
+    expect(store.getState().engineError).toBe(true);
+
+    store.getState().volver();
+
+    expect(store.getState()).toMatchObject({ phase: 'lista', engineError: false });
+  });
+
   it('sin una caída del motor, reintentar no consulta nada', async () => {
     const motor = new MotorQueSeCaeUnaVez();
     const store = createFinalesStore(deps(mate, motor).value);
