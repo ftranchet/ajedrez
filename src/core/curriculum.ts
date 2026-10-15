@@ -13,7 +13,7 @@ const DEMOSTRACIONES_PARA_AUTOMATIZAR = 3;
 
 /** Progreso inicial de un elemento nunca visto: nuevo, disponible de inmediato. */
 export function newCurriculumProgress(itemId: string, now: Date = new Date()): CurriculumProgress {
-  return { id: itemId, fsrs: newFsrsState(now), demostracionesLimpias: 0, updatedAt: now.toISOString() };
+  return { id: itemId, fsrs: newFsrsState(now), demostracionesLimpias: 0, intentos: 0, aciertos: 0, updatedAt: now.toISOString() };
 }
 
 export function isAutomatizado(progress: CurriculumProgress): boolean {
@@ -24,13 +24,16 @@ export function isAutomatizado(progress: CurriculumProgress): boolean {
  * Aplica el resultado de una demostración (RF-6.3): una demostración limpia
  * suma al contador y espacia la reaparición (como un acierto FSRS); un fallo
  * reinicia el contador a cero y la reaparición se adelanta (como un fallo
- * FSRS) — automatizar exige rachas limpias, no un promedio.
+ * FSRS) — automatizar exige rachas limpias, no un promedio. El promedio se
+ * lleva aparte, en `intentos`/`aciertos`, para el modo a ciegas (RF-6.5).
  */
 export function reviewCurriculumProgress(progress: CurriculumProgress, limpia: boolean, now: Date = new Date()): CurriculumProgress {
   return {
     ...progress,
     fsrs: reviewFsrsState(progress.fsrs, limpia, now),
     demostracionesLimpias: limpia ? progress.demostracionesLimpias + 1 : 0,
+    intentos: (progress.intentos ?? 0) + 1,
+    aciertos: (progress.aciertos ?? 0) + (limpia ? 1 : 0),
     updatedAt: now.toISOString(),
   };
 }
@@ -78,22 +81,35 @@ export function finalesJugadosHoy(
 }
 
 const UMBRAL_CIEGAS = 0.8;
-// No activar el modificador con una racha corta y casual: unas pocas
-// repeticiones alcanzan para que el 80% de acierto signifique algo.
+// No activar el modificador con una racha corta y casual: unos pocos
+// intentos medidos alcanzan para que el 80% de acierto signifique algo.
 const REPS_MINIMAS_CIEGAS = 3;
 
 export type NivelCiegas = 'normal' | 'fantasma' | 'coordenadas';
 
 /**
  * Modificador a ciegas progresivo (RF-6.5): sobre un patrón con más de 80%
- * de acierto histórico (y unas pocas repeticiones, para no activarlo con una
+ * de acierto histórico (y unos pocos intentos, para no activarlo con una
  * sola casualidad), sube la dificultad deseable (Bjork) ocultando primero
  * las piezas ("fantasma") y, si el usuario sigue acertando limpio camino a
  * la automatización (RF-6.3), también las coordenadas de las piezas.
+ *
+ * El acierto sale de `aciertos / intentos`, no de FSRS. `(reps − lapses) /
+ * reps` parecía lo mismo, pero ts-fsrs solo cuenta un lapso cuando falla un
+ * elemento que ya estaba en repaso: tres fallos seguidos desde un patrón
+ * nuevo daban "100% de acierto" y el tablero pasaba a piezas fantasma justo
+ * después de demostrar que el patrón no estaba.
+ *
+ * Un registro anterior a los contadores se queda en 'normal' hasta juntar sus
+ * propios intentos. El pasado no se reconstruye porque no se puede: FSRS no
+ * guarda qué repasos fallaron y la racha solo dice cómo terminó. Esperar unos
+ * intentos cuesta poco; subir la dificultad sobre un acierto supuesto es
+ * justamente el error que esto corrige.
  */
 export function nivelCiegas(progress: CurriculumProgress | undefined): NivelCiegas {
-  if (!progress || progress.fsrs.reps < REPS_MINIMAS_CIEGAS) return 'normal';
-  const tasaAcierto = (progress.fsrs.reps - progress.fsrs.lapses) / progress.fsrs.reps;
+  const intentos = progress?.intentos ?? 0;
+  if (!progress || intentos < REPS_MINIMAS_CIEGAS) return 'normal';
+  const tasaAcierto = (progress.aciertos ?? 0) / intentos;
   if (tasaAcierto <= UMBRAL_CIEGAS) return 'normal';
   return progress.demostracionesLimpias >= 2 ? 'coordenadas' : 'fantasma';
 }

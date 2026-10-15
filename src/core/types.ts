@@ -434,6 +434,15 @@ export interface CurriculumProgress {
   id: string; // = CurriculumItem.id
   fsrs: FsrsState;
   demostracionesLimpias: number;
+  /**
+   * Demostraciones hechas y cuántas fueron limpias, para medir el acierto
+   * (RF-6.5). Ni FSRS ni la racha lo dan: `fsrs.lapses` no cuenta los fallos
+   * mientras el elemento se aprende y `demostracionesLimpias` vuelve a cero.
+   * Opcionales porque los registros anteriores no los tienen; empiezan a
+   * contar en su próxima demostración.
+   */
+  intentos?: number;
+  aciertos?: number;
   updatedAt: string; // ISO 8601
 }
 

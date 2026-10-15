@@ -34,10 +34,14 @@ async function seedCurriculumConFantasma(page: Page) {
             tx.objectStore('curriculumProgress').put({ id, fsrs: fsrsAutomatizado, demostracionesLimpias: 3, updatedAt: '2020-01-01T00:00:00.000Z' });
           }
           // 5/6 ≈ 83% de acierto (> 80%), con 1 demostración limpia seguida: "fantasma".
+          // El acierto sale de intentos/aciertos, no de FSRS: sin esos
+          // contadores el patrón se serviría normal.
           tx.objectStore('curriculumProgress').put({
             id: objetivoId,
             fsrs: { ...fsrsAutomatizado, reps: 6, lapses: 1 },
             demostracionesLimpias: 1,
+            intentos: 6,
+            aciertos: 5,
             updatedAt: '2020-01-01T00:00:00.000Z',
           });
           tx.oncomplete = () => resolve();

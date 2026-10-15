@@ -41,6 +41,34 @@ describe('reviewCurriculumProgress', () => {
     const after = reviewCurriculumProgress(racha, false, now);
     expect(after.demostracionesLimpias).toBe(0);
   });
+
+  it('cuenta cada demostración en intentos y solo las limpias en aciertos', () => {
+    const now = new Date('2026-01-01T00:00:00Z');
+    const nuevo = newCurriculumProgress('p1', now);
+    expect(nuevo.intentos).toBe(0);
+    expect(nuevo.aciertos).toBe(0);
+    const resultados = [true, false, true, true, false];
+    const final = resultados.reduce((p, limpia) => reviewCurriculumProgress(p, limpia, now), nuevo);
+    expect(final.intentos).toBe(5);
+    expect(final.aciertos).toBe(3);
+  });
+
+  it('un registro anterior a los contadores empieza a contar desde la próxima demostración', () => {
+    // No se reconstruye el pasado: FSRS no guarda qué repasos fallaron.
+    const now = new Date('2026-01-01T00:00:00Z');
+    const legado: CurriculumProgress = {
+      id: 'p1',
+      fsrs: { ...newCurriculumProgress('p1', now).fsrs, reps: 7, lapses: 1, state: 'review' },
+      demostracionesLimpias: 1,
+      updatedAt: now.toISOString(),
+    };
+    const fallo = reviewCurriculumProgress(legado, false, now);
+    expect(fallo.intentos).toBe(1);
+    expect(fallo.aciertos).toBe(0);
+    const acierto = reviewCurriculumProgress(legado, true, now);
+    expect(acierto.intentos).toBe(1);
+    expect(acierto.aciertos).toBe(1);
+  });
 });
 
 describe('dueCurriculumItems', () => {
@@ -68,7 +96,10 @@ describe('dueCurriculumItems', () => {
 });
 
 describe('nivelCiegas', () => {
-  function progresoCon(reps: number, lapses: number, demostracionesLimpias: number): CurriculumProgress {
+  const now = new Date('2026-01-01T00:00:00Z');
+
+  /** Registro con contadores propios; el FSRS es indistinto para el acierto. */
+  function progresoCon(intentos: number, aciertos: number, demostracionesLimpias: number): CurriculumProgress {
     return {
       id: 'p1',
       fsrs: {
@@ -77,32 +108,67 @@ describe('nivelCiegas', () => {
         difficulty: 5,
         elapsedDays: 0,
         scheduledDays: 0,
-        reps,
-        lapses,
+        reps: intentos,
+        lapses: 0,
         learningSteps: 0,
         state: 'review',
         lastReview: '2026-01-01T00:00:00.000Z',
       },
       demostracionesLimpias,
+      intentos,
+      aciertos,
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
   }
 
-  it('sin progreso, o con menos repeticiones que el mínimo, nivel normal', () => {
+  /** Demostraciones reales desde un patrón nuevo, con el FSRS de verdad. */
+  function demostrar(resultados: boolean[]): CurriculumProgress {
+    return resultados.reduce((p, limpia) => reviewCurriculumProgress(p, limpia, now), newCurriculumProgress('p1', now));
+  }
+
+  it('tres fallos seguidos desde un patrón nuevo no activan el modo a ciegas (B4)', () => {
+    // ts-fsrs no cuenta lapsos mientras la tarjeta está aprendiendo: con el
+    // cociente de FSRS esto daba "100% de acierto" y piezas fantasma.
+    const progreso = demostrar([false, false, false]);
+    expect(progreso.fsrs.reps).toBe(3);
+    expect(progreso.fsrs.lapses).toBe(0);
+    expect(nivelCiegas(progreso)).toBe('normal');
+  });
+
+  it('sin progreso, o con menos intentos que el mínimo, nivel normal', () => {
     expect(nivelCiegas(undefined)).toBe('normal');
-    expect(nivelCiegas(progresoCon(2, 0, 2))).toBe('normal');
+    expect(nivelCiegas(progresoCon(2, 2, 2))).toBe('normal');
+    expect(nivelCiegas(demostrar([true, true]))).toBe('normal');
+  });
+
+  it('3 de 3 limpias superan el umbral; el nivel depende de la racha, como siempre', () => {
+    expect(nivelCiegas(demostrar([true, true, true]))).toBe('coordenadas'); // racha de 3
+    expect(nivelCiegas(progresoCon(3, 3, 1))).toBe('fantasma');
   });
 
   it('con acierto de 80% exacto o menos, nivel normal (el umbral es "más de 80%")', () => {
-    expect(nivelCiegas(progresoCon(5, 1, 1))).toBe('normal'); // 4/5 = 80%
+    expect(nivelCiegas(demostrar([true, true, false, true, true]))).toBe('normal'); // 4/5 = 80%
+    expect(nivelCiegas(progresoCon(5, 4, 1))).toBe('normal');
   });
 
   it('por encima de 80% de acierto, con pocas demostraciones limpias seguidas: piezas fantasma', () => {
-    expect(nivelCiegas(progresoCon(6, 1, 1))).toBe('fantasma'); // 5/6 ≈ 83%
+    expect(nivelCiegas(progresoCon(6, 5, 1))).toBe('fantasma'); // 5/6 ≈ 83%
   });
 
   it('por encima de 80% de acierto, con 2+ demostraciones limpias seguidas (camino a automatizar): solo coordenadas', () => {
-    expect(nivelCiegas(progresoCon(6, 1, 2))).toBe('coordenadas');
+    expect(nivelCiegas(progresoCon(6, 5, 2))).toBe('coordenadas');
+  });
+
+  it('un registro anterior a los contadores queda en normal, aunque FSRS diga que acierta', () => {
+    // Sin intentos medidos no hay acierto que creer: el modo a ciegas espera
+    // a que se junten desde ahora, en vez de subir la dificultad a ciegas.
+    const legado: CurriculumProgress = {
+      id: 'p1',
+      fsrs: progresoCon(10, 10, 2).fsrs, // reps 10, lapses 0: "100%" para FSRS
+      demostracionesLimpias: 2,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect(nivelCiegas(legado)).toBe('normal');
   });
 });
 

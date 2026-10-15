@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { newCurriculumProgress, reviewCurriculumProgress } from './curriculum';
 import { priorizarFinales } from './finalesPrioridad';
 import type { CurriculumItem, CurriculumProgress, PatternKey, TrainingEvent } from './types';
 
@@ -8,13 +9,19 @@ function final(id: string, patternKey: PatternKey): CurriculumItem {
   return { id, tipo: 'final', patternKey, nombre: id, fen: '8/8/8/4k3/8/8/8/4K2R w - - 0 1', solucion: [] };
 }
 
+/**
+ * Sin `intentos`/`aciertos` es un registro anterior a los contadores; con
+ * ellos, uno que ya mide sus fallos.
+ */
 function progreso(
   id: string,
-  over: { reps: number; limpias: number; due: string; lapses?: number },
+  over: { reps: number; limpias: number; due: string; lapses?: number; intentos?: number; aciertos?: number },
 ): CurriculumProgress {
   return {
     id,
     demostracionesLimpias: over.limpias,
+    intentos: over.intentos,
+    aciertos: over.aciertos,
     updatedAt: '2026-08-01T00:00:00.000Z',
     fsrs: {
       due: over.due,
@@ -75,25 +82,59 @@ describe('priorizarFinales', () => {
 
   it('entre dos igual de presentes, primero el que te sale peor', () => {
     const progressById = new Map([
-      ['torre-1', progreso('torre-1', { reps: 4, limpias: 0, due: FUTURO, lapses: 2 })],
-      ['dama-1', progreso('dama-1', { reps: 4, limpias: 2, due: FUTURO })],
+      ['torre-1', progreso('torre-1', { reps: 4, limpias: 0, due: FUTURO, intentos: 4, aciertos: 2 })],
+      ['dama-1', progreso('dama-1', { reps: 4, limpias: 2, due: FUTURO, intentos: 4, aciertos: 4 })],
     ]);
     const orden = priorizarFinales(CATALOGO.slice(0, 2), progressById, { ahora: AHORA });
     expect(orden[0]!.item.id).toBe('torre-1');
     expect(orden[0]!.motivo).toBe('te-sale-mal');
+    expect(orden[0]!.señales.fallos).toBe(2);
     expect(orden[0]!.señales.tasaFallo).toBeCloseTo(0.5);
+  });
+
+  it('los fallos mientras se aprende cuentan: tres fallos seguidos desde cero son 3 de 3 (B4)', () => {
+    // ts-fsrs solo cuenta un lapso cuando falla una tarjeta ya en repaso: con
+    // `fsrs.lapses` esto daba 0 fallos y el final quedaba como si saliera bien.
+    const fallado = [false, false, false].reduce(
+      (p, limpia) => reviewCurriculumProgress(p, limpia, AHORA),
+      newCurriculumProgress('torre-1', AHORA),
+    );
+    expect(fallado.fsrs.lapses).toBe(0);
+    const [torre] = priorizarFinales([CATALOGO[0]!], new Map([['torre-1', fallado]]), { ahora: AHORA });
+    expect(torre!.señales.fallos).toBe(3);
+    expect(torre!.señales.practicas).toBe(3);
+    expect(torre!.señales.tasaFallo).toBe(1);
+  });
+
+  it('un registro anterior a los contadores no inventa una tasa de fallo', () => {
+    // `fsrs.lapses` subestima los fallos, así que "se te escapó 1 de 6" podría
+    // ser falso. Sin contadores la tasa queda sin dato y manda lo exacto: si la
+    // última se escapó.
+    const legado = new Map([['torre-1', progreso('torre-1', { reps: 6, limpias: 2, due: FUTURO, lapses: 1 })]]);
+    const [torre] = priorizarFinales([CATALOGO[0]!], legado, { ahora: AHORA });
+    expect(torre!.señales.practicas).toBe(6);
+    expect(torre!.señales.fallos).toBe(0);
+    expect(torre!.señales.tasaFallo).toBeNull();
+    expect(torre!.motivo).not.toBe('te-sale-mal');
+
+    const legadoFallado = new Map([['torre-1', progreso('torre-1', { reps: 6, limpias: 0, due: FUTURO, lapses: 1 })]]);
+    const [torreFallada] = priorizarFinales([CATALOGO[0]!], legadoFallado, { ahora: AHORA });
+    expect(torreFallada!.señales.ultimaFallada).toBe(true);
+    expect(torreFallada!.motivo).toBe('te-sale-mal');
   });
 
   it('"la última se te escapó" no se deduce de una racha mal leída', () => {
     // `demostracionesLimpias` es una racha que vuelve a cero con cada fallo, no
     // un contador de aciertos: leerla como tasa mostraría un porcentaje falso.
     // Cero con demostraciones hechas significa exactamente que la última falló.
-    const recienFallado = new Map([['torre-1', progreso('torre-1', { reps: 6, limpias: 0, due: FUTURO, lapses: 1 })]]);
+    const recienFallado = new Map([
+      ['torre-1', progreso('torre-1', { reps: 6, limpias: 0, due: FUTURO, intentos: 6, aciertos: 5 })],
+    ]);
     const [torre] = priorizarFinales([CATALOGO[0]!], recienFallado, { ahora: AHORA });
     expect(torre!.señales.ultimaFallada).toBe(true);
     expect(torre!.señales.tasaFallo).toBeCloseTo(1 / 6);
 
-    const enRacha = new Map([['torre-1', progreso('torre-1', { reps: 6, limpias: 2, due: FUTURO, lapses: 1 })]]);
+    const enRacha = new Map([['torre-1', progreso('torre-1', { reps: 6, limpias: 2, due: FUTURO, intentos: 6, aciertos: 5 })]]);
     const [enRachaTorre] = priorizarFinales([CATALOGO[0]!], enRacha, { ahora: AHORA });
     expect(enRachaTorre!.señales.ultimaFallada).toBe(false);
     expect(enRachaTorre!.señales.rachaLimpia).toBe(2);
