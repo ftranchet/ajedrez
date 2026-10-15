@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { buildGameAnalysis, lecturaMomentoCritico, type EngineEvalAtPly, type LecturaMomentoCritico } from '../core/analysis';
 import { posicionPropiaParaCalculo } from '../core/calculoPosicion';
-import { ventajaDesperdiciada } from '../core/conversion';
+import { UMBRAL_PERDIDA_CP, VENTAJA_GANADORA_CP, ventajaDesperdiciada } from '../core/conversion';
 import { CP_MATE } from '../core/engineLevels';
 import type { Color, GameRecord, PhaseOneData } from '../core/types';
-import { esMate, formatDecimal, formatDuracion, formatVentaja, fraseLecturaMomento, fraseSaltoVentaja, textoVentajaDesperdiciada } from './format';
+import {
+  esMate,
+  formatDecimal,
+  formatDuracion,
+  formatVentaja,
+  fraseLecturaMomento,
+  fraseSaltoVentaja,
+  textoConversionPerdida,
+  textoVentajaDesperdiciada,
+} from './format';
 import { t } from './i18n/es';
 
 describe('formato numérico de interfaz', () => {
@@ -224,5 +233,21 @@ describe('una partida cuyo error más caro desperdicia un mate', () => {
     const ventaja = ventajaDesperdiciada(partida('w', blancasTiranElMate, '1/2-1/2'))!;
     expect(textoVentajaDesperdiciada(ventaja)).toBe('Tenías mate forzado en la jugada 3');
     expect(textoVentajaDesperdiciada({ ply: 4, ventajaCp: 450 })).toBe('Ventaja de +4,5 en la jugada 3');
+  });
+});
+
+describe('textoConversionPerdida', () => {
+  // Regresión del hallazgo N4 de la auditoría 2026-10-15: decía "la ventaja
+  // bajó de la mitad de lo que tenías", pero evaluarConversion compara contra
+  // un umbral fijo, no contra el pico. Ahora nombra los números con los que se
+  // decide, tomados de las mismas constantes.
+  it('nombra el umbral con el que se decide, no "la mitad de lo que tenías"', () => {
+    const texto = textoConversionPerdida();
+    expect(formatVentaja(UMBRAL_PERDIDA_CP)).toBe('+1,5');
+    expect(formatVentaja(VENTAJA_GANADORA_CP)).toBe('+3,0');
+    expect(texto).toContain('por debajo de +1,5');
+    expect(texto).toContain('la mitad de +3,0');
+    expect(texto).not.toContain('lo que tenías');
+    expect(texto).not.toMatch(/[{}]/);
   });
 });

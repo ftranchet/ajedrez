@@ -92,20 +92,44 @@ export function ventajasDesperdiciadas(games: GameRecord[]): VentajaDesperdiciad
     .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 }
 
-export type ResultadoConversion = 'convertida' | 'perdida' | 'en-curso';
+/**
+ * Ventaja por debajo de la cual la conversión se da por perdida con la partida
+ * en curso: la mitad de `VENTAJA_GANADORA_CP`, un número fijo y no la mitad
+ * del pico. RF-8.1 define la posición ganadora con una vara absoluta (≥ +3) y
+ * el ejercicio es sostenerla, no sostener el pico: con un pico de +12, la
+ * mitad (+6) daba por "escapada" una posición que sigue ganada por el doble
+ * de esa vara, y la mitad de un pico de mate no es una ventaja: es la mitad
+ * del centinela `CP_MATE`, que ninguna evaluación alcanza. Pedir la vara
+ * entera sería pedir una técnica perfecta; la mitad deja margen sin dejar de
+ * exigir ventaja clara.
+ */
+export const UMBRAL_PERDIDA_CP = VENTAJA_GANADORA_CP / 2;
 
 /**
- * ¿Se convirtió la ventaja? Convertir es ganar; dejarla escapar hasta la
- * igualdad o peor es fallar, aunque la partida siga. El umbral de fallo es la
- * mitad de la ventaja ganadora: exigir que se sostenga el pico entero sería
- * pedir una técnica perfecta, no una conversión.
+ * - `convertida`: la partida terminó y el usuario la ganó.
+ * - `perdida`: con la partida en curso, la ventaja cayó por debajo de
+ *   `UMBRAL_PERDIDA_CP`.
+ * - `sin-ganar`: la partida terminó sin que el usuario la ganara —tablas por
+ *   ahogado, repetición, material insuficiente o cincuenta jugadas—, aunque
+ *   la ventaja no hubiera caído.
+ * - `en-curso`: nada decidido todavía.
+ *
+ * Los dos fallos se separan porque se explican distinto: decir "tu ventaja
+ * cayó" después de ahogar al rival con diez peones de más es falso.
+ */
+export type ResultadoConversion = 'convertida' | 'perdida' | 'sin-ganar' | 'en-curso';
+
+/**
+ * ¿Se convirtió la ventaja? Convertir es ganar; terminar la partida sin
+ * ganarla, o dejar caer la ventaja por debajo de `UMBRAL_PERDIDA_CP` aunque la
+ * partida siga, es fallar.
  */
 export function evaluarConversion(
   ventajaActualCp: number,
   terminada: boolean,
   usuarioGano: boolean,
 ): ResultadoConversion {
-  if (terminada) return usuarioGano ? 'convertida' : 'perdida';
-  if (ventajaActualCp < VENTAJA_GANADORA_CP / 2) return 'perdida';
+  if (terminada) return usuarioGano ? 'convertida' : 'sin-ganar';
+  if (ventajaActualCp < UMBRAL_PERDIDA_CP) return 'perdida';
   return 'en-curso';
 }

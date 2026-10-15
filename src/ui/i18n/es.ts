@@ -226,7 +226,11 @@ export const es = {
     convertida: 'Convertida',
     convertidaTexto: 'Ganaste la posición que en su momento se te escapó. Eso es técnica de conversión.',
     perdida: 'Se escapó otra vez',
-    perdidaTexto: 'La ventaja bajó de la mitad de lo que tenías. Podés volver a intentarlo: la posición no se gasta.',
+    // Los umbrales salen de core/conversion.ts (ver textoConversionPerdida):
+    // decía "la mitad de lo que tenías" y la cuenta era contra un número fijo.
+    perdidaTexto:
+      'Tu ventaja cayó por debajo de {umbral}: la mitad de {ganadora}, la ventaja desde la que una posición cuenta como ganada. Podés volver a intentarlo: la posición no se gasta.',
+    sinGanarTexto: 'La partida terminó sin que la ganaras, y convertir es ganar. Podés volver a intentarlo: la posición no se gasta.',
     dejar: 'Dejar esta posición',
     volver: 'Volver a la lista',
     errorMotor: 'El motor no pudo cargar o responder. Podés volver a intentarlo.',

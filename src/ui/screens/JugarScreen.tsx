@@ -18,7 +18,7 @@ import { isAutomatizado } from '../../core/curriculum';
 import { FINAL_DRAW_HOLD_MOVES, objetivoDeFinal } from '../../core/finales';
 import { isDue } from '../../core/scheduler';
 import type { FinalPriorizado } from '../../core/finalesPrioridad';
-import { textoVentajaDesperdiciada } from '../format';
+import { textoConversionPerdida, textoVentajaDesperdiciada } from '../format';
 import { t } from '../i18n/es';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
@@ -663,7 +663,11 @@ function ConversionScreen() {
               {s.resultado === 'convertida' ? t.conversion.convertida : t.conversion.perdida}
             </h2>
             <p className="m-0 text-secondary">
-              {s.resultado === 'convertida' ? t.conversion.convertidaTexto : t.conversion.perdidaTexto}
+              {s.resultado === 'convertida'
+                ? t.conversion.convertidaTexto
+                : s.resultado === 'sin-ganar'
+                  ? t.conversion.sinGanarTexto
+                  : textoConversionPerdida()}
             </p>
             <p className="m-0 text-xs text-tertiary">{t.conversion.limitacion}</p>
             <button className="btn-primary" onClick={() => s.volver()}>{t.conversion.volver}</button>

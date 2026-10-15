@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { evaluarConversion, ventajaDesperdiciada, ventajasDesperdiciadas } from './conversion';
+import {
+  evaluarConversion,
+  UMBRAL_PERDIDA_CP,
+  VENTAJA_GANADORA_CP,
+  ventajaDesperdiciada,
+  ventajasDesperdiciadas,
+} from './conversion';
 import type { Color, GameAnalysis, GameRecord, MoveAnalysisEntry } from './types';
 
 function jugada(ply: number, cpAntes: number, ladoQueMueve: Color): MoveAnalysisEntry {
@@ -92,9 +98,13 @@ describe('ventajasDesperdiciadas', () => {
 });
 
 describe('evaluarConversion', () => {
-  it('ganar la partida es convertir; terminarla sin ganar es perderla', () => {
+  // Terminarla sin ganar es fallar, pero no es que "la ventaja cayó": ahogar
+  // al rival con diez peones de más termina la partida con la ventaja
+  // intacta. Antes los dos fallos eran 'perdida' y compartían ese texto.
+  it('ganar la partida es convertir; terminarla sin ganar es un fallo propio', () => {
     expect(evaluarConversion(0, true, true)).toBe('convertida');
-    expect(evaluarConversion(0, true, false)).toBe('perdida');
+    expect(evaluarConversion(0, true, false)).toBe('sin-ganar');
+    expect(evaluarConversion(1000, true, false)).toBe('sin-ganar');
   });
 
   it('sostener la ventaja continúa; que caiga a menos de la mitad la da por perdida', () => {
@@ -102,5 +112,15 @@ describe('evaluarConversion', () => {
     expect(evaluarConversion(200, false, false)).toBe('en-curso');
     expect(evaluarConversion(120, false, false)).toBe('perdida');
     expect(evaluarConversion(-300, false, false)).toBe('perdida');
+  });
+
+  // N4 (auditoría 2026-10-15): el umbral es la mitad de la vara de RF-8.1
+  // (+3), fijo, no la mitad del pico. Lo que muestra la pantalla sale de esta
+  // misma constante (textoConversionPerdida, ui/format.ts).
+  it('el umbral es +1,5 fijo: la mitad de la ventaja ganadora', () => {
+    expect(UMBRAL_PERDIDA_CP).toBe(VENTAJA_GANADORA_CP / 2);
+    expect(UMBRAL_PERDIDA_CP).toBe(150);
+    expect(evaluarConversion(UMBRAL_PERDIDA_CP, false, false)).toBe('en-curso');
+    expect(evaluarConversion(UMBRAL_PERDIDA_CP - 1, false, false)).toBe('perdida');
   });
 });

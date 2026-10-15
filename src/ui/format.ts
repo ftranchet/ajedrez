@@ -1,6 +1,6 @@
 import { CP_MATE } from '../core/engineLevels';
 import type { LecturaMomentoCritico } from '../core/analysis';
-import type { VentajaDesperdiciada } from '../core/conversion';
+import { UMBRAL_PERDIDA_CP, VENTAJA_GANADORA_CP, type VentajaDesperdiciada } from '../core/conversion';
 import type { Color } from '../core/types';
 import { t } from './i18n/es';
 
@@ -121,6 +121,18 @@ export function textoVentajaDesperdiciada(ventaja: Pick<VentajaDesperdiciada, 'p
   const jugada = String(Math.floor(ventaja.ply / 2) + 1);
   if (esMate(ventaja.ventajaCp)) return t.conversion.listaMate.replace('{jugada}', jugada);
   return t.conversion.listaVentaja.replace('{ventaja}', formatDecimal(ventaja.ventajaCp / 100, 1)).replace('{jugada}', jugada);
+}
+
+/**
+ * Por qué una conversión se dio por perdida, con los umbrales que usa
+ * `evaluarConversion` y no con una copia: el texto decía "la ventaja bajó de
+ * la mitad de lo que tenías" mientras la cuenta comparaba contra +1,5 fijos
+ * (auditoría 2026-10-15, N4).
+ */
+export function textoConversionPerdida(): string {
+  return t.conversion.perdidaTexto
+    .replace('{umbral}', formatVentaja(UMBRAL_PERDIDA_CP))
+    .replace('{ganadora}', formatVentaja(VENTAJA_GANADORA_CP));
 }
 
 /** Duración legible de un ejercicio ("45 s", "3 min", "12 min"). Redondea a
