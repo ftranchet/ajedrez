@@ -277,6 +277,22 @@ describe('validación por registro de todas las tablas (B10, RF-14.2)', () => {
     expect(validateImportBundle(raw).ok).toBe(false);
   });
 
+  it('acepta las alternativas de una tarjeta como lista de jugadas (B13)', () => {
+    const raw = respaldoCompleto();
+    raw.errorCards = [{ ...raw.errorCards[0]!, jugadasAceptables: ['a1a2', 'a1b2'] }];
+    expect(validateImportBundle(raw).ok).toBe(true);
+  });
+
+  it.each([
+    ['una jugada suelta en vez de una lista', 'a1a2'],
+    ['un elemento que no es texto', ['a1a2', 7]],
+    ['un elemento nulo', [null]],
+  ])('rechaza alternativas de una tarjeta con %s', (_, jugadasAceptables) => {
+    const raw = respaldoCompleto();
+    raw.errorCards = [{ ...raw.errorCards[0]!, jugadasAceptables }];
+    expect(validateImportBundle(raw).ok).toBe(false);
+  });
+
   it.each(TABLAS)('rechaza un registro sin id en %s', (tabla) => {
     const raw = respaldoCompleto();
     raw[tabla] = [sin(raw[tabla][0]!, 'id')];

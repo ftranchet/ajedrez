@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { altaErrorCard, buildErrorCard, dueErrorCards, leechCards, reviewErrorCard, tarjetaEquivalente, tarjetasNuevasHoy, type AltaTarjeta } from './errorCard';
+import { altaErrorCard, buildErrorCard, dueErrorCards, esAciertoEnRepaso, leechCards, reviewErrorCard, tarjetaEquivalente, tarjetasNuevasHoy, type AltaTarjeta } from './errorCard';
 import { bloqueAsignado, buildDailyAssignment, sincronizarColaConVencidas } from './dailyAssignment';
 import type { ErrorCard } from './types';
 
@@ -298,5 +298,103 @@ describe('altaErrorCard — pasado el tope, difiere; nunca descarta (B2, RF-4.5)
     const dias = (altas: AltaTarjeta[]) => altas.map((alta) => alta.card.entraEn);
     expect(dias(despues.altas)).toEqual(dias(antes.altas));
     expect(dias(antes.altas)).toEqual(Array(6).fill('2026-07-23'));
+  });
+});
+
+describe('respuestas aceptadas en el repaso (B13)', () => {
+  const ahora = new Date(2026, 6, 17, 12);
+  // Rey y dama contra rey: Dg7#, Dg8#, Dh1# y Dh2# son mate; Dg6 ahoga, y
+  // Da1 sigue ganando sin dar mate.
+  const finalDama = { ...base, fen: '7k/5K2/8/8/8/8/8/6Q1 w - - 0 1', ladoAMover: 'w' as const, jugadaUsuario: 'g1g6', jugadaCorrecta: 'g1g7', origen: 'final' as const };
+
+  it('la tarjeta guarda las alternativas sin repetirlas ni repetir la correcta', () => {
+    const card = buildErrorCard({ ...base, jugadasAceptables: ['f8c5', 'f8c5', 'd7d6'], now: ahora });
+    expect(card.jugadasAceptables).toEqual(['f8c5']);
+  });
+
+  it('sin alternativas la tarjeta no lleva el campo, como las anteriores a él', () => {
+    expect(buildErrorCard({ ...base, jugadasAceptables: [], now: ahora })).not.toHaveProperty('jugadasAceptables');
+    expect(buildErrorCard({ ...base, jugadasAceptables: ['d7d6'], now: ahora })).not.toHaveProperty('jugadasAceptables');
+    expect(buildErrorCard({ ...base, now: ahora })).not.toHaveProperty('jugadasAceptables');
+  });
+
+  it('acierta la correcta y cualquier alternativa guardada; otra jugada no', () => {
+    const card = buildErrorCard({ ...base, jugadasAceptables: ['f8c5'], now: ahora });
+    expect(esAciertoEnRepaso(card, 'd7d6')).toBe(true);
+    expect(esAciertoEnRepaso(card, 'f8c5')).toBe(true);
+    expect(esAciertoEnRepaso(card, 'g8f6')).toBe(false);
+  });
+
+  it('una tarjeta sin alternativas, como las anteriores al campo, sigue exigiendo la correcta', () => {
+    const card = buildErrorCard({ ...base, now: ahora });
+    expect(esAciertoEnRepaso(card, 'd7d6')).toBe(true);
+    expect(esAciertoEnRepaso(card, 'f8c5')).toBe(false);
+  });
+
+  it('si la correcta es mate, cualquier otro mate acierta', () => {
+    const card = buildErrorCard({ ...finalDama, now: ahora });
+    expect(esAciertoEnRepaso(card, 'g1g8')).toBe(true);
+    expect(esAciertoEnRepaso(card, 'g1h1')).toBe(true);
+    expect(esAciertoEnRepaso(card, 'g1h2')).toBe(true);
+  });
+
+  it('sin motor no se da por buena una jugada que solo sigue ganando, ni el ahogado', () => {
+    const card = buildErrorCard({ ...finalDama, now: ahora });
+    expect(esAciertoEnRepaso(card, 'g1a1')).toBe(false);
+    expect(esAciertoEnRepaso(card, 'g1g6')).toBe(false);
+  });
+
+  it('una jugada ilegal no acierta ni rompe el repaso', () => {
+    const card = buildErrorCard({ ...finalDama, now: ahora });
+    expect(esAciertoEnRepaso(card, 'a1a8')).toBe(false);
+    expect(esAciertoEnRepaso(card, '')).toBe(false);
+  });
+
+  it('dos fallos con una respuesta en común son la misma tarjeta, en las dos direcciones', () => {
+    const conAlternativa = buildErrorCard({ ...base, id: 'x', jugadasAceptables: ['f8c5'], now: ahora });
+    // La nueva pide justo la alternativa de la existente…
+    expect(tarjetaEquivalente([conAlternativa], base.fen, 'f8c5')?.id).toBe('x');
+    // …o la existente pide una que la nueva también acepta.
+    const sinAlternativa = buildErrorCard({ ...base, id: 'y', now: ahora });
+    expect(tarjetaEquivalente([sinAlternativa], base.fen, 'f8c5', ['d7d6'])?.id).toBe('y');
+  });
+
+  it('dos mates distintos de la misma posición son la misma tarjeta', () => {
+    const existente = buildErrorCard({ ...finalDama, id: 'x', now: ahora });
+    expect(tarjetaEquivalente([existente], finalDama.fen, 'g1h1')?.id).toBe('x');
+  });
+
+  it('sin ninguna respuesta en común siguen siendo tarjetas distintas', () => {
+    const existente = buildErrorCard({ ...base, id: 'x', jugadasAceptables: ['f8c5'], now: ahora });
+    expect(tarjetaEquivalente([existente], base.fen, 'f8b4', ['a7a6'])).toBeUndefined();
+    expect(altaErrorCard([existente], { ...base, jugadaCorrecta: 'f8b4', now: ahora }).accion).toBe('crear');
+  });
+
+  it('reforzar suma a la tarjeta las respuestas del fallo nuevo que todavía no aceptaba', () => {
+    const existente = buildErrorCard({ ...base, id: 'x', jugadasAceptables: ['f8c5'], now: new Date(2026, 6, 10, 12) });
+    const alta = altaErrorCard([existente], { ...base, jugadaCorrecta: 'f8c5', jugadasAceptables: ['f8b4', 'd7d6'], now: ahora });
+    expect(alta.accion).toBe('reforzar');
+    expect(alta.card.id).toBe('x');
+    expect(alta.card.jugadaCorrecta).toBe('d7d6');
+    expect(alta.card.jugadasAceptables).toEqual(['f8c5', 'f8b4']);
+    expect(alta.card.fsrs.reps).toBe(existente.fsrs.reps + 1);
+  });
+
+  it('reforzar sin respuestas nuevas no toca las aceptadas, ni agrega un mate que ya contaba', () => {
+    const conAlternativa = buildErrorCard({ ...base, id: 'x', jugadasAceptables: ['f8c5'], now: ahora });
+    expect(altaErrorCard([conAlternativa], { ...base, jugadasAceptables: ['f8c5'], now: ahora }).card.jugadasAceptables).toEqual(['f8c5']);
+    const mate = buildErrorCard({ ...finalDama, id: 'y', now: ahora });
+    expect(altaErrorCard([mate], { ...finalDama, jugadaCorrecta: 'g1h1', now: ahora }).card).not.toHaveProperty('jugadasAceptables');
+  });
+
+  it('una diferida que todavía espera su día también suma las respuestas nuevas, sin adelantarse', () => {
+    const manana = new Date(2026, 6, 18).toISOString();
+    const diferida = buildErrorCard({ ...base, id: 'x', now: ahora });
+    const esperando = { ...diferida, fsrs: { ...diferida.fsrs, due: manana }, entraEn: '2026-07-18' };
+    const alta = altaErrorCard([esperando], { ...base, jugadasAceptables: ['f8c5'], now: ahora });
+    expect(alta.accion).toBe('reforzar');
+    expect(alta.diferidaHasta).toBe(manana);
+    expect(alta.card.fsrs).toEqual(esperando.fsrs);
+    expect(alta.card.jugadasAceptables).toEqual(['f8c5']);
   });
 });

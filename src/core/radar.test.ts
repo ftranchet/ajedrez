@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RADAR_INITIAL_STATE, OWN_ERROR_RADAR_MAX_SHARE, adjustDifficulty, centroInicialDesdeDiagnostico, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, isOwnErrorRadarItem, ownErrorRadarItems, recordServed, scheduleOwnErrorRadarSlots, selectNextRadarItem, type RadarSelectionState } from './radar';
+import { RADAR_INITIAL_STATE, OWN_ERROR_RADAR_MAX_SHARE, adjustDifficulty, alternativasAceptadasRadar, centroInicialDesdeDiagnostico, dificultadNormalizada, esRespuestaCorrectaRadar, explainFeedback, isOwnErrorRadarItem, ownErrorRadarItems, recordServed, scheduleOwnErrorRadarSlots, selectNextRadarItem, type RadarSelectionState } from './radar';
 import type { RadarItem, TipoRadar } from './types';
 import { buildErrorCard } from './errorCard';
 import { seedRadarItems } from '../services/puzzles/seedData';
@@ -359,6 +359,15 @@ describe('errores propios dentro del Radar (RF-5.9)', () => {
     expect(scheduleOwnErrorRadarSlots(3, 3, seededRng(1))).toEqual([]);
   });
 
+  it('el error reciclado acepta las mismas alternativas que su tarjeta en la Cola (B13)', () => {
+    const conAlternativa = { ...ownCard, jugadasAceptables: ['b1c3'] };
+    const item = ownErrorRadarItems([conAlternativa])[0];
+    expect(item.jugadasAceptables).toEqual(['b1c3']);
+    expect(esRespuestaCorrectaRadar(item, 'b1c3')).toBe(true);
+    // Sin alternativas en la tarjeta, el ítem tampoco lleva el campo.
+    expect(ownErrorRadarItems([ownCard])[0]).not.toHaveProperty('jugadasAceptables');
+  });
+
   it('registra el id reciclado sin contaminar el historial de tipos del catálogo', () => {
     const item = ownErrorRadarItems([ownCard])[0];
     const initial = { ...RADAR_INITIAL_STATE, historialTipos: ['defensa' as const] };
@@ -454,6 +463,31 @@ describe('esRespuestaCorrectaRadar', () => {
     expect(esRespuestaCorrectaRadar(conAlt, 'g1f3')).toBe(true);
     // Una que no está listada sigue siendo fallo.
     expect(esRespuestaCorrectaRadar(conAlt, 'a2a3')).toBe(false);
+  });
+});
+
+describe('alternativasAceptadasRadar (B13)', () => {
+  const base: RadarItem = {
+    id: 'q1',
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    tipo: 'tranquila',
+    temas: [],
+    rating: 1200,
+    solucion: ['e2e4'],
+    fuente: 'pipeline-tranquilas',
+  };
+
+  it('en una tranquila son las jugadas equivalentes que el Radar también acepta', () => {
+    expect(alternativasAceptadasRadar({ ...base, jugadasAceptables: ['d2d4', 'g1f3'] })).toEqual(['d2d4', 'g1f3']);
+  });
+
+  it('en una doble solución es la familiar, que el Radar da por acierto (RF-5.7)', () => {
+    const dobleSolucion: RadarItem = { ...base, tipo: 'ofensiva', fuente: 'pipeline-doble-solucion', dobleSolucion: { familiar: 'd2d4' } };
+    expect(alternativasAceptadasRadar(dobleSolucion)).toEqual(['d2d4']);
+  });
+
+  it('con una única jugada correcta no hay alternativas', () => {
+    expect(alternativasAceptadasRadar({ ...base, tipo: 'ofensiva' })).toEqual([]);
   });
 });
 

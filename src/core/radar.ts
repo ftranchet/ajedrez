@@ -81,6 +81,9 @@ export function radarItemFromOwnError(card: ErrorCard): RadarItem {
     temas: ['error-propio', card.categoria],
     rating: 0,
     solucion: [card.jugadaCorrecta],
+    // Las alternativas de la tarjeta (B13): reciclada en el Radar, la misma
+    // posición se juzga igual que en la Cola.
+    ...(card.jugadasAceptables?.length ? { jugadasAceptables: card.jugadasAceptables } : {}),
     fuente: 'error-propio',
     errorCardId: card.id,
   };
@@ -392,6 +395,18 @@ export function explainOwnErrorFeedback(acierto: boolean): string {
 export function esRespuestaCorrectaRadar(item: RadarItem, jugadaUsuario: string): boolean {
   if (jugadaUsuario === item.solucion[0]) return true;
   return item.jugadasAceptables?.includes(jugadaUsuario) ?? false;
+}
+
+/**
+ * Jugadas que, además de `solucion[0]`, el Radar da por acierto en el ítem: la
+ * familiar de una doble solución (RF-5.7) o las aceptables del resto (RF-5.3),
+ * con el mismo criterio con que la sesión resuelve la respuesta. Viajan a la
+ * tarjeta que nace de un fallo para que la Cola juzgue la misma posición con
+ * la misma vara (B13).
+ */
+export function alternativasAceptadasRadar(item: RadarItem): string[] {
+  if (item.dobleSolucion) return [item.dobleSolucion.familiar];
+  return item.jugadasAceptables ?? [];
 }
 
 /**

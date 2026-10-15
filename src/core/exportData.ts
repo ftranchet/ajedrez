@@ -190,6 +190,10 @@ function esErrorCardValida(x: unknown): boolean {
     (x.ladoAMover === 'w' || x.ladoAMover === 'b') &&
     typeof x.jugadaUsuario === 'string' &&
     typeof x.jugadaCorrecta === 'string' &&
+    // El repaso las expande en la lista de respuestas (B13): un texto suelto
+    // se desarmaría en letras que nunca aciertan, y un número rompería el
+    // repaso de esa tarjeta.
+    opcional(x.jugadasAceptables, (v) => esListaDe(v, esTexto)) &&
     // La fuga táctica filtra por origen y categoría, y el reciclaje en el
     // Radar traduce la categoría a un tipo: un valor fuera del enumerado no
     // contaba en ninguna fuga y se reciclaba como si fuera táctico.

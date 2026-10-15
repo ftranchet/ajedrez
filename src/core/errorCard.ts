@@ -3,12 +3,15 @@
 import type { CategoriaError, Color, ErrorCard, OrigenTarjeta } from './types';
 import { isDue, newFsrsState, reviewFsrsState } from './scheduler';
 import { dailyAssignmentId } from './dailyAssignment';
+import { esDemostracionLimpia } from './curriculum';
 
 export interface BuildErrorCardArgs {
   fen: string;
   ladoAMover: Color;
   jugadaUsuario: string;
   jugadaCorrecta: string;
+  /** Otras jugadas que la fuente del fallo también daba por buenas (ver `ErrorCard.jugadasAceptables`). */
+  jugadasAceptables?: string[];
   categoria: CategoriaError;
   origen: OrigenTarjeta;
   id?: string;
@@ -17,17 +20,45 @@ export interface BuildErrorCardArgs {
 
 export function buildErrorCard(args: BuildErrorCardArgs): ErrorCard {
   const now = args.now ?? new Date();
+  const aceptables = [...new Set(args.jugadasAceptables ?? [])].filter((jugada) => jugada !== args.jugadaCorrecta);
   return {
     id: args.id ?? crypto.randomUUID(),
     fen: args.fen,
     ladoAMover: args.ladoAMover,
     jugadaUsuario: args.jugadaUsuario,
     jugadaCorrecta: args.jugadaCorrecta,
+    ...(aceptables.length > 0 ? { jugadasAceptables: aceptables } : {}),
     categoria: args.categoria,
     origen: args.origen,
     fsrs: newFsrsState(now),
     creadaEn: now.toISOString(),
   };
+}
+
+type RespuestasDeTarjeta = Pick<ErrorCard, 'fen' | 'jugadaCorrecta' | 'jugadasAceptables'>;
+
+/** Las respuestas que la tarjeta lista: la correcta primero, después las alternativas. */
+function respuestasListadas(card: RespuestasDeTarjeta): string[] {
+  return [card.jugadaCorrecta, ...(card.jugadasAceptables ?? [])];
+}
+
+/**
+ * ¿La jugada cuenta como acierto al repasar la tarjeta (RF-4.2)? La correcta,
+ * cualquiera de las alternativas que la fuente del fallo también daba por
+ * buenas y, si la correcta da mate, cualquier otro mate. Antes se exigía la
+ * correcta exacta y la Cola era más estricta que el Radar sobre la misma
+ * posición (B13).
+ *
+ * Nada más, a propósito: la Cola no tiene motor, y el mate es lo único que se
+ * comprueba sin él (el mismo criterio con que se demuestra un patrón, RF-6.1).
+ * En un final de dama o torre contra rey hay muchas jugadas que siguen
+ * ganando, pero "sigue ganando" no se puede verificar acá y tampoco alcanzaría:
+ * la jugada lenta que dejó escapar el mate por las 50 jugadas también seguía
+ * ganando. Cuando la correcta no es mate se exige ella o una alternativa
+ * guardada.
+ */
+export function esAciertoEnRepaso(card: RespuestasDeTarjeta, jugada: string): boolean {
+  return esDemostracionLimpia(card.fen, jugada, respuestasListadas(card));
 }
 
 /** Aplica el resultado de un repaso (RF-4.2): no muta, devuelve una tarjeta nueva. */
@@ -48,13 +79,40 @@ export function leechCards(cards: ErrorCard[], umbralLapsos = 5): ErrorCard[] {
 }
 
 /**
- * Identidad ajedrecística de una tarjeta: misma posición y misma respuesta
- * correcta. Dos fallos de la misma posición (p. ej. un ítem del Radar que
+ * Identidad ajedrecística de una tarjeta: misma posición y una respuesta en
+ * común. Dos fallos de la misma posición (p. ej. un ítem del Radar que
  * reaparece, o el mismo error en dos análisis) no deben crear dos tarjetas
- * distintas — la Cola es una sola cola sin duplicados (E4).
+ * distintas — la Cola es una sola cola sin duplicados (E4). La respuesta en
+ * común es cualquiera que una de las dos acepte en el repaso (una alternativa,
+ * u otro mate si la correcta lo es): si una fuente pide A y acepta B, y otra
+ * pide B, una sola jugada resuelve las dos y son el mismo ejercicio. Antes se
+ * comparaba solo la correcta, y esas dos quedaban como tarjetas separadas que
+ * se contradecían en el repaso.
  */
-export function tarjetaEquivalente(cards: ErrorCard[], fen: string, jugadaCorrecta: string): ErrorCard | undefined {
-  return cards.find((c) => c.fen === fen && c.jugadaCorrecta === jugadaCorrecta);
+export function tarjetaEquivalente(
+  cards: ErrorCard[],
+  fen: string,
+  jugadaCorrecta: string,
+  jugadasAceptables: string[] = [],
+): ErrorCard | undefined {
+  const nueva: RespuestasDeTarjeta = { fen, jugadaCorrecta, jugadasAceptables };
+  return cards.find(
+    (c) =>
+      c.fen === fen &&
+      (respuestasListadas(nueva).some((jugada) => esAciertoEnRepaso(c, jugada)) ||
+        respuestasListadas(c).some((jugada) => esAciertoEnRepaso(nueva, jugada))),
+  );
+}
+
+/**
+ * La tarjeta que se refuerza por equivalencia pasa a aceptar también las
+ * respuestas del fallo nuevo que todavía no aceptaba: si no, la jugada que esa
+ * fuente pide seguiría contando como fallo en la Cola (B13).
+ */
+function sumarRespuestas(card: ErrorCard, args: BuildErrorCardArgs): ErrorCard {
+  const nuevas = [...new Set(respuestasListadas(args))].filter((jugada) => !esAciertoEnRepaso(card, jugada));
+  if (nuevas.length === 0) return card;
+  return { ...card, jugadasAceptables: [...(card.jugadasAceptables ?? []), ...nuevas] };
 }
 
 /**
@@ -113,11 +171,12 @@ export type AltaTarjeta =
  * Decide qué hacer ante un nuevo fallo, antes de tocar el almacenamiento
  * (RF-4.1/4.5):
  * - si ya existe una tarjeta con la misma identidad → **reforzar** (un fallo
- *   sobre la existente, que adelanta su repaso), en vez de duplicar. Si esa
- *   tarjeta todavía espera su día de entrada, queda como está y se devuelve
- *   ese día, para avisar que no entra hoy: el error ya está registrado, y
- *   adelantarla a hoy la sumaría por encima del cupo (el mismo error de
- *   apertura repetido en dos partidas de un lote exprés);
+ *   sobre la existente, que adelanta su repaso), en vez de duplicar; si el
+ *   fallo nuevo trae respuestas que la existente no aceptaba, se le suman.
+ *   Si esa tarjeta todavía espera su día de entrada, su repaso queda como
+ *   está y se devuelve ese día, para avisar que no entra hoy: el error ya
+ *   está registrado, y adelantarla a hoy la sumaría por encima del cupo (el
+ *   mismo error de apertura repetido en dos partidas de un lote exprés);
  * - si no → **crear** una tarjeta nueva, siempre. Si el cupo de hoy ya está
  *   lleno, la tarjeta nace con su `due` en el inicio del primer día local con
  *   cupo, y ese día queda fijado en `entraEn`: el excedente se reparte de a
@@ -135,8 +194,9 @@ export function altaErrorCard(
   opts: { topeDiario?: number } = {},
 ): AltaTarjeta {
   const now = args.now ?? new Date();
-  const existente = tarjetaEquivalente(cards, args.fen, args.jugadaCorrecta);
-  if (existente) {
+  const equivalente = tarjetaEquivalente(cards, args.fen, args.jugadaCorrecta, args.jugadasAceptables);
+  if (equivalente) {
+    const existente = sumarRespuestas(equivalente, args);
     if (esperaSuDia(existente, now)) return { accion: 'reforzar', card: existente, diferidaHasta: existente.fsrs.due };
     return { accion: 'reforzar', card: reviewErrorCard(existente, false, now) };
   }

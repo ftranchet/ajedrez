@@ -134,6 +134,18 @@ export interface ErrorCard {
   jugadaUsuario: string;
   /** Jugada correcta, en UCI. */
   jugadaCorrecta: string;
+  /**
+   * Otras jugadas UCI que también cuentan como acierto al repasarla: las que
+   * la fuente del fallo daba por buenas en la misma posición (las aceptables
+   * de una tranquila o la familiar de una doble solución del Radar), más las
+   * que trajo un fallo equivalente que la reforzó. Sin esto la Cola era más
+   * estricta que el Radar: jugar en el repaso una jugada que el Radar acepta
+   * contaba como fallo y reiniciaba el FSRS (B13). Ausente en las tarjetas
+   * con una sola respuesta y en las anteriores a este campo. Los otros mates,
+   * cuando la correcta es mate, no se guardan: se comprueban al repasar
+   * (`esAciertoEnRepaso`).
+   */
+  jugadasAceptables?: string[];
   categoria: CategoriaError;
   origen: OrigenTarjeta;
   fsrs: FsrsState;
@@ -178,7 +190,8 @@ export interface RadarItem {
    * centipeones), así que exigir la primera jugada exacta marcaría como fallo
    * una segunda jugada prácticamente equivalente. El motor las verifica en el
    * pipeline (MultiPV). Vacío/ausente en el resto de los tipos, donde sí hay
-   * una única jugada correcta.
+   * una única jugada correcta. Un error propio reciclado (RF-5.9) trae las
+   * alternativas de su tarjeta, si las tiene.
    */
   jugadasAceptables?: string[];
   /**
