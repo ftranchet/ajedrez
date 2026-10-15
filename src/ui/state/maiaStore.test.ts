@@ -218,6 +218,26 @@ describe('maiaStore — fallos explicables', () => {
     expect(store.getState().fallo).toBe('sin-permisos');
   });
 
+  // Cancelar aborta la espera del desafío, que entonces falla. Antes ese
+  // fallo se mostraba como "algo salió mal con Lichess" sobre la pantalla a
+  // la que el usuario ya había vuelto.
+  it('cancelar la búsqueda no termina en un error', async () => {
+    const { store } = crearDoble({
+      desafiarBot: (_token, _bot, _control, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        }),
+    });
+    const empezando = store.getState().empezar('token', 'maia1');
+    expect(store.getState().phase).toBe('desafiando');
+
+    store.getState().volver();
+    await empezando;
+
+    expect(store.getState().phase).toBe('inactivo');
+    expect(store.getState().fallo).toBeNull();
+  });
+
   it('volver limpia el estado para un desafío nuevo', async () => {
     const { store } = crearDoble();
     await store.getState().empezar('token', 'maia1');

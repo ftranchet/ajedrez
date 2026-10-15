@@ -164,7 +164,8 @@ export function createMaiaStore(deps: MaiaDeps) {
         if (get().phase === 'desafiando' || get().phase === 'jugando') return;
         tokenActual = token;
         abort?.abort();
-        abort = new AbortController();
+        const intento = new AbortController();
+        abort = intento;
         chess = new Chess();
         ultimoEstadoConfirmado = null;
         set({
@@ -172,17 +173,21 @@ export function createMaiaStore(deps: MaiaDeps) {
           resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false,
         });
         try {
-          const partida = await deps.lichess.desafiarBot(token, bot, CONTROL_LENTO, abort.signal);
+          const partida = await deps.lichess.desafiarBot(token, bot, CONTROL_LENTO, intento.signal);
+          if (intento.signal.aborted) return;
           inicioMs = Date.now();
           set({ phase: 'jugando', gameId: partida.gameId, playerColor: partida.color, rival: partida.rival });
           aplicarEstado(partida.estadoInicial);
           // El seguimiento queda corriendo: cada `gameState` reescribe el tablero.
           void deps.lichess
-            .seguirPartida(token, partida.gameId, aplicarEstado, abort.signal)
+            .seguirPartida(token, partida.gameId, aplicarEstado, intento.signal)
             .catch(() => {
               if (get().phase === 'jugando') set({ phase: 'error', fallo: 'sin-conexion' });
             });
         } catch (error) {
+          // Cancelar la búsqueda corta la espera y la hace fallar: eso no es un
+          // error de Lichess, y el usuario ya está en otra pantalla.
+          if (intento.signal.aborted) return;
           const motivo = error instanceof LichessError ? error.motivo : 'desconocido';
           set({ phase: 'error', fallo: motivo as FalloMaia });
         }

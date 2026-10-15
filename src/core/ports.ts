@@ -101,9 +101,11 @@ export interface LichessPort {
   /** Valida el token y devuelve el usuario dueño. */
   cuenta(token: string): Promise<{ username: string }>;
   /**
-   * Desafía a un bot y resuelve cuando la partida arranca. Escucha el stream de
-   * eventos antes de mandar el desafío: al revés se pierde el `gameStart` si el
-   * bot acepta rápido.
+   * Desafía a un bot y resuelve cuando arranca la partida de ESE desafío (no
+   * otra que el usuario tenga en curso). Escucha el stream de eventos antes de
+   * mandar el desafío: al revés se pierde el `gameStart` si el bot acepta
+   * rápido. Si el bot lo rechaza o no contesta a tiempo, falla con
+   * `bot-no-disponible`.
    */
   desafiarBot(token: string, bot: string, control: { minutos: number; incremento: number }, signal: AbortSignal): Promise<PartidaLichessIniciada>;
   /** Sigue la partida hasta que termina o se aborta la señal. */

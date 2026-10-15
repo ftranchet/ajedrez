@@ -77,6 +77,29 @@ async function* leerNdjson(response: Response, signal: AbortSignal): AsyncGenera
   }
 }
 
+/**
+ * Cierra un stream que se abrió y no se llegó a leer. Si ya se estaba leyendo,
+ * lo cerró `leerNdjson` al salir y el cuerpo sigue bloqueado por ese lector.
+ */
+async function cerrarSinLeer(response: Response): Promise<void> {
+  if (response.body && !response.body.locked) await response.body.cancel().catch(() => {});
+}
+
+/**
+ * Cuánto se espera la respuesta del bot. Un desafío creado sin
+ * `keepAliveStream` vence a los 20 s si nadie lo acepta, y el stream no siempre
+ * lo avisa: pasado este margen ya no puede llegar el `gameStart`.
+ */
+export const ESPERA_RESPUESTA_MS = 30_000;
+
+/** Id de un desafío: la respuesta del POST lo trae en la raíz, o bajo `challenge` en el formato viejo. */
+function idDeDesafio(raw: unknown): string | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const objeto = raw as { id?: unknown; challenge?: { id?: unknown } };
+  if (typeof objeto.id === 'string') return objeto.id;
+  return typeof objeto.challenge?.id === 'string' ? objeto.challenge.id : null;
+}
+
 function estadoDesde(raw: Record<string, unknown>): EstadoPartidaLichess {
   return {
     moves: typeof raw.moves === 'string' ? raw.moves : '',
@@ -101,34 +124,73 @@ export class LichessClient implements LichessPort {
   ): Promise<PartidaLichessIniciada> {
     const { username } = await this.cuenta(token);
 
-    // El stream de eventos se abre ANTES de desafiar: si el bot acepta rápido,
-    // el `gameStart` llega antes de que alcancemos a escuchar y la partida
-    // quedaría empezada sin que la app se entere.
-    const eventos = await pedir(token, '/api/stream/event', { signal });
+    // Señal propia de la espera: se corta si el llamador cancela o si el bot
+    // no contesta a tiempo. Sin esto, un bot caído dejaba la pantalla en
+    // "buscando partida" para siempre.
+    const espera = new AbortController();
+    const cancelar = () => espera.abort();
+    if (signal.aborted) espera.abort();
+    signal.addEventListener('abort', cancelar, { once: true });
+    let vencida = false;
+    let temporizador: ReturnType<typeof setTimeout> | undefined;
+    let eventos: Response | null = null;
 
-    const cuerpo = new URLSearchParams({
-      rated: 'false',
-      'clock.limit': String(control.minutos * 60),
-      'clock.increment': String(control.incremento),
-      color: 'random',
-      variant: 'standard',
-    });
-    await pedir(token, `/api/challenge/${bot}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: cuerpo.toString(),
-      signal,
-    });
+    try {
+      // El stream de eventos se abre ANTES de desafiar: si el bot acepta rápido,
+      // el `gameStart` llega antes de que alcancemos a escuchar y la partida
+      // quedaría empezada sin que la app se entere.
+      eventos = await pedir(token, '/api/stream/event', { signal: espera.signal });
 
-    for await (const evento of leerNdjson(eventos, signal)) {
-      if (evento.type !== 'gameStart') continue;
-      const game = evento.game as Record<string, unknown> | undefined;
-      const gameId = typeof game?.gameId === 'string' ? game.gameId : typeof game?.id === 'string' ? game.id : null;
-      if (!gameId) continue;
-      const estadoInicial = await this.primerEstado(token, gameId, username, signal);
-      return estadoInicial;
+      const cuerpo = new URLSearchParams({
+        rated: 'false',
+        'clock.limit': String(control.minutos * 60),
+        'clock.increment': String(control.incremento),
+        color: 'random',
+        variant: 'standard',
+      });
+      const respuesta = await pedir(token, `/api/challenge/${bot}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: cuerpo.toString(),
+        signal: espera.signal,
+      });
+      // La partida que nace del desafío lleva su mismo id. Sin él no hay forma
+      // de reconocerla: al conectarse, Lichess manda un `gameStart` por cada
+      // partida en curso del usuario, y tomar el primero hacía que la app
+      // "jugara" una partida por correspondencia abierta.
+      const desafioId = idDeDesafio(await respuesta.json().catch(() => null));
+      if (!desafioId) throw new LichessError('desconocido');
+
+      temporizador = setTimeout(() => {
+        vencida = true;
+        espera.abort();
+      }, ESPERA_RESPUESTA_MS);
+
+      for await (const evento of leerNdjson(eventos, espera.signal)) {
+        if (evento.type === 'gameStart') {
+          const game = evento.game as Record<string, unknown> | undefined;
+          const gameId = typeof game?.gameId === 'string' ? game.gameId : typeof game?.id === 'string' ? game.id : null;
+          if (gameId !== desafioId) continue;
+          clearTimeout(temporizador);
+          return await this.primerEstado(token, gameId, username, signal);
+        }
+        if (evento.type === 'challengeDeclined' || evento.type === 'challengeCanceled') {
+          // Rechazado o cancelado: que el bot no juegue es un desenlace normal.
+          if (idDeDesafio(evento.challenge) === desafioId) throw new LichessError('bot-no-disponible');
+        }
+      }
+      throw new LichessError('bot-no-disponible');
+    } catch (error) {
+      // Vencida la espera, la lectura falla por el corte: lo que pasó es que
+      // el bot no contestó.
+      if (vencida && !signal.aborted) throw new LichessError('bot-no-disponible');
+      throw error;
+    } finally {
+      clearTimeout(temporizador);
+      signal.removeEventListener('abort', cancelar);
+      // Si el desafío falló antes de leer, el stream de eventos seguía abierto.
+      if (eventos) await cerrarSinLeer(eventos);
     }
-    throw new LichessError('bot-no-disponible');
   }
 
   /** Primer mensaje del stream de la partida (`gameFull`): trae colores y estado. */
