@@ -393,6 +393,85 @@ describe('exportAllData / importAllData', () => {
     expect(outcome.error).toContain('inválida');
   });
 
+  // B10 (T8 de la auditoría): de nueve tablas solo se validaba que fueran
+  // listas. Un registro sin `id` llegaba al `bulkPut`, que lanzaba `DataError`:
+  // `importAllData` terminaba en una excepción y la pantalla no decía nada.
+  it.each([
+    'games',
+    'errorCards',
+    'calibrationRecords',
+    'radarProgress',
+    'radarAttempts',
+    'curriculumProgress',
+    'candidataAttempts',
+    'compromisoAttempts',
+    'calculoAttempts',
+    'dobleSolucionAttempts',
+    'stoykoAttempts',
+    'triageAttempts',
+    'sessions',
+    'transferMeasurements',
+    'n1Experiments',
+    'dailyAssignments',
+    'trainingEvents',
+  ])('un registro sin id en %s se rechaza con un mensaje, sin tocar los datos locales', async (tabla) => {
+    const local = buildGameRecord({ pgn: '1. e4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(local);
+
+    const { zipSync, strToU8 } = await import('fflate');
+    const archivos: Record<string, Uint8Array> = {
+      'manifest.json': strToU8(JSON.stringify({ esquema: SCHEMA_VERSION, exportadoEn: new Date().toISOString(), app: 'elomax' })),
+      'games.json': strToU8('[]'),
+      'errorCards.json': strToU8('[]'),
+      'calibrationRecords.json': strToU8('[]'),
+    };
+    archivos[`${tabla}.json`] = strToU8(JSON.stringify([{ fecha: '2026-07-19T10:00:00.000Z' }]));
+
+    const outcome = await importAllData(zipSync(archivos));
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.error).not.toBe('');
+    expect(await db.games.toArray()).toEqual([local]);
+  });
+
+  it('si la escritura falla a mitad, se deshace entera y lo dice: los datos locales quedan como estaban', async () => {
+    // Un respaldo que pasa la validación también puede fallar al escribirse
+    // (cuota de almacenamiento llena, la base cerrada por otra pestaña). Antes
+    // eso era una excepción sin mensaje; ahora es un `{ ok: false }` que
+    // promete que nada cambió, y esta prueba verifica que la promesa es cierta.
+    const delRespaldo = buildGameRecord({ pgn: '1. e4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(delRespaldo);
+    await db.trainingEvents.put({ id: 'final:f1:1', modalidad: 'final', fecha: '2026-08-04T10:00:00.000Z', ms: 480_000 });
+    const zip = await exportAllData();
+
+    // El dispositivo destino tiene sus propios datos.
+    await db.games.clear();
+    await db.trainingEvents.clear();
+    const local = buildGameRecord({ pgn: '1. d4 *', resultado: '*', tiemposPorJugadaMs: [], fuente: 'local', ritmo: 'sin-reloj' });
+    await db.games.put(local);
+    const card = buildErrorCard({ fen: '8/8/8/8/8/8/8/K6k w - - 0 1', ladoAMover: 'w', jugadaUsuario: 'a1a2', jugadaCorrecta: 'a1b1', categoria: 'tactico', origen: 'partida' });
+    await db.errorCards.put(card);
+    await db.trainingEvents.put({ id: 'partida:local:1', modalidad: 'partida', fecha: '2026-08-05T10:00:00.000Z', ms: 600_000 });
+
+    // Falla la última escritura del reemplazo: para entonces ya se vaciaron
+    // todas las tablas y se escribieron las partidas del respaldo.
+    const falla = vi.spyOn(db.trainingEvents, 'bulkPut').mockRejectedValueOnce(new Error('QuotaExceededError'));
+    let outcome: Awaited<ReturnType<typeof importAllData>>;
+    try {
+      outcome = await importAllData(zip);
+      expect(falla).toHaveBeenCalledTimes(1);
+    } finally {
+      falla.mockRestore();
+    }
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.error).toContain('no se tocaron');
+    expect(await db.games.toArray()).toEqual([local]);
+    expect(await db.errorCards.toArray()).toEqual([card]);
+    expect((await db.trainingEvents.toArray()).map((evento) => evento.id)).toEqual(['partida:local:1']);
+  });
+
   it('rechaza un archivo comprimido descomunal antes de descomprimirlo', async () => {
     // > 100 MB de entrada: se corta sin intentar unzipSync (evita el spike de memoria).
     const enorme = new Uint8Array(101 * 1024 * 1024);

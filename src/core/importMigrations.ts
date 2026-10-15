@@ -249,5 +249,7 @@ export function migrarDatosImportados<T extends DatosMigrables>(
 export const ESQUEMA_MINIMO_MIGRABLE = 1;
 
 export function esEsquemaMigrable(esquema: number): boolean {
-  return esquema >= ESQUEMA_MINIMO_MIGRABLE && esquema <= SCHEMA_VERSION;
+  // Solo enteros: 17.5 no es ninguna versión publicada, pero caía dentro del
+  // rango y recibía los pasos de 18 en adelante, adivinando su formato (B17).
+  return Number.isInteger(esquema) && esquema >= ESQUEMA_MINIMO_MIGRABLE && esquema <= SCHEMA_VERSION;
 }

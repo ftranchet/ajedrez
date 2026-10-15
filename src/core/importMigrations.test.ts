@@ -313,6 +313,14 @@ describe('esEsquemaMigrable', () => {
     expect(esEsquemaMigrable(0)).toBe(false);
     expect(esEsquemaMigrable(SCHEMA_VERSION + 1)).toBe(false);
   });
+
+  it('rechaza un esquema fraccional aunque caiga dentro del rango (B17)', () => {
+    // 17.5 no es ninguna versión publicada: con la sola comparación de rango
+    // pasaba, y la restauración le aplicaba los pasos de 18 en adelante
+    // adivinando en qué formato venían los datos.
+    expect(esEsquemaMigrable(17.5)).toBe(false);
+    expect(esEsquemaMigrable(ESQUEMA_MINIMO_MIGRABLE + 0.5)).toBe(false);
+  });
 });
 
 describe('partidasDelDiagnostico', () => {

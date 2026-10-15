@@ -19,7 +19,9 @@ export interface FsrsState {
   lastReview: string | null; // ISO 8601
 }
 
-const STATE_NAMES = ['new', 'learning', 'review', 'relearning'] as const;
+/** Índice = `State` de ts-fsrs. Exportado para validar respaldos: un nombre
+ * fuera de esta lista se traduce a -1 en `fromFsrsState`. */
+export const STATE_NAMES = ['new', 'learning', 'review', 'relearning'] as const;
 
 const scheduler = fsrs(generatorParameters({ enable_fuzz: true }));
 

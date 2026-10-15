@@ -5,6 +5,7 @@ import type {
   CalculoAttempt,
   CalibrationRecord,
   CandidataAttempt,
+  CategoriaError,
   CompromisoAttempt,
   CurriculumProgress,
   DailyAssignment,
@@ -12,9 +13,12 @@ import type {
   ErrorCard,
   GameRecord,
   N1Experiment,
+  OrigenTarjeta,
+  PresetCalculoPersistido,
   Profile,
   RadarAttempt,
   RadarProgress,
+  ResultadoDobleSolucion,
   SessionRecord,
   StoykoAttempt,
   TrainingEvent,
@@ -27,6 +31,7 @@ import { DEFAULT_PROFILE } from './prescriptor';
 import { isValidWeeklyPlan } from './adherence';
 import { isValidReminder } from './reminder';
 import { TIPOS_RADAR } from './leakProfile';
+import { STATE_NAMES } from './scheduler';
 import { esTrainingEventValido } from './trainingEvents';
 
 export interface ExportManifest {
@@ -117,10 +122,43 @@ function isObj(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null;
 }
 
+// Piezas para validar cada tabla con lo que la app lee de sus registros sin
+// volver a chequearlo. Un registro roto no siempre falla al escribirse: un
+// enumerado desconocido o una fecha que no es texto entran sin error y rompen
+// después —un `indexOf` que da -1 en el planificador, un `localeCompare` sobre
+// `undefined`—, lejos del respaldo que los trajo. Lo opcional se acepta
+// ausente (los respaldos viejos no lo traen) y lo desconocido se ignora: una
+// versión más nueva puede sumar campos sin cambiar de esquema, y rechazarlos
+// sería negarse a restaurar datos buenos.
+type Predicado = (x: unknown) => boolean;
+
+/** IndexedDB necesita la clave: sin `id`, el `bulkPut` de la tabla entera falla. */
+const esId: Predicado = (x) => typeof x === 'string' && x !== '';
+const esTexto: Predicado = (x) => typeof x === 'string';
+const esNumero: Predicado = (x) => typeof x === 'number' && Number.isFinite(x);
+const esBooleano: Predicado = (x) => typeof x === 'boolean';
+const opcional = (x: unknown, es: Predicado): boolean => x === undefined || es(x);
+const esListaDe = (x: unknown, es: Predicado): boolean => Array.isArray(x) && x.every((elemento) => es(elemento));
+const unoDe = (valores: readonly string[]): Predicado => (x) => typeof x === 'string' && valores.includes(x);
+/** Valores de una unión de textos. El `Record` obliga a listarlos todos: si el
+ * tipo suma uno y esta lista no, no compila (y no se rechazan respaldos que lo usen). */
+const valoresDe = <T extends string>(todos: Record<T, true>): T[] => Object.keys(todos) as T[];
+
+const esTipoRadar = unoDe(TIPOS_RADAR);
+const esCategoriaError = unoDe(valoresDe<CategoriaError>({ tactico: true, posicional: true, tiempo: true, psicologico: true }));
+const esOrigenTarjeta = unoDe(valoresDe<OrigenTarjeta>({ radar: true, partida: true, final: true, apertura: true }));
+const esOrigenContenido = unoDe(
+  valoresDe<NonNullable<RadarAttempt['origenContenido']>>({ catalogo: true, 'error-propio': true, diagnostico: true }),
+);
+const esPresetCalculo = unoDe(valoresDe<PresetCalculoPersistido>({ forzado: true, abierto: true }));
+const esResultadoCandidata = unoDe(valoresDe<CandidataAttempt['resultado']>({ mejoro: true, empeoro: true, 'sin-cambio': true }));
+const esResultadoDobleSolucion = unoDe(valoresDe<ResultadoDobleSolucion>({ superior: true, familiar: true, otra: true }));
+const esDecisionCriterio = unoDe(valoresDe<TriageAttempt['decisionUsuario']>({ calcular: true, alcanza: true }));
+
 function esGameRecordValido(x: unknown): boolean {
   if (!isObj(x)) return false;
   return (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     typeof x.pgn === 'string' &&
     typeof x.fecha === 'string' &&
     typeof x.fuente === 'string' &&
@@ -133,19 +171,27 @@ function esGameRecordValido(x: unknown): boolean {
 }
 
 function esFsrsValido(x: unknown): boolean {
-  return isObj(x) && typeof x.due === 'string' && typeof x.reps === 'number' && typeof x.lapses === 'number';
+  return (
+    isObj(x) && typeof x.due === 'string' && typeof x.reps === 'number' && typeof x.lapses === 'number' &&
+    // `fromFsrsState` lo traduce con `indexOf`: un nombre desconocido daba -1
+    // y el repaso se calculaba sobre un estado que ts-fsrs no tiene.
+    opcional(x.state, unoDe(STATE_NAMES))
+  );
 }
 
 function esErrorCardValida(x: unknown): boolean {
   if (!isObj(x)) return false;
   return (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     typeof x.fen === 'string' &&
     (x.ladoAMover === 'w' || x.ladoAMover === 'b') &&
     typeof x.jugadaUsuario === 'string' &&
     typeof x.jugadaCorrecta === 'string' &&
-    typeof x.categoria === 'string' &&
-    typeof x.origen === 'string' &&
+    // La fuga táctica filtra por origen y categoría, y el reciclaje en el
+    // Radar traduce la categoría a un tipo: un valor fuera del enumerado no
+    // contaba en ninguna fuga y se reciclaba como si fuera táctico.
+    esCategoriaError(x.categoria) &&
+    esOrigenTarjeta(x.origen) &&
     typeof x.creadaEn === 'string' &&
     esFsrsValido(x.fsrs)
   );
@@ -154,7 +200,7 @@ function esErrorCardValida(x: unknown): boolean {
 function esCalibrationRecordValido(x: unknown): boolean {
   if (!isObj(x)) return false;
   return (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     typeof x.contexto === 'string' &&
     typeof x.confianzaDeclarada === 'number' &&
     typeof x.acierto === 'boolean' &&
@@ -167,7 +213,7 @@ function esSessionRecordValido(x: unknown): boolean {
   const blockTypes = ['cola', 'curriculo', 'triage', 'radar'];
   const blockStatuses = ['pendiente', 'en_curso', 'completado', 'salteado'];
   return (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     typeof x.fechaInicio === 'string' &&
     (x.estado === 'en_curso' || x.estado === 'completada' || x.estado === 'abandonada') &&
     Array.isArray(x.bloques) &&
@@ -188,7 +234,7 @@ function esDailyAssignmentValida(x: unknown): boolean {
   const sonIds = (ids: unknown): boolean =>
     ids === undefined || (Array.isArray(ids) && ids.every((id) => typeof id === 'string'));
   return (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     typeof x.creadoEn === 'string' &&
     Array.isArray(x.bloques) &&
     x.bloques.every(
@@ -250,7 +296,7 @@ function esProfileValido(x: unknown): boolean {
 function esTransferMeasurementValida(x: unknown): boolean {
   if (!isObj(x)) return false;
   return (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     typeof x.datasetVersion === 'string' &&
     typeof x.startedAt === 'string' &&
     (x.completedAt === null || typeof x.completedAt === 'string') &&
@@ -283,7 +329,7 @@ function esN1ExperimentValido(x: unknown): boolean {
     Number.isInteger(outcome.partidasAnalizadas) && Number(outcome.partidasAnalizadas) >= 0 &&
     (outcome.rating === null || (typeof outcome.rating === 'number' && Number.isFinite(outcome.rating)));
   const basicShape = (
-    typeof x.id === 'string' &&
+    esId(x.id) &&
     (x.estado === 'activo' || x.estado === 'completado') &&
     typeof x.creadoEn === 'string' && Number.isFinite(Date.parse(x.creadoEn)) &&
     modalities.includes(String(x.modalidadA)) &&
@@ -316,11 +362,160 @@ function esN1ExperimentValido(x: unknown): boolean {
     : x.fases.some((phase) => isObj(phase) && phase.snapshot === undefined);
 }
 
+function esRadarProgressValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    // El selector los recorre y los extiende en cada posición servida.
+    esListaDe(x.historialTipos, esTipoRadar) &&
+    esListaDe(x.historialIds, esTexto) &&
+    esListaDe(x.aciertosRecientes, esBooleano) &&
+    // Ausente en respaldos anteriores a ADR-0007; `ratingCentro`, en desuso, no se lee.
+    opcional(x.dificultadCentro, esNumero)
+  );
+}
+
+function esRadarAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esTexto(x.itemId) &&
+    esTipoRadar(x.tipo) &&
+    esBooleano(x.acierto) &&
+    esTexto(x.fecha) &&
+    // Ausentes en intentos históricos (types.ts); el detector de sobreajuste
+    // promedia la dificultad y el Panel separa por origen.
+    opcional(x.dificultadNormalizada, esNumero) &&
+    opcional(x.origenContenido, esOrigenContenido)
+  );
+}
+
+function esCurriculumProgressValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esFsrsValido(x.fsrs) &&
+    esNumero(x.demostracionesLimpias) &&
+    esTexto(x.updatedAt)
+  );
+}
+
+function esCandidataAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esTexto(x.itemId) &&
+    esBooleano(x.cambio) &&
+    esResultadoCandidata(x.resultado) &&
+    esTexto(x.fecha)
+  );
+}
+
+/** Formato anterior a ADR-0015: se valida tal como se escribió, porque la
+ * migración v18 lo convierte después de esta validación. */
+function esCompromisoAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esTexto(x.itemId) &&
+    esNumero(x.profundidad) &&
+    esBooleano(x.correcta) &&
+    opcional(x.primerErrorEn, (valor) => valor === null || esNumero(valor)) &&
+    opcional(x.tiempoMs, esNumero) &&
+    esTexto(x.fecha)
+  );
+}
+
+function esCalculoAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esPresetCalculo(x.preset) &&
+    esListaDe(x.ramas, (rama) => isObj(rama) && esListaDe(rama.linea, esTexto)) &&
+    // El Panel ordena por fecha con `localeCompare`, y el registro de tiempo
+    // entrenado se reconstruye de `tiempoMs`.
+    esTexto(x.fecha) &&
+    opcional(x.tiempoMs, esNumero) &&
+    opcional(x.origen, (origen) => isObj(origen) && esTexto(origen.gameId) && esNumero(origen.ply))
+  );
+}
+
+function esDobleSolucionAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esTexto(x.itemId) &&
+    esResultadoDobleSolucion(x.resultado) &&
+    esTexto(x.fecha)
+  );
+}
+
+/** Formato anterior a ADR-0015 (el cálculo de la semana): igual que el
+ * comprometido, se valida en su forma original y la migración v18 lo convierte. */
+function esStoykoAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esTexto(x.itemId) &&
+    // La conversión recorre las candidatas: si no son lista, la migración lanza.
+    esListaDe(x.candidatas, (candidata) => isObj(candidata) && esTexto(candidata.jugada)) &&
+    esBooleano(x.acierto) &&
+    opcional(x.confianzaDeclarada, esNumero) &&
+    opcional(x.tiempoMs, esNumero) &&
+    esTexto(x.fecha)
+  );
+}
+
+function esTriageAttemptValido(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    esId(x.id) &&
+    esTexto(x.itemId) &&
+    esDecisionCriterio(x.decisionUsuario) &&
+    esDecisionCriterio(x.decisionCorrecta) &&
+    esBooleano(x.correcta) &&
+    esTexto(x.fecha) &&
+    // Ninguna lectura lo usa (el informe mira fecha y acierto): exigirlo
+    // arriesgaría rechazar registros del primer formato del ejercicio.
+    opcional(x.tipo, esTipoRadar)
+  );
+}
+
+/**
+ * Validación por registro de cada tabla (RF-14.2), con el mensaje que ve el
+ * usuario. Como la restauración reemplaza el estado local entero, un solo
+ * registro corrupto rechaza el paquete en vez de escribirse sobre datos
+ * buenos. Ningún mensaje nombra "Stoyko" ni "Triage": son identificadores
+ * internos; la interfaz llama a esos ejercicios cálculo de la semana y
+ * criterio de cálculo.
+ */
+const VALIDACION_POR_REGISTRO: ReadonlyArray<readonly [Exclude<keyof ExportBundle, 'manifest' | 'profile'>, Predicado, string]> = [
+  ['games', esGameRecordValido, 'Alguna partida del respaldo está corrupta o incompleta.'],
+  ['errorCards', esErrorCardValida, 'Alguna tarjeta de la Cola del respaldo está corrupta o incompleta.'],
+  ['calibrationRecords', esCalibrationRecordValido, 'Algún registro de calibración del respaldo está corrupto o incompleto.'],
+  ['radarProgress', esRadarProgressValido, 'El progreso del Radar del respaldo está corrupto o incompleto.'],
+  ['radarAttempts', esRadarAttemptValido, 'Alguna respuesta del Radar del respaldo está corrupta o incompleta.'],
+  ['curriculumProgress', esCurriculumProgressValido, 'Algún progreso del currículo del respaldo está corrupto o incompleto.'],
+  ['candidataAttempts', esCandidataAttemptValido, 'Algún intento de la regla de candidatas del respaldo está corrupto o incompleto.'],
+  ['compromisoAttempts', esCompromisoAttemptValido, 'Algún intento de cálculo comprometido del respaldo está corrupto o incompleto.'],
+  ['calculoAttempts', esCalculoAttemptValido, 'Algún intento de cálculo declarado del respaldo está corrupto o incompleto.'],
+  ['dobleSolucionAttempts', esDobleSolucionAttemptValido, 'Algún intento de doble solución del respaldo está corrupto o incompleto.'],
+  ['stoykoAttempts', esStoykoAttemptValido, 'Algún intento del cálculo de la semana del respaldo está corrupto o incompleto.'],
+  ['triageAttempts', esTriageAttemptValido, 'Algún ejercicio del criterio de cálculo del respaldo está corrupto o incompleto.'],
+  ['sessions', esSessionRecordValido, 'Alguna sesión del respaldo está corrupta o incompleta.'],
+  ['transferMeasurements', esTransferMeasurementValida, 'Alguna batería de transferencia del respaldo está corrupta o incompleta.'],
+  ['n1Experiments', esN1ExperimentValido, 'Algún experimento n=1 del respaldo está corrupto o incompleto.'],
+  ['dailyAssignments', esDailyAssignmentValida, 'Algún plan diario del respaldo está corrupto o incompleto.'],
+  ['trainingEvents', esTrainingEventValido, 'Algún tramo de tiempo entrenado del respaldo está corrupto o incompleto.'],
+];
+
 /**
  * Valida la forma de un paquete importado antes de tocar la base de datos
- * (RF-14.2). No migra todavía versiones de esquema anteriores a la actual:
- * con un solo esquema publicado hasta ahora, el único caso a futuro es
- * `esquema < SCHEMA_VERSION`, que queda como punto de extensión documentado.
+ * (RF-14.2). Acepta cualquier esquema que `core/importMigrations.ts` sabe
+ * llevar al actual, y valida los datos **tal como se escribieron**: la
+ * migración corre después, sobre datos ya validados. Por eso los formatos
+ * viejos (`compromisoAttempts`, `stoykoAttempts`) se validan con su propia
+ * forma y los campos que llegaron en versiones posteriores se aceptan ausentes.
  */
 export function validateImportBundle(raw: unknown): ImportResult {
   if (typeof raw !== 'object' || raw === null) return { ok: false, error: 'El archivo no contiene un paquete válido.' };
@@ -379,10 +574,10 @@ export function validateImportBundle(raw: unknown): ImportResult {
   }
   // Ni el historial de Stoyko (E7) o Triage (E9), agregados en esquema v11.
   if (obj.stoykoAttempts !== undefined && !Array.isArray(obj.stoykoAttempts)) {
-    return { ok: false, error: 'El historial de Stoyko no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial del cálculo de la semana no tiene la forma esperada.' };
   }
   if (obj.triageAttempts !== undefined && !Array.isArray(obj.triageAttempts)) {
-    return { ok: false, error: 'El historial de Triage no tiene la forma esperada.' };
+    return { ok: false, error: 'El historial del criterio de cálculo no tiene la forma esperada.' };
   }
   // Los respaldos anteriores a RF-12.1 no traen sesiones persistidas.
   if (obj.sessions !== undefined && !Array.isArray(obj.sessions)) {
@@ -403,32 +598,11 @@ export function validateImportBundle(raw: unknown): ImportResult {
   if (obj.trainingEvents !== undefined && !Array.isArray(obj.trainingEvents)) {
     return { ok: false, error: 'El registro de tiempo entrenado no tiene la forma esperada.' };
   }
-  // Validación por-registro de las entidades críticas (RF-14.2): como la
-  // restauración reemplaza el estado local entero, un solo registro corrupto
-  // rechaza el paquete en vez de escribirse sobre datos buenos.
-  if (!(obj.games as unknown[]).every(esGameRecordValido)) {
-    return { ok: false, error: 'Alguna partida del respaldo está corrupta o incompleta.' };
-  }
-  if (!(obj.errorCards as unknown[]).every(esErrorCardValida)) {
-    return { ok: false, error: 'Alguna tarjeta de la Cola del respaldo está corrupta o incompleta.' };
-  }
-  if (!(obj.calibrationRecords as unknown[]).every(esCalibrationRecordValido)) {
-    return { ok: false, error: 'Algún registro de calibración del respaldo está corrupto o incompleto.' };
-  }
-  if (!((obj.sessions ?? []) as unknown[]).every(esSessionRecordValido)) {
-    return { ok: false, error: 'Alguna sesión del respaldo está corrupta o incompleta.' };
-  }
-  if (!((obj.transferMeasurements ?? []) as unknown[]).every(esTransferMeasurementValida)) {
-    return { ok: false, error: 'Alguna batería de transferencia del respaldo está corrupta o incompleta.' };
-  }
-  if (!((obj.n1Experiments ?? []) as unknown[]).every(esN1ExperimentValido)) {
-    return { ok: false, error: 'Algún experimento n=1 del respaldo está corrupto o incompleto.' };
-  }
-  if (!((obj.dailyAssignments ?? []) as unknown[]).every(esDailyAssignmentValida)) {
-    return { ok: false, error: 'Algún plan diario del respaldo está corrupto o incompleto.' };
-  }
-  if (!((obj.trainingEvents ?? []) as unknown[]).every(esTrainingEventValido)) {
-    return { ok: false, error: 'Algún tramo de tiempo entrenado del respaldo está corrupto o incompleto.' };
+  // Todas las tablas, no solo las críticas: de las que solo se miraba que
+  // fueran listas, un registro sin `id` hacía fallar la escritura y la
+  // restauración terminaba en una excepción sin mensaje (B10).
+  for (const [tabla, esValido, error] of VALIDACION_POR_REGISTRO) {
+    if (!((obj[tabla] ?? []) as unknown[]).every((registro) => esValido(registro))) return { ok: false, error };
   }
   return {
     ok: true,

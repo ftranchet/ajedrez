@@ -29,6 +29,10 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
       a.click();
       URL.revokeObjectURL(url);
       setMensaje(t.panel.exportado);
+    } catch {
+      // Sin esto, un fallo al leer la base o al armar el .zip devolvía el
+      // botón a su estado normal sin ninguna explicación (B10).
+      setMensaje(t.panel.exportadoError);
     } finally {
       setExportando(false);
     }
@@ -58,6 +62,11 @@ export function DataBackupCard({ onImported }: { onImported?: () => void }) {
       } else {
         setMensaje(`${t.panel.importadoError}: ${outcome.error}`);
       }
+    } catch {
+      // `importAllData` ya devuelve sus fallos como `{ ok: false }`; lo que
+      // llega acá es no haber podido leer el archivo elegido, antes de tocar
+      // la base. Antes no había `catch` y la pantalla no decía nada (B10).
+      setMensaje(`${t.panel.importadoError}: ${t.panel.importadoErrorLectura}`);
     } finally {
       setImportando(false);
       if (fileInput.current) fileInput.current.value = '';

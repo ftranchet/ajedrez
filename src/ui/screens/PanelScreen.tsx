@@ -1191,6 +1191,10 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
       setRating('');
       setMensaje(t.panel.importarPgnOk);
       onImported();
+    } catch {
+      // Una escritura fallida (cuota llena, base bloqueada) dejaba el botón
+      // habilitado otra vez sin decir que la partida no se guardó (B10).
+      setMensaje(t.panel.importarPgnErrorGuardar);
     } finally {
       setGuardando(false);
     }
