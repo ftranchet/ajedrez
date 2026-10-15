@@ -111,7 +111,10 @@ test('doble solución: conformarse con la familiar acierta pero avisa que había
   await clickSquare(page, board, 'b', 5);
 
   await page.getByText('Acertaste').waitFor({ timeout: 10_000 });
-  await page.getByText('d5c6').waitFor(); // el feedback menciona la jugada superior
+  // El feedback menciona la jugada superior en algebraica del idioma por
+  // defecto (español), nunca en UCI (RNF-9).
+  await page.getByText('había una superior: Dxc6+').waitFor();
+  await expect(page.getByText('d5c6')).toHaveCount(0);
   // La flecha valida lo que el usuario encontró (f1→b5), no sustituye esa
   // respuesta aceptada por la variante principal d5→c6.
   await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback-move', 'f1-b5');

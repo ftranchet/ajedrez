@@ -8,11 +8,13 @@ import { MoveListPicker } from '../components/MoveListPicker';
 import { Chip } from '../components/Chip';
 import { useAnalysisStore } from '../state/analysisStore';
 import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
+import { TOPE_DIARIO_NUEVAS } from '../../core/errorCard';
 import type { CategoriaError } from '../../core/types';
-import { formatPeones, formatVentaja } from '../format';
+import { fraseLecturaMomento } from '../format';
 import { t } from '../i18n/es';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
+import { sanDeJugada } from '../state/chessBoardUtils';
 
 export function AnalizarScreen() {
   const phase = useAnalysisStore((s) => s.phase);
@@ -311,7 +313,8 @@ function LecturaDelMomento() {
     : t.analisis.momentoLecturaDifiere
         .replace('{tuya}', String(jugadaDe(lectura.plyUsuario)))
         .replace('{motor}', String(jugadaDe(lectura.plyMotor)))
-        .replace('{san}', lectura.sanMotor);
+        // sanMotor es el SAN inglés de chess.js: se traduce como el resto (RNF-9).
+        .replace('{san}', aNotacion(lectura.sanMotor, readIdiomaNotacion()));
 
   return (
     <section
@@ -322,10 +325,7 @@ function LecturaDelMomento() {
       <h2 className="m-0 text-sm tracking-wider text-tertiary uppercase">{t.analisis.momentoLecturaTitulo}</h2>
       <p className="m-0 text-primary">{texto}</p>
       <p className="m-0 text-sm text-secondary">
-        {t.analisis.momentoLecturaCosto
-          .replace('{cp}', formatPeones(lectura.cpPerdidos))
-          .replace('{antes}', formatVentaja(lectura.ventajaAntes))
-          .replace('{despues}', formatVentaja(lectura.ventajaDespues))}
+        {fraseLecturaMomento(lectura, game.jugadorColor)}
       </p>
     </section>
   );
@@ -357,11 +357,13 @@ function ConfirmarErrores() {
               {t.analisis.confirmarProgreso.replace('{actual}', String(s.erroresConfirmados + 1)).replace('{total}', String(total))}
             </p>
             <p className="m-0 mt-1 font-display text-xl">{aNotacion(entry.san, readIdiomaNotacion())}</p>
+            {/* Las dos jugadas se guardan en UCI ("e2e4"), que no es notación
+                de ajedrez: se muestran en algebraica del idioma elegido (RNF-9). */}
             <p className="m-0 mt-2 text-sm text-secondary">
-              {t.analisis.confirmarJugadaJugada}: <span className="font-mono text-primary">{entry.jugadaUsuario}</span>
+              {t.analisis.confirmarJugadaJugada}: <span className="font-mono text-primary">{sanDeJugada(entry.fenAntes, entry.jugadaUsuario)}</span>
             </p>
             <p className="m-0 text-sm text-secondary">
-              {t.analisis.confirmarJugadaCorrecta}: <span className="font-mono text-primary">{entry.jugadaMotor}</span>
+              {t.analisis.confirmarJugadaCorrecta}: <span className="font-mono text-primary">{sanDeJugada(entry.fenAntes, entry.jugadaMotor)}</span>
             </p>
           </div>
 
@@ -394,12 +396,21 @@ function resumenErrores(n: number): string {
   return t.analisis.finResumenOtro.replace('{n}', String(n));
 }
 
+/** Aviso de los confirmados que, por el tope diario (RF-4.5), entran a repaso otro día. */
+function avisoDiferidos(n: number): string | null {
+  if (n === 0) return null;
+  const texto = n === 1 ? t.analisis.finDiferidasUno : t.analisis.finDiferidasOtro.replace('{n}', String(n));
+  return texto.replace('{tope}', String(TOPE_DIARIO_NUEVAS));
+}
+
 function Fin() {
   const s = useAnalysisStore();
+  const aviso = avisoDiferidos(s.erroresDiferidos);
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
       <Encabezado titulo={t.analisis.finTitulo} />
       <p className="m-0 text-secondary">{resumenErrores(s.erroresConfirmados)}</p>
+      {aviso && <p className="m-0 text-sm text-secondary">{aviso}</p>}
       <button className="btn-primary" onClick={() => s.volver()}>
         {t.analisis.volver}
       </button>

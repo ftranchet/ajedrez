@@ -135,6 +135,15 @@ export interface ErrorCard {
   origen: OrigenTarjeta;
   fsrs: FsrsState;
   creadaEn: string; // ISO 8601
+  /**
+   * Día local ('YYYY-MM-DD') en que la tarjeta entra a repaso, solo cuando el
+   * tope diario la difirió (ADR-0017). Fija su lugar en el cupo de ese día aun
+   * después de repasarla: sin esto, al repasarla volvía a contar en su día de
+   * creación y liberaba el cupo, y un error nuevo entraba hoy o en tres días
+   * según si el usuario había hecho la Cola antes o después. Ausente en las
+   * tarjetas que entraron el día en que se crearon, que son casi todas.
+   */
+  entraEn?: string;
 }
 
 /** Tipos de posición que sirve el Radar, mezclados sin previo aviso (RF-5.1). */
@@ -186,11 +195,11 @@ export interface RadarItem {
    * decir dónde estaba, que es justamente la queja que originó RF-5.3.
    */
   carnada?: {
-    /** La captura que parece ganar, en SAN. */
+    /** La captura que parece ganar, en SAN inglés: es dato del catálogo y se traduce al idioma elegido al mostrarlo (RNF-9). */
     san: string;
     /** Material aparente de la captura, en peones, contando recaptura a 1 ply. */
     ganaPeones: number;
-    /** Continuación del motor tras la carnada, en SAN. Puede venir vacía. */
+    /** Continuación del motor tras la carnada, en SAN inglés (se traduce al mostrarla). Puede venir vacía. */
     refutacionSan: string[];
     /** Cuánto peor que la mejor jugada es la carnada, en centipeones. */
     costoCp: number;
@@ -434,6 +443,25 @@ export interface CurriculumProgress {
   id: string; // = CurriculumItem.id
   fsrs: FsrsState;
   demostracionesLimpias: number;
+  /**
+   * Demostraciones hechas y cuántas fueron limpias, para medir el acierto
+   * (RF-6.5). Ni FSRS ni la racha lo dan: `fsrs.lapses` no cuenta los fallos
+   * mientras el elemento se aprende y `demostracionesLimpias` vuelve a cero.
+   * Opcionales porque los registros anteriores no los tienen; empiezan a
+   * contar en su próxima demostración. Lo anterior a los contadores lo
+   * estima `nivelCiegas` con una cota inferior (repasos FSRS y racha).
+   */
+  intentos?: number;
+  aciertos?: number;
+  /**
+   * Si la última demostración se hizo a ciegas: con piezas fantasma o solo
+   * coordenadas (RF-6.5). Las coordenadas solas llegan solo después de una
+   * demostración limpia con piezas fantasma, y ese nivel anterior no se puede
+   * deducir de los contadores: depende de lo que habían sumado en ese momento
+   * las otras posiciones del patrón. Ausente en los registros anteriores, que
+   * cuentan como no hechas a ciegas.
+   */
+  ultimaACiegas?: boolean;
   updatedAt: string; // ISO 8601
 }
 

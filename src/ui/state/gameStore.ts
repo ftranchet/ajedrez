@@ -5,6 +5,7 @@ import { Chess, type Square } from 'chess.js';
 import type { Color, ContextoPartida, Resultado } from '../../core/types';
 import type { EngineLevel } from '../../core/ports';
 import { buildGameRecord, deriveResult } from '../../core/game';
+import { dailyAssignmentId } from '../../core/dailyAssignment';
 import { engine } from '../../services/engine/stockfishEngine';
 import { gameRepo } from '../../services/storage/gameRepo';
 import levelsConfig from '../../config/engine-levels.json';
@@ -92,7 +93,9 @@ export const useGameStore = create<GameState>((set, get) => {
     const { playerColor, levelId, contexto } = get();
     chess.header('Event', contexto === 'diagnostico' ? 'Diagnóstico inicial ELOmax' : 'Partida local ELOmax');
     chess.header('Site', 'ELOmax');
-    chess.header('Date', new Date().toISOString().slice(0, 10).replaceAll('-', '.'));
+    // Fecha del día LOCAL, como la anota cualquiera en una planilla: con el
+    // día UTC, una partida terminada a las 22:00 en UTC−3 quedaba fechada mañana.
+    chess.header('Date', dailyAssignmentId().replaceAll('-', '.'));
     chess.header('White', playerColor === 'w' ? 'Usuario' : `Motor local (${levelId})`);
     chess.header('Black', playerColor === 'b' ? 'Usuario' : `Motor local (${levelId})`);
     chess.header('Result', resultado);

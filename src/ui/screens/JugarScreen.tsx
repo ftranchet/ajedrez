@@ -18,8 +18,10 @@ import { isAutomatizado } from '../../core/curriculum';
 import { FINAL_DRAW_HOLD_MOVES, objetivoDeFinal } from '../../core/finales';
 import { isDue } from '../../core/scheduler';
 import type { FinalPriorizado } from '../../core/finalesPrioridad';
-import { formatDecimal } from '../format';
+import { textoVentajaDesperdiciada } from '../format';
 import { t } from '../i18n/es';
+import { aNotacion } from '../../core/notacion';
+import { readIdiomaNotacion } from '../notacionPrefs';
 
 // La sub-ruta #/jugar/finales entra directo al modo finales (deep-link desde
 // Hoy), y elegir un modo actualiza el hash para que el botón "atrás" funcione.
@@ -189,9 +191,13 @@ function resultText(s: ReturnType<typeof useGameStore.getState>): string {
 }
 
 function MoveList({ moves }: { moves: string[] }) {
+  // `moves` es `chess.history()`, en SAN inglés: sin traducir, la partida se
+  // anotaba en inglés con la app en español (RNF-9).
+  const idioma = readIdiomaNotacion();
   const rows: Array<[number, string, string | undefined]> = [];
   for (let i = 0; i < moves.length; i += 2) {
-    rows.push([i / 2 + 1, moves[i], moves[i + 1]]);
+    const negras = moves[i + 1];
+    rows.push([i / 2 + 1, aNotacion(moves[i], idioma), negras === undefined ? undefined : aNotacion(negras, idioma)]);
   }
   return (
     <div className="max-h-48 overflow-y-auto rounded-lg border border-subtle bg-surface p-3 font-mono text-sm sm:max-h-80">
@@ -358,7 +364,7 @@ function textoMotivo(final: FinalPriorizado): string | null {
     // porcentaje acumulado solo aparece cuando es lo único que hay.
     return señales.ultimaFallada
       ? t.finales.motivoUltimaFallada
-      : t.finales.motivoFalla
+      : (señales.historialParcial ? t.finales.motivoFallaRecientes : t.finales.motivoFalla)
           .replace('{fallos}', String(señales.fallos))
           .replace('{total}', String(señales.practicas));
   }
@@ -574,11 +580,7 @@ function ConversionScreen() {
             {s.ventajas.map((ventaja) => (
               <li key={ventaja.gameId} className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3">
                 <div className="min-w-0">
-                  <p className="m-0 text-primary tabular-nums">
-                    {t.conversion.listaVentaja
-                      .replace('{ventaja}', formatDecimal(ventaja.ventajaCp / 100, 1))
-                      .replace('{jugada}', String(Math.floor(ventaja.ply / 2) + 1))}
-                  </p>
+                  <p className="m-0 text-primary tabular-nums">{textoVentajaDesperdiciada(ventaja)}</p>
                   <p className="m-0 mt-1 text-xs text-tertiary">
                     {t.conversion.listaResultado.replace('{resultado}', ventaja.resultado)}
                     {' · '}
@@ -623,11 +625,7 @@ function ConversionScreen() {
         <div className="rounded-lg border border-subtle bg-surface p-4">
           <p className="m-0 font-display text-xl">{t.conversion.titulo}</p>
           {s.ventaja && (
-            <p className="m-0 mt-2 text-sm text-secondary tabular-nums">
-              {t.conversion.listaVentaja
-                .replace('{ventaja}', formatDecimal(s.ventaja.ventajaCp / 100, 1))
-                .replace('{jugada}', String(Math.floor(s.ventaja.ply / 2) + 1))}
-            </p>
+            <p className="m-0 mt-2 text-sm text-secondary tabular-nums">{textoVentajaDesperdiciada(s.ventaja)}</p>
           )}
         </div>
         {s.engineError && (

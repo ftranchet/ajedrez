@@ -17,11 +17,15 @@ import type { SessionRecord } from './types';
 const START = new Date('2026-07-19T10:00:00.000Z');
 
 describe('bloquesHechosHoy', () => {
-  const ahora = new Date('2026-07-22T20:00:00.000Z');
+  // "Hoy" es el día LOCAL: los instantes se arman con la hora local para que
+  // el test signifique lo mismo en cualquier zona. Con instantes UTC fijos
+  // (10:00Z y 20:00Z) caían en días distintos en UTC+9 y el test fallaba
+  // por la zona del proceso, no por el código.
+  const ahora = new Date(2026, 6, 22, 20, 0);
   function sesion(overrides: Partial<SessionRecord>): SessionRecord {
     return {
       id: crypto.randomUUID(),
-      fechaInicio: '2026-07-22T10:00:00.000Z',
+      fechaInicio: new Date(2026, 6, 22, 10, 0).toISOString(),
       estado: 'abandonada',
       bloques: [],
       ...overrides,
@@ -42,7 +46,7 @@ describe('bloquesHechosHoy', () => {
 
   it('ignora sesiones de otros días', () => {
     const ayer = sesion({
-      fechaInicio: '2026-07-21T10:00:00.000Z',
+      fechaInicio: new Date(2026, 6, 21, 10, 0).toISOString(),
       bloques: [{ tipo: 'radar', planificados: 8, completados: 8, estado: 'completado' }],
     });
     expect(bloquesHechosHoy([ayer], ahora).size).toBe(0);
@@ -145,12 +149,14 @@ describe('registro de sesión', () => {
   });
 
   it('conserva la racha de ayer durante hoy, pero no una racha ya cortada', () => {
+    // Hora local, como en `bloquesHechosHoy`: la racha cuenta días locales, y
+    // con instantes UTC fijos el test fallaba en UTC+14.
     const yesterday = completeSessionRecord(
-      startSessionRecord([{ tipo: 'radar', planificados: 1 }], new Date('2026-07-18T10:00:00.000Z'), 'ayer'),
-      new Date('2026-07-18T10:10:00.000Z'),
+      startSessionRecord([{ tipo: 'radar', planificados: 1 }], new Date(2026, 6, 18, 10, 0), 'ayer'),
+      new Date(2026, 6, 18, 10, 10),
     );
-    expect(processStreak([yesterday], new Date('2026-07-19T08:00:00.000Z'))).toBe(1);
-    expect(processStreak([yesterday], new Date('2026-07-20T08:00:00.000Z'))).toBe(0);
+    expect(processStreak([yesterday], new Date(2026, 6, 19, 8, 0))).toBe(1);
+    expect(processStreak([yesterday], new Date(2026, 6, 20, 8, 0))).toBe(0);
   });
 });
 

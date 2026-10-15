@@ -71,11 +71,35 @@ describe('sessionStore — doble solución (RF-5.7)', () => {
 
     const after = useSessionStore.getState();
     expect(after.radarUltimoAcierto).toBe(true);
-    expect(after.radarFeedbackTexto).toContain('d5c6'); // menciona la jugada superior
+    // Menciona la jugada superior en algebraica del idioma por defecto
+    // (español), no en UCI (RNF-9); la línea va en la misma notación.
+    expect(after.radarFeedbackTexto).toContain('había una superior: Dxc6+');
+    expect(after.radarFeedbackTexto).not.toContain('d5c6');
+    expect(after.radarLinea).toBe('12.Dxc6+');
     expect(await db.errorCards.count()).toBe(0);
     const attempts = await db.dobleSolucionAttempts.toArray();
     expect(attempts).toHaveLength(1);
     expect(attempts[0].resultado).toBe('familiar');
+  });
+
+  it('con la preferencia en inglés, el feedback y la línea salen en inglés (RNF-9)', async () => {
+    // Comprueba que el store lee la preferencia y no fija un idioma: el bug
+    // B1 fue justamente un texto que ignoraba la elección del usuario.
+    vi.stubGlobal('localStorage', { getItem: (k: string) => (k === 'elomax-notacion' ? 'en' : null) });
+    try {
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+      await useSessionStore.getState().start();
+      const s = useSessionStore.getState();
+      s.radarEval('igual');
+      await s.radarUserMove('f1' as never, 'b5' as never);
+      vi.restoreAllMocks();
+
+      const after = useSessionStore.getState();
+      expect(after.radarFeedbackTexto).toContain('había una superior: Qxc6+');
+      expect(after.radarLinea).toBe('12.Qxc6+');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('jugar cualquier otra cosa es un fallo genuino: tarjeta de error y sin registro de conformismo', async () => {

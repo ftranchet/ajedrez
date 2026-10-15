@@ -1,8 +1,8 @@
 // E2E del modificador a ciegas progresivo del currículo (E6, RF-6.5): sobre
-// un patrón con más de 80% de acierto histórico, el tablero pasa a piezas
-// fantasma (opacidad reducida) mientras se está jugando. El umbral y la
-// progresión en sí ya están probados en core/curriculum.test.ts — acá se
-// verifica que la UI aplica el modificador sobre el ítem servido.
+// un patrón con más de 80% de acierto —sumando todas sus posiciones—, el
+// tablero pasa a piezas fantasma (opacidad reducida) mientras se está jugando.
+// El umbral y la progresión en sí ya están probados en core/curriculum.test.ts
+// — acá se verifica que la UI aplica el modificador sobre el ítem servido.
 import { expect, test, type Page } from '@playwright/test';
 import { seedCurriculumItems } from '../src/services/puzzles/curriculumSeedData';
 
@@ -12,7 +12,7 @@ const OBJETIVO = 'patron-mate-pasillo-1';
 // vencido sea el objetivo: determinístico, sin depender del orden de Dexie.
 async function seedCurriculumConFantasma(page: Page) {
   await page.evaluate(
-    ({ objetivoId, otrosIds }: { objetivoId: string; otrosIds: string[] }) => {
+    ({ otrosIds }: { otrosIds: string[] }) => {
       return new Promise<void>((resolve, reject) => {
         const req = indexedDB.open('elomax');
         req.onsuccess = () => {
@@ -30,23 +30,27 @@ async function seedCurriculumConFantasma(page: Page) {
             state: 'review',
             lastReview: '2020-01-01T00:00:00.000Z',
           };
+          // Las otras posiciones del mismo mate quedan automatizadas como se
+          // automatiza de verdad: 3 demostraciones limpias de 3. Eso pone el
+          // patrón en 100% de acierto, y el objetivo —nuevo, sin progreso, así
+          // que vencido— se sirve con piezas fantasma (racha 0).
           for (const id of otrosIds) {
-            tx.objectStore('curriculumProgress').put({ id, fsrs: fsrsAutomatizado, demostracionesLimpias: 3, updatedAt: '2020-01-01T00:00:00.000Z' });
+            tx.objectStore('curriculumProgress').put({
+              id,
+              fsrs: fsrsAutomatizado,
+              demostracionesLimpias: 3,
+              intentos: 3,
+              aciertos: 3,
+              updatedAt: '2020-01-01T00:00:00.000Z',
+            });
           }
-          // 5/6 ≈ 83% de acierto (> 80%), con 1 demostración limpia seguida: "fantasma".
-          tx.objectStore('curriculumProgress').put({
-            id: objetivoId,
-            fsrs: { ...fsrsAutomatizado, reps: 6, lapses: 1 },
-            demostracionesLimpias: 1,
-            updatedAt: '2020-01-01T00:00:00.000Z',
-          });
           tx.oncomplete = () => resolve();
           tx.onerror = () => reject(tx.error);
         };
         req.onerror = () => reject(req.error);
       });
     },
-    { objetivoId: OBJETIVO, otrosIds: seedCurriculumItems.map((i) => i.id).filter((id) => id !== OBJETIVO) },
+    { otrosIds: seedCurriculumItems.map((i) => i.id).filter((id) => id !== OBJETIVO) },
   );
 }
 

@@ -26,3 +26,4 @@ Un ADR documenta una decisión con costo de reversa alto: qué se decidió, en q
 | 0014 | Token de Lichess device-local y reloj impuesto por la plataforma | Aceptado |
 | 0015 | Un solo ejercicio de cálculo declarado, con dos varas de medición | Aceptado (puntos 2 y 3 reemplazados por ADR-0016) |
 | 0016 | El cálculo queda como un solo ejercicio, sin presets | Aceptado |
+| 0017 | El tope diario de tarjetas limita su entrada a repaso, no su creación | Aceptado |

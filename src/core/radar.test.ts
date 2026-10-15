@@ -407,8 +407,8 @@ describe('explainFeedback', () => {
   };
 
   it('explica también cuando no había táctica (RF-5.3), en fallo y en acierto', () => {
-    const fallo = explainFeedback(item, false);
-    const acierto = explainFeedback(item, true);
+    const fallo = explainFeedback(item, false, 'es');
+    const acierto = explainFeedback(item, true, 'es');
     expect(fallo.length).toBeGreaterThan(0);
     expect(acierto.length).toBeGreaterThan(0);
     expect(fallo).not.toBe(acierto);
@@ -416,8 +416,16 @@ describe('explainFeedback', () => {
 
   it('da una explicación distinta para cada uno de los cinco tipos', () => {
     const tipos: RadarItem['tipo'][] = ['ofensiva', 'defensa', 'tranquila', 'genuina', 'envenenada'];
-    const textos = tipos.map((tipo) => explainFeedback({ ...item, tipo }, false));
+    const textos = tipos.map((tipo) => explainFeedback({ ...item, tipo }, false, 'es'));
     expect(new Set(textos).size).toBe(5);
+  });
+
+  // RNF-9: es la puerta de entrada que usan la sesión y el diagnóstico, así
+  // que el idioma tiene que llegar hasta el texto y no quedarse en el camino.
+  it('escribe las jugadas en el idioma que recibe', () => {
+    const envenenada: RadarItem = { ...item, tipo: 'envenenada', solucion: ['g1f3'] };
+    expect(explainFeedback(envenenada, false, 'es')).toContain('declinar con 1.Cf3');
+    expect(explainFeedback(envenenada, false, 'en')).toContain('declinar con 1.Nf3');
   });
 });
 

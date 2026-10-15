@@ -45,7 +45,7 @@ npm run verify:finales # valida FEN y resultado del catálogo de finales con Sto
 npm run e2e        # tests de punta a punta (Playwright) sobre el build de producción
 ```
 
-La CI (GitHub Actions) corre lint + typecheck + test + verificación de finales + build en cada push; no se mergea en rojo (RNF-5). El job `e2e` además juega una partida real contra el motor sobre el build de producción, dos veces: con base `/` y con base `/ajedrez/` (el subpath de GitHub Pages).
+La CI (GitHub Actions) corre lint + typecheck + test (también en dos zonas horarias extremas, UTC+14 y UTC−11, porque buena parte del dominio razona en días locales) + verificación de patrones + verificación de finales + build en cada push; no se mergea en rojo (RNF-5). El job `e2e` además juega una partida real contra el motor sobre el build de producción, dos veces: con base `/` y con base `/ajedrez/` (el subpath de GitHub Pages).
 
 ## Estrategia de tests
 1. **Unitarios de dominio** (`src/**/*.test.ts`, Vitest): obligatorios para todo módulo de `core/` (regla 5) y para toda migración de esquema (regla 3). Corren en milisegundos; son la primera línea.

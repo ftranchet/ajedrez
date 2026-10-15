@@ -175,8 +175,25 @@ const MAX_ZIP_INPUT_BYTES = 100 * 1024 * 1024; // 100 MB comprimidos de entrada
 const MAX_UNCOMPRESSED_BYTES = 400 * 1024 * 1024; // 400 MB descomprimidos en total
 
 /** Restaura un .zip exportado previamente (RF-14.2): reemplaza el estado local
- * completo, con validación y topes de tamaño. */
+ * completo, con validación y topes de tamaño. Nunca lanza: todo fallo vuelve
+ * como `{ ok: false }` con un mensaje para mostrar. */
 export async function importAllData(zipBytes: Uint8Array): Promise<ImportOutcome> {
+  try {
+    return await restaurarRespaldo(zipBytes);
+  } catch {
+    // Lo que la validación no anticipa —una escritura que falla por cuota,
+    // la base cerrada por otra pestaña, un error al migrar— terminaba en una
+    // excepción que la pantalla no mostraba (B10). Decir que los datos no se
+    // tocaron es cierto: antes de escribir no se tocó nada, y la escritura es
+    // una sola transacción que IndexedDB deshace entera si algo falla.
+    return {
+      ok: false,
+      error: 'Hubo un error inesperado y se canceló todo. Tus datos locales no se tocaron.',
+    };
+  }
+}
+
+async function restaurarRespaldo(zipBytes: Uint8Array): Promise<ImportOutcome> {
   if (zipBytes.length > MAX_ZIP_INPUT_BYTES) {
     return { ok: false, error: 'El archivo es demasiado grande para ser una exportación de ELOmax.' };
   }

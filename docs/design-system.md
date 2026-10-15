@@ -224,11 +224,22 @@ mensaje que enseña la equivalencia y señala dónde cambiar la preferencia.
 ## Cantidades del motor
 
 Evaluaciones y costos se muestran en **peones con un decimal**, nunca en
-centipeones (`formatVentaja` y `formatPeones` en `ui/format.ts`). La evaluación
+centipeones (`formatVentaja` y `fraseSaltoVentaja` en `ui/format.ts`). La evaluación
 lleva signo y usa el menos tipográfico (−), el mismo de los símbolos +−/±/=/∓/−+;
 el costo de una jugada va sin signo, porque es una magnitud. Un costo se informa
 siempre junto al salto de evaluación que lo produjo: la magnitud sola no dice si
 la partida se entregó o si seguía ganada.
+
+El costo que acompaña al salto se calcula con **los mismos números que se
+muestran**, ya redondeados (`fraseSaltoVentaja`): el lector tiene que poder
+reconstruirlo restando. Un **mate** no se expresa en peones: se nombra
+("mate a favor", "mate en contra"; `esMate` y `formatVentaja`), y si uno de los
+dos extremos del salto es mate no se informa costo. Cuando la jugada fue del
+rival, se dice y la evaluación se cuenta desde el lado del usuario
+(`fraseLecturaMomento`); si no se sabe con qué color jugó, se nombra el bando y
+se dice que la evaluación es desde su lado. Ninguna frase dice "tu evaluación"
+de un número del motor: en Analizar, "tus evaluaciones" son las que dio el
+usuario.
 
 ## Anotaciones sobre el tablero
 

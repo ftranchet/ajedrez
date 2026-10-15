@@ -5,6 +5,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAnalysisEngine } from '../../test/fakeEngine';
+import type { MoveAnalysisEntry } from '../../core/types';
 
 vi.mock('../../services/engine/stockfishEngine', () => ({
   engine: new FakeAnalysisEngine(),
@@ -172,6 +173,55 @@ describe('analysisStore — fase 2 y confirmación de errores', () => {
     s = useAnalysisStore.getState();
     expect(s.phase).toBe('fin');
     expect(s.erroresConfirmados).toBe(total);
+  });
+
+  it('confirmar más de 10 errores en un día no pierde ninguno: los que pasan el tope quedan diferidos (B2, RF-4.5)', async () => {
+    // Un lote exprés con 12 errores de posiciones distintas, todos confirmados
+    // en el mismo instante: antes, del 11.º en adelante se "confirmaban" y se
+    // descartaban, y la partida ya no los volvía a ofrecer.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 15, 12, 0));
+    try {
+      const errores: MoveAnalysisEntry[] = Array.from({ length: 12 }, (_, i) => ({
+        ply: i,
+        san: 'Ab5',
+        fenAntes: `fen-${i}`,
+        ladoQueMueve: 'w',
+        jugadaUsuario: 'f1b5',
+        jugadaMotor: `mv${i}`,
+        cpAntes: 0,
+        cpDespues: -300,
+        cpPerdidos: 300,
+        clasificacion: 'grave',
+      }));
+      useAnalysisStore.setState({ erroresPendientes: errores, erroresConfirmados: 0, phase: 'confirmar-errores' });
+      for (let i = 0; i < errores.length; i++) {
+        await useAnalysisStore.getState().confirmarErrorActual();
+      }
+
+      const s = useAnalysisStore.getState();
+      expect(s.phase).toBe('fin');
+      expect(s.erroresConfirmados).toBe(12);
+      expect(await db.errorCards.count()).toBe(12);
+      expect(s.erroresDiferidos).toBe(2);
+      const manana = new Date(2026, 9, 16).toISOString();
+      const cards = await db.errorCards.toArray();
+      expect(cards.filter((card) => card.fsrs.due === manana)).toHaveLength(2);
+
+      // Empezar otro análisis no arrastra el aviso del anterior.
+      useAnalysisStore.getState().volver();
+      expect(useAnalysisStore.getState().erroresDiferidos).toBe(0);
+
+      // Otra partida repite un error que quedó para mañana: la tarjeta sigue
+      // esperando su día, así que el cierre tiene que avisarlo igual.
+      useAnalysisStore.setState({ erroresPendientes: [errores[11]!], erroresConfirmados: 0, phase: 'confirmar-errores' });
+      await useAnalysisStore.getState().confirmarErrorActual();
+      expect(await db.errorCards.count()).toBe(12);
+      expect(useAnalysisStore.getState().erroresConfirmados).toBe(1);
+      expect(useAnalysisStore.getState().erroresDiferidos).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('volver() reinicia todo el estado', async () => {

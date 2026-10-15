@@ -121,13 +121,33 @@ export function detectarFugaCalculo(
   };
 }
 
+/** Qué fuga sumó el bloque "¿Calcular o ya alcanza?". Existe porque el porqué
+ * que muestra Hoy (principio 8, RF-11.3) era uno solo, sobre errores tácticos
+ * de partida, y afirmaba algo que no había pasado cuando el bloque lo sumaba
+ * únicamente la fuga de cálculo. */
+export type MotivoCriterio = 'tactica' | 'calculo' | 'ambas';
+
+const SIN_FUGA_CALCULO: AjusteFugaCalculo = { activa: false, fallos: 0, total: 0 };
+
+function motivoDelCriterio(fugaTactica: boolean, fugaCalculo: boolean): MotivoCriterio | null {
+  if (fugaTactica && fugaCalculo) return 'ambas';
+  if (fugaTactica) return 'tactica';
+  if (fugaCalculo) return 'calculo';
+  return null;
+}
+
 export interface DietaSesion {
   curriculumMax: number;
   radarCount: number;
   ajusteFugas: AjusteFugas;
+  /** La fuga de cálculo medida (sin señal si quien compone la dieta no la
+   * midió): el porqué del bloque de criterio cita sus fallos. */
+  ajusteCalculo: AjusteFugaCalculo;
   /** RF-9.2/RF-11.2: se suma el bloque "¿Calcular o ya alcanza?" ante fuga
    * táctica o fuga de cálculo. */
   criterioActivo: boolean;
+  /** Cuál de las dos lo sumó; null si no está activo. */
+  motivoCriterio: MotivoCriterio | null;
 }
 
 /** Dieta base por banda de Elo (RF-11.2 punto 2) más el ajuste por fugas
@@ -151,12 +171,16 @@ export function dietaPorBanda(
   const base = DIETA_POR_BANDA[banda];
   const ajusteFugas = detectarFugaTactica(cardsRecientes, now);
   const fugaTactica = ajusteFugas.categoria === 'tactico';
+  const ajusteCalculo = fugaCalculo ?? SIN_FUGA_CALCULO;
   const radarCount = fugaTactica ? base.radarCount + BONUS_RADAR_POR_FUGA : base.radarCount;
+  const motivoCriterio = motivoDelCriterio(fugaTactica, ajusteCalculo.activa);
   return {
     curriculumMax: base.curriculumMax,
     radarCount,
     ajusteFugas,
-    criterioActivo: fugaTactica || (fugaCalculo?.activa ?? false),
+    ajusteCalculo,
+    criterioActivo: motivoCriterio !== null,
+    motivoCriterio,
   };
 }
 

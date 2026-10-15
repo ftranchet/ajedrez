@@ -3,10 +3,10 @@
 | Campo | Valor |
 |---|---|
 | Documento | Documento de Requisitos de Producto (PRD) |
-| Versión | 0.3.1 |
+| Versión | 0.3.2 |
 | Estado | Borrador para validación del dueño de producto |
 | Dueño | Fran Tranchet |
-| Última actualización | 2026-07-25 |
+| Última actualización | 2026-10-15 |
 | Documentos hermanos | `CONTRIBUTING.md`, `roadmap.md`, `design-system.md`, `adr/`, `evidence/` |
 
 > **Cómo usar este documento.** Es la fuente de verdad de producto. Cada épica tiene requisitos numerados (RF = requisito funcional, RNF = no funcional) con criterios de aceptación. Al construirlo —sea una persona o un agente de IA—: implementar de a una épica, citando los números de requisito en los commits; las reglas de trabajo completas están en `CONTRIBUTING.md`. Si una decisión técnica contradice o excede lo escrito acá, se documenta en un ADR antes de codear. Este documento cambia por pull request y cada cambio se refleja en el changelog.
@@ -114,7 +114,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
 - **RF-4.2 (P0)** El planificador implementa FSRS (ver ADR-0003): acierto espacia la reaparición, fallo la reinicia. Parámetros por defecto de la librería; recalibrables a futuro sin migración de datos.
 - **RF-4.3 (P0)** Al responder una tarjeta, el usuario produce la jugada en el tablero (nunca opción múltiple).
 - **RF-4.4 (P0)** Los repasos vencidos tienen prioridad fija al inicio de cada sesión prescrita.
-- **RF-4.5 (P1)** Tope diario de tarjetas nuevas configurable (por defecto 10) para evitar avalanchas de repaso.
+- **RF-4.5 (P1)** Tope diario de tarjetas nuevas configurable (por defecto 10) para evitar avalanchas de repaso. El tope limita cuántas tarjetas nuevas **entran a repaso** por día local, no cuántas se crean: pasado el tope, la tarjeta se crea igual y entra el primer día con cupo; un error confirmado nunca se descarta (ADR-0017).
 - **RF-4.6 (P2)** Estadísticas de la Cola: tasa de retención por categoría de error, tarjetas "sanguijuela" (fallan >5 veces) con sugerencia de estudio dedicado.
 
 *Criterios de aceptación E4:* una tarjeta fallada reaparece antes que una acertada; los intervalos crecen con aciertos consecutivos; el estado sobrevive al cierre del navegador y a una actualización de versión de la app (migraciones, RNF-5).
@@ -147,7 +147,7 @@ También quedan fuera de v1.0 tres módulos del documento de diseño (`docs/evid
   - **RF-6.2a (P0)** "Demostrar la técnica" es llevarla hasta el final, y cada final declara cuál es ese final: en un mate elemental, **dar el mate**; en un final de peón o de Lucena, **coronar y que la posición siga decidida** después de coronar; en uno de tablas, **alcanzarlas o sostener la defensa** durante doce jugadas propias. Que el motor *vea* el mate o que el peón corone no alcanza: cerrar el ejercicio ahí acredita una técnica que el usuario no ejecutó, y es lo mismo que la app dice no querer hacer con el resto de sus métricas. Perder la técnica muestra el punto crítico —posición, jugada propia y la que prefería el motor— además de registrarlo como repaso.
 - **RF-6.3 (P0)** Cada patrón y final tiene estado en el planificador espaciado: reaparece con intervalos crecientes hasta automatización (3 demostraciones espaciadas sin error). El **espaciado es parte del requisito, no un detalle**: una interfaz que permita encadenar las tres demostraciones seguidas produce automatización por práctica masiva, que es el mecanismo contrario al que sostiene el currículo. Repetir un elemento antes de que venza está permitido como práctica libre, pero no acumula racha ni mueve el calendario (mismo criterio que RF-7.2).
 - **RF-6.4 (P1)** Verificación de finales contra tablebases vía interfaz de Lichess cuando hay conexión (sello de "jugada perfecta").
-- **RF-6.5 (P2)** Modificador a ciegas progresivo (piezas fantasma → solo coordenadas) que se activa automáticamente sobre patrones con acierto >80% para mantener la dificultad deseable.
+- **RF-6.5 (P2)** Modificador a ciegas progresivo (piezas fantasma → solo coordenadas) que se activa automáticamente sobre patrones con acierto >80% para mantener la dificultad deseable. El acierto es del **patrón** (todas sus posiciones, automatizadas incluidas) y se mide con contadores propios de intentos y aciertos, no con los lapsos de FSRS: medido por posición suelta era inalcanzable, porque una posición deja de servirse al automatizarse (RF-6.3). Las coordenadas solas llegan después de una demostración limpia con piezas fantasma de esa misma posición.
 
 ### E7 — Cálculo comprometido
 
@@ -266,7 +266,7 @@ El **idioma de las iniciales de pieza es una preferencia** (Ajustes), con españ
 Lo que **no** se admite es que convivan: al validar entrada se acepta solo el idioma configurado, porque "Re1" es rey en español y torre en inglés y las dos pueden ser legales en la misma posición. La entrada en el otro idioma se rechaza con un mensaje que enseña la equivalencia y señala dónde cambiarla. Ajustes explica además cómo se lee la notación, porque la app pasa a **pedir** jugadas escritas y quien nunca anotó una partida quedaría afuera del ejercicio de cálculo. Detalle en `docs/design-system.md`.
 
 ### RNF-10 — Las cantidades se dicen en la unidad del usuario (P1)
-Las evaluaciones y los costos de una jugada se muestran en **peones con un decimal**, nunca en centipeones: el centipeón es la unidad del motor y obliga a dividir por cien mentalmente. Una evaluación lleva signo (`+1,2`, `−0,8`, `0,0`); lo que **costó** una jugada va sin signo, porque es una magnitud y "perdiste −2,5" es una doble negación. Cuando se informa un costo se acompaña del salto de evaluación (`de +1,2 a −1,3`): perder dos peones desde +6 deja la partida ganada y perderlos desde +1 la entrega, así que la magnitud sola no ubica la jugada.
+Las evaluaciones y los costos de una jugada se muestran en **peones con un decimal**, nunca en centipeones: el centipeón es la unidad del motor y obliga a dividir por cien mentalmente. Una evaluación lleva signo (`+1,2`, `−0,8`, `0,0`); lo que **costó** una jugada va sin signo, porque es una magnitud y "perdiste −2,5" es una doble negación. Cuando se informa un costo se acompaña del salto de evaluación (`de +1,2 a −1,3`): perder dos peones desde +6 deja la partida ganada y perderlos desde +1 la entrega, así que la magnitud sola no ubica la jugada. El costo se calcula con los números que se muestran, para que el lector pueda reconstruirlo. Un mate no se expresa en peones: se nombra ("mate a favor", "mate en contra"), y si un extremo del salto es mate no se informa costo.
 
 ---
 
@@ -293,9 +293,9 @@ Regla de dependencias: `ui → core → (interfaces de) services`. `core` no imp
 | Entidad | Campos clave |
 |---|---|
 | `Game` | id, pgn, fuente (local/lichess/chesscom/manual), ritmo, resultado, tiemposPorJugada, analizada (bool), fase1 (respuestas del usuario), fecha, contexto (diagnóstico) |
-| `ErrorCard` | id, fen, ladoAMover, jugadaUsuario, jugadaCorrecta, categoría, origen, fsrs {due, stability, difficulty, reps, lapses}, historialRepasos |
+| `ErrorCard` | id, fen, ladoAMover, jugadaUsuario, jugadaCorrecta, categoría, origen, fsrs {due, stability, difficulty, reps, lapses}, historialRepasos, entraEn (día de entrada si el tope diario la difirió, ADR-0017) |
 | `RadarItem` | id, fen, tipo (ofensiva/defensa/tranquila/genuina/envenenada/dobleSolución), temas[], rating, fuente |
-| `CurriculumItem` | id, tipo (patrón/final), contenido, fsrs, demostracionesLimpias |
+| `CurriculumItem` | id, tipo (patrón/final), contenido, fsrs, demostracionesLimpias, intentos, aciertos, ultimaACiegas (RF-6.5) |
 | `CalibrationRecord` | id, contexto, confianzaDeclarada, acierto, fecha |
 | `Session` | id, fecha, bloquesPrescritos[], bloquesCompletados[], duración |
 | `Profile` | bandaElo, ratingsExternos (serie declarada), perfilDeFugas (por tipo del Radar), config, versiónEsquema |

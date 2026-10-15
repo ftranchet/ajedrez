@@ -106,6 +106,13 @@ test('análisis en dos fases: motor bloqueado hasta fase 1, detecta el error y l
 
   await page.getByRole('button', { name: /Revisar errores/ }).click();
   await page.getByText('Confirmá y categorizá').waitFor();
+  // Las dos jugadas del error se guardan en UCI ("c4a6"), pero en pantalla
+  // van en algebraica del idioma elegido (RNF-9).
+  for (const etiqueta of ['Jugaste:', 'El motor prefería:']) {
+    const renglon = page.locator('p', { hasText: etiqueta });
+    await expect(renglon).toBeVisible();
+    await expect(renglon).not.toContainText(/[a-h][1-8][a-h][1-8]/);
+  }
 
   // El total de errores a resolver está en "Error {actual} de {total}"; se lee
   // antes de confirmar para saber cuántas veces más descartar sin necesidad de

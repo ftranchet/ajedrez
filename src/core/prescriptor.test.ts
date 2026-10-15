@@ -130,6 +130,48 @@ describe('dietaPorBanda', () => {
     const dieta = dietaPorBanda('intermedio', [], new Date(), { activa: false, fallos: 1, total: 10 });
     expect(dieta.criterioActivo).toBe(false);
   });
+
+  // B9 (principio 8, RF-11.3): Hoy decía siempre "tus errores recientes de
+  // partida son sobre todo tácticos", también cuando el bloque lo había sumado
+  // solo la fuga de cálculo. El motivo tiene que salir de la dieta para que el
+  // porqué diga lo que de verdad pasó.
+  describe('motivo del bloque de criterio', () => {
+    const ahora = new Date('2026-07-17T00:00:00.000Z');
+    const fugaTactica = [cardTactica('2026-07-10'), cardTactica('2026-07-11'), cardPosicional('2026-07-12')];
+    const fugaCalculo = { activa: true, fallos: 6, total: 10 };
+    const sinFugaCalculo = { activa: false, fallos: 1, total: 10 };
+
+    it('sin ninguna fuga no hay motivo', () => {
+      const dieta = dietaPorBanda('intermedio', [], ahora, sinFugaCalculo);
+      expect(dieta.motivoCriterio).toBeNull();
+      expect(dieta.criterioActivo).toBe(false);
+    });
+
+    it('solo la fuga táctica de partidas: motivo táctico', () => {
+      const dieta = dietaPorBanda('intermedio', fugaTactica, ahora, sinFugaCalculo);
+      expect(dieta.motivoCriterio).toBe('tactica');
+      expect(dieta.criterioActivo).toBe(true);
+    });
+
+    it('solo la fuga de cálculo: motivo de cálculo, con los fallos que la dispararon', () => {
+      const dieta = dietaPorBanda('intermedio', [], ahora, fugaCalculo);
+      expect(dieta.motivoCriterio).toBe('calculo');
+      expect(dieta.criterioActivo).toBe(true);
+      expect(dieta.ajusteCalculo).toEqual(fugaCalculo);
+    });
+
+    it('las dos fugas a la vez: motivo doble', () => {
+      const dieta = dietaPorBanda('intermedio', fugaTactica, ahora, fugaCalculo);
+      expect(dieta.motivoCriterio).toBe('ambas');
+      expect(dieta.criterioActivo).toBe(true);
+    });
+
+    it('sin medir la fuga de cálculo, la dieta no inventa una', () => {
+      const dieta = dietaPorBanda('intermedio', fugaTactica, ahora);
+      expect(dieta.motivoCriterio).toBe('tactica');
+      expect(dieta.ajusteCalculo).toEqual({ activa: false, fallos: 0, total: 0 });
+    });
+  });
 });
 
 describe('estimarBandaElo', () => {

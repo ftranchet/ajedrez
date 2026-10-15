@@ -204,6 +204,7 @@ export const es = {
       'No encontramos partidas tuyas con una ventaja clara desperdiciada. Aparecen acá cuando analizás una partida que ganabas por más de tres peones y terminó en tablas o derrota.',
     cargando: 'Preparando el motor…',
     listaVentaja: 'Ventaja de +{ventaja} en la jugada {jugada}',
+    listaMate: 'Tenías mate forzado en la jugada {jugada}',
     listaResultado: 'La partida terminó {resultado}',
     empezar: 'Rejugar desde acá',
     teToca: 'Te toca. Convertí.',
@@ -261,11 +262,14 @@ export const es = {
     bloqueCurriculoPorque: 'Mates y motivos típicos, hasta reconocerlos sin pensar.',
     bloqueCurriculoExplica: 'Resolvés mates y motivos típicos (pasillo, horquilla, clavada…) hasta automatizarlos. Se intercalan y, con tres demostraciones limpias, dejan de aparecer.',
     bloqueTriage: '¿Calcular o ya alcanza? — {n} posiciones',
-    bloqueTriagePorque: 'Tus errores recientes de partida son sobre todo tácticos: conviene afinar cuándo hay que detenerse a calcular.',
+    bloqueTriagePorque: 'El {pct}% de tus errores recientes de partida son tácticos: conviene afinar cuándo hay que detenerse a calcular.',
+    bloqueTriagePorqueCalculo: 'En los últimos 30 días fallaste {fallos} de {total} veces en posiciones cuya solución es una línea forzada: conviene afinar cuándo hay que detenerse a calcular.',
+    bloqueTriagePorqueAmbas: 'El {pct}% de tus errores recientes de partida son tácticos y fallaste {fallos} de {total} veces en posiciones con una línea forzada: conviene afinar cuándo hay que detenerse a calcular.',
+    bloqueTriagePorquePlan: 'Entró al plan de hoy porque más del 35% de tus errores recientes de partida eran tácticos o venías fallando posiciones cuya solución es una línea forzada.',
     bloqueTriageExplica: 'Para cada posición decidís si pide cálculo profundo o alcanza con una jugada sólida. Entrena la calibración del esfuerzo —no jugar en automático una posición crítica, ni quemar tu concentración en una tranquila—. Sin reloj.',
     bloqueRadar: 'Radar — {n} posiciones',
     bloqueRadarPorque: 'Posiciones de partidas para que decidas la mejor jugada.',
-    bloqueRadarPorqueFuga: 'Reforzado: la mayoría de tus errores recientes son tácticos.',
+    bloqueRadarPorqueFuga: 'Reforzado: el {pct}% de tus errores recientes de partida son tácticos.',
     bloqueRadarPorqueTipo: 'Con algo más de {tipo}: es donde venís fallando más.',
     bloqueRadarExplica: 'Evaluás, decidís y jugás la mejor en posiciones mezcladas como en partida, sin que nadie te avise si hay táctica. La dificultad se adapta a tu nivel.',
     hechoHoy: 'Hecho hoy',
@@ -327,6 +331,8 @@ export const es = {
     motivoPartidasUna: 'Llegaste a este final en una de tus últimas partidas.',
     motivoUltimaFallada: 'La última vez se te escapó.',
     motivoFalla: 'Se te escapó {fallos} de {total} veces.',
+    // Registro anterior a los contadores: lo medido son solo las últimas.
+    motivoFallaRecientes: 'Se te escapó {fallos} de tus últimas {total} veces.',
     motivoSinPracticar: 'Todavía no lo demostraste ninguna vez.',
     motivoLento: 'Te lleva unos {n} segundos, más que tus otros finales.',
     motivoVencido: 'Toca repasarlo hoy.',
@@ -503,6 +509,13 @@ export const es = {
     },
     borrarAnotaciones: 'Borrar marcas',
   },
+  // Una evaluación que es mate no se muestra como número (RNF-10): el
+  // análisis la guarda como un centinela que, dividido por cien, daba
+  // "+1000,0". "A favor" y "en contra" son el + y el − de las demás ventajas.
+  evaluacion: {
+    mateAFavor: 'mate a favor',
+    mateEnContra: 'mate en contra',
+  },
 
   calculo: {
     // Un solo ejercicio desde ADR-0016: el título nombra la pantalla y el
@@ -550,6 +563,7 @@ export const es = {
     errorDeclaracionIncompleta: 'Faltan candidatas: dos con su línea, y cada una con su evaluación.',
     origenCatalogo: 'Posición del catálogo: rica y sin una jugada claramente mejor.',
     origenPropiaPeones: 'Posición de tu propia partida: acá tu ventaja pasó de {antes} a {despues} — te costó {peones} peones. Volvés a tomar esa decisión.',
+    origenPropiaMate: 'Posición de tu propia partida: acá tu ventaja pasó de {antes} a {despues}. Volvés a tomar esa decisión.',
     origenPropiaTiempo: 'Posición de tu propia partida: acá te tomaste {duracion}. Volvés a tomar esa decisión.',
     ramaConLinea: 'Candidata {n} — con su línea',
     ramaSuelta: 'Candidata {n} — suelta alcanza',
@@ -672,7 +686,19 @@ export const es = {
     momentoLecturaTitulo: 'Tu lectura de la partida',
     momentoLecturaCoincide: 'Le acertaste: marcaste la jugada {jugada} y ahí es donde la partida se dio vuelta.',
     momentoLecturaDifiere: 'Vos sentiste que se definía en la jugada {tuya}. Para el motor se dio vuelta en la {motor}, con {san}.',
-    momentoLecturaCosto: 'Esa jugada costó {cp} peones: la evaluación pasó de {antes} a {despues}.',
+    momentoLecturaCosto: 'Esa jugada costó {peones} peones: la evaluación pasó de {antes} a {despues}.',
+    momentoLecturaMate: 'Con esa jugada la evaluación pasó de {antes} a {despues}.',
+    // La jugada que dio vuelta la partida puede ser del rival: se dice, y la
+    // evaluación se lee desde tu lado, sin costo (para vos no fue una pérdida).
+    // "La evaluación", no "tu evaluación": en esta pantalla "tus evaluaciones"
+    // son las que diste en la fase 1.
+    momentoLecturaRival: 'Fue una jugada de tu rival: la evaluación, desde tu lado, pasó de {antes} a {despues}.',
+    // Partidas viejas sin el color del usuario: se nombra el bando y se dice
+    // que la evaluación es desde su lado, para que "mate a favor" no se lea
+    // como propio.
+    momentoLecturaLado: 'Jugaban las {lado}, y la evaluación se cuenta desde su lado.',
+    ladoBlancas: 'blancas',
+    ladoNegras: 'negras',
     curvaTitulo: 'Curva de evaluación',
     jugadasTitulo: 'Jugadas',
     comparacionTitulo: 'Tus evaluaciones vs. el motor',
@@ -699,6 +725,10 @@ export const es = {
     finResumenUno: '1 error nuevo para repasar.',
     finResumenOtro: '{n} errores nuevos para repasar.',
     finResumenNinguno: 'Sin errores nuevos — no se confirmó ninguno.',
+    // Tope diario de tarjetas nuevas (RF-4.5): pasado el tope se guardan igual
+    // y entran a repaso en los días siguientes.
+    finDiferidasUno: '1 de estas tarjetas entra a tu repaso en los próximos días, para no sumar más de {tope} nuevas por día.',
+    finDiferidasOtro: '{n} de estas tarjetas entran a tu repaso en los próximos días, para no sumar más de {tope} nuevas por día.',
   },
   panel: {
     titulo: 'Panel',
@@ -801,7 +831,7 @@ export const es = {
     calculoBrechaMedia: 'Media de tus tomas medidas: {media}.',
     triageInformeTitulo: '¿Calcular o ya alcanza?',
     triageInformePeriodo: 'Últimos 30 días.',
-    triageInformeSinDatos: 'Acá vas a ver qué tan bien reconocés cuándo una posición pide cálculo profundo y cuándo alcanza con una jugada sólida. El ejercicio aparece en tu sesión cuando tus errores recientes son sobre todo tácticos.',
+    triageInformeSinDatos: 'Acá vas a ver qué tan bien reconocés cuándo una posición pide cálculo profundo y cuándo alcanza con una jugada sólida. El ejercicio aparece en tu sesión cuando más del 35% de tus errores recientes de partida son tácticos, o cuando fallás seguido las posiciones cuya solución es una línea forzada y no una jugada suelta.',
     triageEjercicios: 'Reconocimiento correcto: {correctos}/{total} ({porcentaje}%).',
     hitosTitulo: 'Hitos',
     hitosAyuda: 'Capacidades demostradas y evidencia nueva. No hay puntos, monedas ni rankings.',
@@ -830,7 +860,11 @@ export const es = {
       },
       'calibracion-afinada': {
         titulo: 'Juicio calibrado',
-        significado: 'Tu confianza declarada se acerca a tu acierto real: sabés cuándo sabés. Un juicio calibrado decide mejor bajo presión.',
+        // Dice lo que mide la brecha: que en promedio la confianza coincide
+        // con el acierto. "Sabés cuándo sabés" afirmaba además distinguir los
+        // aciertos de los fallos, y eso la brecha no lo mide: declarar siempre
+        // 70 con un 70% de acierto también da brecha cero.
+        significado: 'En promedio, la confianza que declarás coincide con lo que acertás: no te sobreestimás ni te subestimás. Un juicio calibrado decide mejor bajo presión.',
       },
     },
     importarPgnTitulo: 'Importar PGN',
@@ -846,6 +880,7 @@ export const es = {
     importarPgnRatingAyuda: 'Se usa solo para comparar entrenamiento con juego real. Si lo dejás vacío, se toma WhiteElo o BlackElo del PGN.',
     importarPgnBoton: 'Importar partida',
     importarPgnOk: 'Partida importada.',
+    importarPgnErrorGuardar: 'No se pudo guardar la partida. Probá de nuevo.',
     importarPgnErrorVacio: 'Pegá un PGN para importar.',
     importarPgnErrorInvalido: 'Ese texto no es un PGN válido.',
     importarPgnErrorSinJugadas: 'El PGN no tiene jugadas.',
@@ -863,11 +898,16 @@ export const es = {
     exportar: 'Exportar mis datos',
     exportando: 'Preparando el archivo…',
     exportado: 'Descarga lista',
+    exportadoError: 'No se pudo preparar el archivo. Tus datos no cambiaron; probá de nuevo.',
     importar: 'Importar / restaurar',
     importando: 'Restaurando…',
     importadoOk: 'Restaurado: {partidas} partidas, {tarjetas} tarjetas, {calibraciones} registros de calibración y {radar} respuestas del Radar',
     importadoMigrado: 'El respaldo era de un formato anterior (esquema {esquema}) y se actualizó al restaurarlo.',
-    importadoError: 'No se pudo restaurar',
+    // Cada motivo es una oración completa: se compone con punto, no con dos
+    // puntos, para que "No se pudo restaurar: Ocurrió un error … al restaurar"
+    // no repita la idea ni encadene dos veces dos puntos.
+    importadoError: 'No se pudo restaurar. {motivo}',
+    importadoErrorLectura: 'El archivo elegido no se puede leer. Tus datos locales no se tocaron.',
     eliminar: 'Eliminar todos mis datos',
     eliminarAdvertencia: 'Se borran tu perfil, partidas, repasos y todo tu progreso, más las preferencias de este dispositivo y el token de Lichess (queda desconectado acá; revocarlo en tu cuenta de Lichess es aparte). No se puede deshacer. Si querés conservarlos, exportá primero.',
     eliminarConfirmar: 'Sí, borrar todo',

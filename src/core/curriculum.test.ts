@@ -41,6 +41,34 @@ describe('reviewCurriculumProgress', () => {
     const after = reviewCurriculumProgress(racha, false, now);
     expect(after.demostracionesLimpias).toBe(0);
   });
+
+  it('cuenta cada demostración en intentos y solo las limpias en aciertos', () => {
+    const now = new Date('2026-01-01T00:00:00Z');
+    const nuevo = newCurriculumProgress('p1', now);
+    expect(nuevo.intentos).toBe(0);
+    expect(nuevo.aciertos).toBe(0);
+    const resultados = [true, false, true, true, false];
+    const final = resultados.reduce((p, limpia) => reviewCurriculumProgress(p, limpia, now), nuevo);
+    expect(final.intentos).toBe(5);
+    expect(final.aciertos).toBe(3);
+  });
+
+  it('un registro anterior a los contadores empieza a contar desde la próxima demostración', () => {
+    // No se reconstruye el pasado: FSRS no guarda qué repasos fallaron.
+    const now = new Date('2026-01-01T00:00:00Z');
+    const legado: CurriculumProgress = {
+      id: 'p1',
+      fsrs: { ...newCurriculumProgress('p1', now).fsrs, reps: 7, lapses: 1, state: 'review' },
+      demostracionesLimpias: 1,
+      updatedAt: now.toISOString(),
+    };
+    const fallo = reviewCurriculumProgress(legado, false, now);
+    expect(fallo.intentos).toBe(1);
+    expect(fallo.aciertos).toBe(0);
+    const acierto = reviewCurriculumProgress(legado, true, now);
+    expect(acierto.intentos).toBe(1);
+    expect(acierto.aciertos).toBe(1);
+  });
 });
 
 describe('dueCurriculumItems', () => {
@@ -68,41 +96,179 @@ describe('dueCurriculumItems', () => {
 });
 
 describe('nivelCiegas', () => {
-  function progresoCon(reps: number, lapses: number, demostracionesLimpias: number): CurriculumProgress {
+  const now = new Date('2026-01-01T00:00:00Z');
+
+  /** Registro con contadores propios; el FSRS es indistinto para el acierto. */
+  function progresoCon(
+    id: string,
+    intentos: number,
+    aciertos: number,
+    demostracionesLimpias: number,
+    ultimaACiegas = false,
+  ): CurriculumProgress {
     return {
-      id: 'p1',
+      id,
       fsrs: {
         due: '2026-01-01T00:00:00.000Z',
         stability: 5,
         difficulty: 5,
         elapsedDays: 0,
         scheduledDays: 0,
-        reps,
-        lapses,
+        reps: intentos,
+        lapses: 0,
         learningSteps: 0,
         state: 'review',
         lastReview: '2026-01-01T00:00:00.000Z',
       },
       demostracionesLimpias,
+      intentos,
+      aciertos,
+      ultimaACiegas,
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
   }
 
-  it('sin progreso, o con menos repeticiones que el mínimo, nivel normal', () => {
-    expect(nivelCiegas(undefined)).toBe('normal');
-    expect(nivelCiegas(progresoCon(2, 0, 2))).toBe('normal');
+  /** Demostraciones reales desde un patrón nuevo, con el FSRS de verdad. */
+  function demostrar(id: string, resultados: boolean[]): CurriculumProgress {
+    return resultados.reduce((p, limpia) => reviewCurriculumProgress(p, limpia, now), newCurriculumProgress(id, now));
+  }
+
+  const a = item('a', 'mate-pasillo');
+  const b = item('b', 'mate-pasillo');
+  const c = item('c', 'mate-pasillo');
+  const otro = item('x', 'horquilla');
+  const catalogo = [a, b, c, otro];
+  const mapa = (...progresos: CurriculumProgress[]) => new Map(progresos.map((p) => [p.id, p] as const));
+
+  it('tres fallos seguidos desde un patrón nuevo no activan el modo a ciegas (B4)', () => {
+    // ts-fsrs no cuenta lapsos mientras la tarjeta está aprendiendo: con el
+    // cociente de FSRS esto daba "100% de acierto" y piezas fantasma.
+    const progreso = demostrar('a', [false, false, false]);
+    expect(progreso.fsrs.reps).toBe(3);
+    expect(progreso.fsrs.lapses).toBe(0);
+    expect(nivelCiegas(a, catalogo, mapa(progreso))).toBe('normal');
   });
 
-  it('con acierto de 80% exacto o menos, nivel normal (el umbral es "más de 80%")', () => {
-    expect(nivelCiegas(progresoCon(5, 1, 1))).toBe('normal'); // 4/5 = 80%
+  it('el acierto es del patrón: dominar una posición lleva a las otras del mismo mate a ciegas', () => {
+    const automatizada = demostrar('a', [true, true, true]);
+    expect(isAutomatizado(automatizada)).toBe(true);
+    expect(nivelCiegas(b, catalogo, mapa(automatizada))).toBe('fantasma');
+    // Otro patrón no hereda nada.
+    expect(nivelCiegas(otro, catalogo, mapa(automatizada))).toBe('normal');
   });
 
-  it('por encima de 80% de acierto, con pocas demostraciones limpias seguidas: piezas fantasma', () => {
-    expect(nivelCiegas(progresoCon(6, 1, 1))).toBe('fantasma'); // 5/6 ≈ 83%
+  it('las coordenadas solas piden dos limpias seguidas de la posición, la última a ciegas', () => {
+    const automatizada = demostrar('a', [true, true, true]);
+    expect(nivelCiegas(b, catalogo, mapa(automatizada, progresoCon('b', 2, 2, 2, true)))).toBe('coordenadas'); // 5/5
+    expect(nivelCiegas(b, catalogo, mapa(automatizada, progresoCon('b', 1, 1, 1, true)))).toBe('fantasma'); // 4/4
+    // Dos limpias, pero la última con el tablero normal (el patrón no llegaba
+    // al umbral, o el modo estaba apagado): primero las piezas fantasma.
+    expect(nivelCiegas(b, catalogo, mapa(automatizada, progresoCon('b', 2, 2, 2, false)))).toBe('fantasma');
   });
 
-  it('por encima de 80% de acierto, con 2+ demostraciones limpias seguidas (camino a automatizar): solo coordenadas', () => {
-    expect(nivelCiegas(progresoCon(6, 1, 2))).toBe('coordenadas');
+  it('una posición servida normal no salta a coordenadas cuando el patrón cruza el umbral', () => {
+    // Revisión final de la etapa 1: a se automatizó después de un fallo (3 de
+    // 4) y b se acierta tres veces. Con la racha sola, la tercera iba directo
+    // a coordenadas sin haber pasado por las piezas fantasma.
+    let progresos = mapa(demostrar('a', [false, true, true, true]));
+    const niveles: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const nivel = nivelCiegas(b, catalogo, progresos);
+      niveles.push(nivel);
+      const previo = progresos.get('b') ?? newCurriculumProgress('b', now);
+      progresos = new Map(progresos).set('b', reviewCurriculumProgress(previo, true, now, nivel !== 'normal'));
+    }
+    expect(niveles).toEqual(['normal', 'normal', 'fantasma']);
+  });
+
+  it('con 80% exacto o menos en el patrón, nivel normal (el umbral es "más de 80%")', () => {
+    expect(nivelCiegas(b, catalogo, mapa(progresoCon('a', 3, 3, 3), progresoCon('b', 2, 1, 1)))).toBe('normal'); // 4/5
+  });
+
+  it('sin intentos medidos suficientes en el patrón, nivel normal', () => {
+    expect(nivelCiegas(a, catalogo, mapa())).toBe('normal');
+    expect(nivelCiegas(a, catalogo, mapa(progresoCon('a', 2, 2, 2)))).toBe('normal');
+  });
+
+  it('un registro anterior a los contadores aporta solo lo seguro: sus repasos y su racha', () => {
+    const legado = (id: string, reps: number, racha: number): CurriculumProgress => ({
+      id,
+      fsrs: { ...progresoCon(id, reps, reps, racha).fsrs, lapses: 0 }, // FSRS diría "100%"
+      demostracionesLimpias: racha,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    // Automatizada sin fallos antes de los contadores (3 de 3): cuenta, y las
+    // otras posiciones del mate se sirven a ciegas. Antes no sumaba nada y, si
+    // era la única otra posición, el patrón no llegaba nunca al modo.
+    expect(nivelCiegas(b, catalogo, mapa(legado('a', 3, 3)))).toBe('fantasma');
+    // Con un repaso antes de la racha, ese repaso cuenta como fallo: 3 de 4.
+    expect(nivelCiegas(b, catalogo, mapa(legado('a', 4, 3)))).toBe('normal');
+    // Muchos repasos y racha corta: 2 de 10, aunque FSRS no marque lapsos.
+    expect(nivelCiegas(b, catalogo, mapa(legado('a', 10, 2)))).toBe('normal');
+    // Sin saber si se hizo a ciegas, no salta a coordenadas.
+    expect(nivelCiegas(b, catalogo, mapa(legado('a', 3, 3), legado('b', 2, 2)))).toBe('fantasma');
+  });
+
+  it('un registro legado que se vuelve a demostrar conserva la cota de sus repasos previos', () => {
+    // Revisión final de la etapa 1: al ganar contadores, el registro tiraba
+    // su historia. b falló cinco veces antes de los contadores y acierta una
+    // después: 1 de 1 llevaba el patrón a 100% y piezas fantasma. Es 1 de 6.
+    const sinContadores = (p: CurriculumProgress): CurriculumProgress => ({
+      id: p.id,
+      fsrs: p.fsrs,
+      demostracionesLimpias: p.demostracionesLimpias,
+      updatedAt: p.updatedAt,
+    });
+    const aLegada = sinContadores(demostrar('a', [true, true, true]));
+    const bLegada = sinContadores(demostrar('b', [false, false, false, false, false]));
+    expect(nivelCiegas(b, catalogo, mapa(aLegada, bLegada))).toBe('normal'); // 3/8
+    const bDespues = reviewCurriculumProgress(bLegada, true, now);
+    expect(bDespues.intentos).toBe(1);
+    expect(nivelCiegas(b, catalogo, mapa(aLegada, bDespues))).toBe('normal'); // 4/9
+    // Una racha que viene de antes de los contadores cuenta entera.
+    const cLegada = sinContadores(demostrar('c', [false, true, true]));
+    expect(nivelCiegas(b, catalogo, mapa(aLegada, reviewCurriculumProgress(cLegada, true, now)))).toBe('fantasma'); // 3/3 + 3/4
+  });
+
+  it('jugando de verdad, en cualquier orden, alcanza los tres niveles y las coordenadas llegan después de las piezas fantasma', () => {
+    // Recorre todas las formas de jugar un patrón de tres posiciones, hasta 7
+    // demostraciones intercaladas en cualquier orden y sin servir las
+    // automatizadas, como la sesión. Cada demostración guarda si se hizo a
+    // ciegas con el nivel que se mostró.
+    const niveles = new Set<string>();
+    const saltos: string[] = [];
+    const recorrer = (
+      progresos: Map<string, CurriculumProgress>,
+      anterior: Map<string, { nivel: string; limpia: boolean }>,
+      historia: string[],
+    ) => {
+      if (historia.length === 7) return;
+      for (const actual of [a, b, c]) {
+        const p = progresos.get(actual.id);
+        if (p && isAutomatizado(p)) continue;
+        const nivel = nivelCiegas(actual, catalogo, progresos);
+        niveles.add(nivel);
+        const previo = anterior.get(actual.id);
+        if (nivel === 'coordenadas' && !(previo && previo.limpia && previo.nivel !== 'normal')) {
+          saltos.push(`${historia.join(' ')} → ${actual.id}: coordenadas`);
+        }
+        for (const limpia of [true, false]) {
+          const siguiente = new Map(progresos);
+          siguiente.set(actual.id, reviewCurriculumProgress(p ?? newCurriculumProgress(actual.id, now), limpia, now, nivel !== 'normal'));
+          recorrer(siguiente, new Map(anterior).set(actual.id, { nivel, limpia }), [...historia, `${actual.id}${limpia ? '✓' : '✗'}`]);
+        }
+      }
+    };
+    recorrer(new Map(), new Map(), []);
+    expect(saltos).toEqual([]);
+    expect([...niveles].sort()).toEqual(['coordenadas', 'fantasma', 'normal']);
+  });
+
+  it('un patrón de una sola posición nunca lo activa', () => {
+    const solo = item('d', 'descubierta');
+    for (const resultados of [[true, true], [false, true, true], [true, false, true, true]]) {
+      expect(nivelCiegas(solo, [solo], mapa(demostrar('d', resultados)))).toBe('normal');
+    }
   });
 });
 

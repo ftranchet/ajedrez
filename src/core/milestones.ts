@@ -13,7 +13,7 @@ import type {
   GameRecord,
   TransferMeasurement,
 } from './types';
-import { brierScore } from './calibration';
+import { brechaCalibracion } from './calibration';
 import { isAutomatizado } from './curriculum';
 import { mejoraErroresGraves } from './panel';
 import { transferResults } from './transfer';
@@ -42,9 +42,14 @@ export const HITOS_ORDEN: HitoId[] = [
   'calibracion-afinada',
 ];
 
-// La calibración pide una muestra mínima para no premiar un Brier bajo de suerte.
+// El juicio calibrado se mide con la brecha de calibración, no con Brier: el
+// Radar sostiene el acierto en torno al 70% a propósito (RF-5.5) y quien declara
+// 70% y acierta 70% saca Brier 0,21, así que un umbral de Brier dejaba el hito
+// fuera del alcance de quien está bien calibrado (ver brechaCalibracion). La
+// muestra mínima evita premiar una brecha baja de suerte.
 const CALIBRACION_MIN_REGISTROS = 15;
-const CALIBRACION_BRIER_MAX = 0.18;
+/** Puntos de distancia entre confianza declarada y acierto real. */
+const CALIBRACION_BRECHA_MAX = 10;
 
 export interface MilestoneInputs {
   games: GameRecord[];
@@ -108,9 +113,13 @@ export function hitosLogrados(inputs: MilestoneInputs): Hito[] {
     logros.set('mejora-errores-graves', { id: 'mejora-errores-graves' });
   }
 
-  // Capacidad/evidencia: juicio calibrado (Brier bajo con muestra suficiente, RF-10.2).
-  const brier = brierScore(calibraciones);
-  if (calibraciones.length >= CALIBRACION_MIN_REGISTROS && brier !== null && brier <= CALIBRACION_BRIER_MAX) {
+  // Capacidad/evidencia: juicio calibrado (brecha baja con muestra suficiente,
+  // RF-10.3). Sobre todo el historial y no sobre las últimas respuestas: la
+  // brecha se infla con pocos registros por banda, y una ventana corta volvería
+  // a negarle el hito a quien está calibrado pero usa todo el rango de confianza.
+  // Así además coincide con la brecha que el Panel muestra como titular.
+  const brecha = brechaCalibracion(calibraciones);
+  if (calibraciones.length >= CALIBRACION_MIN_REGISTROS && brecha !== null && brecha <= CALIBRACION_BRECHA_MAX) {
     logros.set('calibracion-afinada', { id: 'calibracion-afinada' });
   }
 

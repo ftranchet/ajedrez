@@ -61,6 +61,8 @@ import { profileRepo } from '../../services/storage/profileRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
 import { trainingEventRepo } from '../../services/storage/trainingEventRepo';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
+import { readIdiomaNotacion } from '../notacionPrefs';
+import { nivelCiegasServido } from '../trainingPrefs';
 import { singleFlight } from './singleFlight';
 import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 
@@ -1007,7 +1009,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       chess.move({ from, to, promotion: promo });
 
       const progresoPrevio = s.curriculumProgressById.get(item.id) ?? newCurriculumProgress(item.id);
-      const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia);
+      // Con el mismo progreso con que se mostró: si se jugó a ciegas, la
+      // próxima vez puede tocar el nivel siguiente (RF-6.5).
+      const aCiegas = nivelCiegasServido(item, s.curriculumItemsAll, s.curriculumProgressById) !== 'normal';
+      const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia, new Date(), aCiegas);
       await curriculumProgressRepo.save(progresoNuevo);
       updateTrackedSession((record) => recordSessionItem(record, 'curriculo'));
       updateTrackedAssignment('curriculo', item.id);
@@ -1185,7 +1190,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     if (!acierto && !ownError) {
       // Dedup por identidad + tope diario (RF-4.1/4.5): si ya hay una tarjeta
       // de esta posición se refuerza en vez de duplicar; superado el tope
-      // diario de tarjetas nuevas, se omite para no avalanchar la Cola.
+      // diario de tarjetas nuevas, se crea igual pero entra a la Cola otro día.
       const cards = await errorCardRepo.list();
       const alta = altaErrorCard(cards, {
         fen: item.fen,
@@ -1195,7 +1200,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         categoria: categoriaFromTipo(item.tipo),
         origen: 'radar',
       });
-      if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
+      await errorCardRepo.save(alta.card);
     }
   }
 
@@ -1211,19 +1216,22 @@ export const useSessionStore = create<SessionState>((set, get) => {
       void dobleSolucionAttemptRepo.save({ id: crypto.randomUUID(), itemId: item.id, resultado: resultadoDS, fecha: new Date().toISOString() });
     }
     const pedirConfianza = shouldSampleConfidence();
+    // La misma notación que "Jugada correcta" (sanDeJugada): sin pasarla, la
+    // línea y el texto salían en inglés con la app en español (RNF-9).
+    const idioma = readIdiomaNotacion();
     set({
       ...boardSnapshot(),
       lastMove,
       radarUltimoAcierto: acierto,
       radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
       revision: acierto ? null : revisionDelError(item.fen, jugadaUsuario, item.solucion[0]),
-      radarLinea: lineaParaMostrar(item),
+      radarLinea: lineaParaMostrar(item, idioma),
       radarJugadaUsuario: jugadaUsuario,
       radarFeedbackTexto: isOwnErrorRadarItem(item)
         ? explainOwnErrorFeedback(acierto)
         : resultadoDS === 'familiar'
-          ? feedbackConformismo(item)
-          : explainFeedback(item, acierto),
+          ? feedbackConformismo(item, idioma)
+          : explainFeedback(item, acierto, idioma),
       radarPedirConfianza: pedirConfianza,
       radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
     });

@@ -338,6 +338,30 @@ describe('diagnosticoStore — el diagnóstico deja línea base (RF-11.4)', () =
     expect(useDiagnosticoStore.getState().radarCalibraciones).toEqual([]);
   });
 
+  // RNF-9: la línea y el texto del feedback usan la notación elegida, la
+  // misma que "Jugada correcta". Antes salían en inglés con la app en español.
+  it('la línea y el feedback salen en la notación elegida (RNF-9)', async () => {
+    await cargarPosicion(0);
+    useDiagnosticoStore.getState().radarEval('igual');
+    await responderRadar();
+    let state = useDiagnosticoStore.getState();
+    expect(state.radarLinea).toBe('4...Dh5');
+    expect(state.radarFeedbackTexto).toContain('declinar con 4...Dh5');
+    expect(state.radarFeedbackTexto).not.toContain('Qh5');
+
+    vi.stubGlobal('localStorage', { getItem: (k: string) => (k === 'elomax-notacion' ? 'en' : null) });
+    try {
+      await cargarPosicion(0);
+      useDiagnosticoStore.getState().radarEval('igual');
+      await responderRadar();
+      state = useDiagnosticoStore.getState();
+      expect(state.radarLinea).toBe('4...Qh5');
+      expect(state.radarFeedbackTexto).toContain('declinar con 4...Qh5');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('marca sus respuestas del Radar como del diagnóstico, para no contaminar la banda 60–80%', async () => {
     await cargarPosicion(0);
     useDiagnosticoStore.getState().radarEval('igual');

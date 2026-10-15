@@ -6,6 +6,7 @@
 // core/dobleSolucion.ts, no acá.
 import type { CategoriaError, ErrorCard, RadarItem, TipoRadar } from './types';
 import { explicarPosicion } from './radarExplicacion';
+import type { IdiomaNotacion } from './notacion';
 import seleccion from '../config/radar-seleccion.json';
 
 export interface RadarSelectionState {
@@ -365,10 +366,12 @@ export function recordServed(state: RadarSelectionState, item: RadarItem): Radar
  * que las 116 posiciones del catálogo se repartían. La composición por
  * posición vive en `core/radarExplicacion.ts`, que solo afirma lo que puede
  * comprobar sobre el tablero; acá queda la puerta de entrada que ya usaban
- * las dos pantallas.
+ * las dos pantallas. El idioma de notación (RNF-9) es obligatorio por la
+ * misma razón que allá: core no lee preferencias, y un default elegía el
+ * idioma por el usuario sin que nadie lo notara.
  */
-export function explainFeedback(item: RadarItem, acierto: boolean): string {
-  return explicarPosicion(item, acierto);
+export function explainFeedback(item: RadarItem, acierto: boolean, idioma: IdiomaNotacion): string {
+  return explicarPosicion(item, acierto, idioma);
 }
 
 /** Feedback que revela el origen propio recién después de responder. */

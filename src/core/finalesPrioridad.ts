@@ -20,7 +20,9 @@
 //    si la **última** se te escapó. Ojo con `demostracionesLimpias`: es una
 //    racha hacia la automatización que se resetea a cero con cada fallo, no un
 //    contador de aciertos, así que `limpias / reps` **no** es una tasa de
-//    acierto y usarla mostraría un porcentaje falso.
+//    acierto y usarla mostraría un porcentaje falso. Tampoco sirve
+//    `fsrs.lapses`: no cuenta los fallos mientras se aprende. Los fallos salen
+//    de los contadores propios (`intentos − aciertos`).
 // 3. *Cuánto lo practicaste.* Lo nunca visto pesa más que lo ya trabajado.
 // 4. *Cuánto tardás.* Tu tiempo típico en ese final contra tu propia mediana:
 //    resolverlo al doble de lento es señal de que la técnica no está
@@ -66,11 +68,15 @@ export type MotivoPrioridad =
 export interface SeñalesFinal {
   /** Partidas tuyas recientes que llegaron a este tipo de final. */
   partidas: number;
-  /** Demostraciones hechas (limpias o no). */
+  /**
+   * Demostraciones hechas (limpias o no), contadas en la misma ventana que
+   * `fallos`: los intentos medidos o, en un registro anterior a los
+   * contadores, las repeticiones de FSRS (que cuentan bien los intentos).
+   */
   practicas: number;
-  /** Fallos registrados por la repetición espaciada. */
+  /** Fallos medidos (`intentos − aciertos`); 0 sin contadores, no se adivinan. */
   fallos: number;
-  /** Fallos sobre demostraciones hechas; null si nunca se practicó. */
+  /** Fallos sobre demostraciones; null si nunca se practicó o no hay fallos medidos. */
   tasaFallo: number | null;
   /**
    * La última demostración se escapó. Es exacto —`demostracionesLimpias` vuelve
@@ -79,6 +85,13 @@ export interface SeñalesFinal {
   ultimaFallada: boolean;
   /** Demostraciones limpias seguidas; 3 automatizan la técnica (RF-6.3). */
   rachaLimpia: number;
+  /**
+   * Los contadores empezaron después de las primeras demostraciones (un
+   * registro anterior a que existieran): `fallos` y `practicas` cuentan solo
+   * las últimas, no todas. Sin esta marca, "se te escapó 1 de 2 veces" se leía
+   * como el total en un final demostrado doce veces.
+   */
+  historialParcial: boolean;
   /** Segundos que tardás típicamente; null si no hay tiempo medido. */
   segundosTipicos: number | null;
   /** Tu tiempo contra tu propia mediana (1 = igual); null sin datos. */
@@ -129,17 +142,26 @@ function señalesDe(
   medianaGlobal: number | null,
   ahora: Date,
 ): SeñalesFinal {
-  const practicas = progress?.fsrs.reps ?? 0;
-  const fallos = progress?.fsrs.lapses ?? 0;
+  // Un registro anterior a los contadores no tiene fallos medidos, y
+  // `fsrs.lapses` los subestima: "se te escapó 1 de 6 veces" podía ser falso.
+  // Antes que mostrar un número que puede mentir, la tasa queda sin dato y
+  // "te sale mal" se apoya solo en si la última se escapó, que es exacto.
+  // Cuesta poco: a la próxima demostración el registro ya empieza a medir.
+  const intentos = progress?.intentos;
+  const aciertos = progress?.aciertos;
+  const medidos = intentos !== undefined && aciertos !== undefined;
+  const practicas = medidos ? intentos : (progress?.fsrs.reps ?? 0);
+  const fallos = medidos ? intentos - aciertos : 0;
   const rachaLimpia = progress?.demostracionesLimpias ?? 0;
   const segundosTipicos = mediana(segundos ?? []);
   return {
     partidas,
     practicas,
     fallos,
-    tasaFallo: practicas > 0 ? Math.min(1, fallos / practicas) : null,
+    tasaFallo: medidos && practicas > 0 ? Math.min(1, fallos / practicas) : null,
     ultimaFallada: practicas > 0 && rachaLimpia === 0,
     rachaLimpia,
+    historialParcial: medidos && (progress?.fsrs.reps ?? 0) > (intentos ?? 0),
     segundosTipicos,
     lentitudRelativa:
       segundosTipicos !== null && medianaGlobal !== null && medianaGlobal > 0

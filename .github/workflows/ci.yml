@@ -18,6 +18,14 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      # Buena parte del dominio razona en días y semanas LOCALES (plan diario,
+      # tope de tarjetas, racha, plan semanal). Correr la suite en las dos zonas
+      # extremas hace visible cualquier cálculo o test que use el día UTC sin
+      # querer: con el runner en UTC, esos errores pasan en verde.
+      - name: test (zonas horarias extremas)
+        run: |
+          TZ=Pacific/Kiritimati npm test
+          TZ=Pacific/Pago_Pago npm test
       - run: npm run verify:patrones
       - run: npm run verify:finales
       - run: npm run build
