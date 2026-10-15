@@ -604,7 +604,7 @@ export const es = {
     empezar: 'Empezar partida',
     cargandoMotor: 'Cargando el motor…',
     errorMotor: 'El motor no pudo cargar. Revisá tu conexión la primera vez; después funciona sin internet.',
-    errorMotorEnJuego: 'El motor dejó de responder. Si reintentás, vuelve a pensar su jugada en la misma posición: la partida no se pierde.',
+    errorMotorEnJuego: 'El motor dejó de responder. Si reintentás, vuelve a pensar su jugada en la misma posición, sin perder lo jugado.',
     reintentarMotor: 'Reintentar',
     teToca: 'Te toca',
     pensando: 'El motor piensa…',
