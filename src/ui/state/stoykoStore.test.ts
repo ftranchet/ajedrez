@@ -10,6 +10,7 @@ import { STOYKO_DATASET_VERSION } from '../../services/puzzles/stoykoSeedData';
 import type { EvalSymbol, GameRecord, MoveAnalysisEntry, Profile, StoykoItem } from '../../core/types';
 import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
 import { engine } from '../../services/engine/stockfishEngine';
+import { profileRepo } from '../../services/storage/profileRepo';
 
 const item: StoykoItem = {
   id: 'stoyko-test-1',
@@ -220,6 +221,27 @@ describe('stoykoStore — preset abierto', () => {
       ['f1c4', 'f8c5', 'e1g1'],
     ]);
     expect(typeof attempts[0].tiempoMs).toBe('number');
+  });
+
+  // Auditoría 2026-10-15, B20: el enfriamiento se guardaba con get() + save()
+  // del perfil entero, y una escritura de otra pantalla que cayera entre las
+  // dos se perdía.
+  it('guardar el enfriamiento no pisa lo que otra pantalla escribió en el perfil', async () => {
+    await seedProfile();
+    await useStoykoStore.getState().empezar();
+    declararRama(['f1c4', 'f8c5'], '=');
+    declararRama(['d2d4', 'e5d4'], '±');
+    useStoykoStore.getState().terminarAnalisis();
+
+    // La copia que leería el store es de antes de que otra pantalla cambie la banda.
+    const copiaVieja = await profileRepo.get();
+    await profileRepo.update({ bandaElo: 'avanzado' });
+    vi.spyOn(profileRepo, 'get').mockResolvedValue(copiaVieja);
+
+    await useStoykoStore.getState().confirmarConfianza(70);
+    const profile = await db.profile.get('principal');
+    expect(profile?.stoykoUltimaCompletadaEn).toBeTruthy();
+    expect(profile?.bandaElo).toBe('avanzado');
   });
 
   it('dos confirmaciones simultáneas guardan una sola calibración y un solo intento', async () => {

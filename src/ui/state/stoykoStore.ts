@@ -398,7 +398,8 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
     // El tiempo del ejercicio suma al plan semanal (RF-13.4): antes se medía
     // —el cronómetro silencioso de RF-7.3— pero no lo contaba nadie.
     registrarTiempoEntrenado('calculo', idIntento, tiempoMs, ahora);
-    const profile = await profileRepo.get();
-    await profileRepo.save({ ...profile, stoykoUltimaCompletadaEn: ahora });
+    // Merge transaccional: leer el perfil y guardarlo entero pisaba lo que otra
+    // pantalla hubiera escrito entre la lectura y la escritura.
+    await profileRepo.update({ stoykoUltimaCompletadaEn: ahora });
   }),
 }));
