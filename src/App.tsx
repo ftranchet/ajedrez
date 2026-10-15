@@ -11,6 +11,7 @@ import { CalculoScreen } from './ui/screens/CalculoScreen';
 import { PanelScreen } from './ui/screens/PanelScreen';
 import { AjustesScreen } from './ui/screens/AjustesScreen';
 import { Wordmark } from './ui/components/Wordmark';
+import { ErrorBoundary } from './ui/components/ErrorBoundary';
 import { t } from './ui/i18n/es';
 
 export type Tab = 'hoy' | 'jugar' | 'calculo' | 'panel';
@@ -194,11 +195,16 @@ export default function App() {
         celular angosto: el botón quedaba tapado hasta scrollear a mano.
       */}
       <main ref={mainRef} tabIndex={-1} className="min-h-0 flex-1 scroll-pb-24 overflow-x-hidden overflow-y-auto p-4 pb-24 focus:outline-none lg:scroll-pb-4 lg:pb-4">
-        {route === 'hoy' && <HoyScreen />}
-        {route === 'jugar' && <JugarScreen />}
-        {route === 'calculo' && <CalculoScreen />}
-        {route === 'panel' && <PanelScreen />}
-        {route === 'ajustes' && <AjustesScreen />}
+        {/* Un error al dibujar una pantalla queda contenido acá (R1): la
+            navegación sigue andando, y cambiar de destino monta un límite
+            nuevo por la `key`, así que la otra pantalla se dibuja limpia. */}
+        <ErrorBoundary key={route}>
+          {route === 'hoy' && <HoyScreen />}
+          {route === 'jugar' && <JugarScreen />}
+          {route === 'calculo' && <CalculoScreen />}
+          {route === 'panel' && <PanelScreen />}
+          {route === 'ajustes' && <AjustesScreen />}
+        </ErrorBoundary>
       </main>
 
       {/* Navegación inferior de 4 ítems (celular/tablet), targets ≥44 px */}

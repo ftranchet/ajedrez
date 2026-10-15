@@ -12,6 +12,14 @@ export const es = {
     panel: 'Panel',
     ajustes: 'Ajustes',
   },
+  // Límite de error de la app (R1): lo que queda en pie cuando una pantalla
+  // se rompe al dibujarse. Exportar reusa los textos de `panel`.
+  fallo: {
+    titulo: 'Esta pantalla no se pudo mostrar',
+    texto: 'La app tuvo un error interno. Lo que ya estaba guardado sigue en este dispositivo.',
+    nota: 'Volver a Hoy reinicia la app desde lo guardado; lo que no se llegó a guardar se pierde. Si el error se repite, exportá tus datos: el archivo se puede restaurar desde Ajustes.',
+    volverAHoy: 'Volver a Hoy',
+  },
   ajustes: {
     titulo: 'Ajustes',
     subtitulo: 'Tu plan, los avisos, el sonido y tus datos, en un solo lugar.',
