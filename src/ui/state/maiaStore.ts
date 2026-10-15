@@ -56,12 +56,15 @@ interface MaiaDeps {
   games: Pick<typeof gameRepo, 'save'>;
 }
 
-/** Cuándo arrancó la partida en curso, para medir su tiempo (RF-13.4). */
-let inicioMs: number | null = null;
-
 export function createMaiaStore(deps: MaiaDeps) {
   let chess = new Chess();
   let abort: AbortController | null = null;
+  /**
+   * Cuándo arrancó la partida en curso, para medir su tiempo (RF-13.4). Vive
+   * dentro de la fábrica: como variable de módulo, dos instancias la
+   * compartían y una partida podía registrar el tiempo de otra, o ninguno.
+   */
+  let inicioMs: number | null = null;
 
   return create<MaiaState>((set, get) => {
     /** Último estado confirmado por el servidor, para revertir una jugada rechazada. */

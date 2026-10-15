@@ -5,11 +5,19 @@
 // cubren lo que sí se puede cubrir: que el tablero refleje el estado remoto,
 // que una jugada no se pinte antes de que Lichess la acepte, y que la partida
 // terminada entre al ciclo de análisis.
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EstadoPartidaLichess, LichessPort, PartidaLichessIniciada } from '../../core/ports';
 import type { GameRecord } from '../../core/types';
 import { createMaiaStore } from './maiaStore';
 import { LichessError } from '../../services/lichess/lichessClient';
+
+const { registrarTiempoEntrenado } = vi.hoisted(() => ({ registrarTiempoEntrenado: vi.fn() }));
+vi.mock('../../services/storage/trainingEventRepo', () => ({ registrarTiempoEntrenado }));
+
+afterEach(() => {
+  vi.useRealTimers();
+  registrarTiempoEntrenado.mockClear();
+});
 
 function crearDoble(overrides: Partial<LichessPort> = {}) {
   let emitir: ((estado: EstadoPartidaLichess) => void) | null = null;
@@ -139,6 +147,36 @@ describe('maiaStore — la partida terminada entra al ciclo de análisis', () =>
       pgn: '1. e4 e5 2. Nf3 Nc6 *',
     });
     await vi.waitFor(() => expect(store.getState().guardada).toBe(true));
+  });
+
+  // B19: el inicio de la partida era una variable de módulo. La segunda
+  // instancia lo pisaba, y al terminar lo dejaba en null: la primera partida
+  // no registraba su tiempo.
+  it('cada instancia mide el tiempo de su propia partida', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 6, 17, 12, 0));
+    const a = crearDoble();
+    await a.store.getState().empezar('token', 'maia1');
+
+    vi.setSystemTime(new Date(2026, 6, 17, 12, 10));
+    const b = crearDoble();
+    await b.store.getState().empezar('token', 'maia1');
+
+    vi.setSystemTime(new Date(2026, 6, 17, 12, 20));
+    b.emitir({ moves: 'e2e4', status: 'resign', winner: 'black' });
+    await vi.waitFor(() => expect(b.store.getState().guardada).toBe(true));
+
+    vi.setSystemTime(new Date(2026, 6, 17, 12, 30));
+    a.emitir({ moves: 'e2e4', status: 'resign', winner: 'black' });
+    await vi.waitFor(() => expect(a.store.getState().guardada).toBe(true));
+
+    // `vi.waitFor` adelanta el reloj falso unos milisegundos en cada sondeo.
+    const minutosDe = (id: string) => {
+      const llamada = registrarTiempoEntrenado.mock.calls.find((c) => c[0] === 'partida' && c[1] === id);
+      return llamada ? Math.round((llamada[2] as number) / 60_000) : null;
+    };
+    expect(minutosDe(b.guardadas[0].id)).toBe(10);
+    expect(minutosDe(a.guardadas[0].id)).toBe(30);
   });
 
   it('si no se puede traer el PGN, avisa en vez de inventar la partida', async () => {
