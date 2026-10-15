@@ -27,6 +27,7 @@ import { readBlindTrainingEnabled } from '../trainingPrefs';
 import { normalizeSensoryPreferences } from '../../core/sensory';
 import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
 import { useSlowLoading } from '../hooks/useSlowLoading';
+import { porqueCriterio } from '../porqueCriterio';
 import { t } from '../i18n/es';
 
 export function HoyScreen() {
@@ -213,7 +214,7 @@ function bloquesDelPlan(assignment: DailyAssignment, dieta: DietaSesion, fugas: 
         return {
           tipo: 'triage' as const,
           texto: t.sesion.bloqueTriage.replace('{n}', String(n)),
-          porque: t.sesion.bloqueTriagePorque,
+          porque: porqueCriterio(dieta),
           explicacion: t.sesion.bloqueTriageExplica,
           minutos: minutosDeBloque('triage', n),
         };
@@ -255,7 +256,7 @@ function bloquesDeLaSesion(s: ReturnType<typeof useSessionStore.getState>): Bloq
     bloques.push({
       tipo: 'triage',
       texto: t.sesion.bloqueTriage.replace('{n}', String(TRIAGE_SESSION_SIZE)),
-      porque: t.sesion.bloqueTriagePorque,
+      porque: porqueCriterio(s.dieta),
       explicacion: t.sesion.bloqueTriageExplica,
       minutos: minutosDeBloque('triage', TRIAGE_SESSION_SIZE),
     });
