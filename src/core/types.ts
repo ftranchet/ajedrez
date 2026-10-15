@@ -26,7 +26,10 @@ export interface GameRecord {
   fuente: Fuente;
   ritmo: Ritmo;
   resultado: Resultado;
-  /** Milisegundos consumidos por cada media jugada, en orden (RF-1.5). */
+  /**
+   * Milisegundos consumidos por cada media jugada, indexados por ply (RF-1.5).
+   * Vacío si la partida no tuvo reloj; un 0 es una jugada sin dato.
+   */
   tiemposPorJugadaMs: number[];
   analizada: boolean;
   /** Fecha de la partida en ISO 8601. */

@@ -101,11 +101,17 @@ function idDeDesafio(raw: unknown): string | null {
 }
 
 function estadoDesde(raw: Record<string, unknown>): EstadoPartidaLichess {
-  return {
+  const estado: EstadoPartidaLichess = {
     moves: typeof raw.moves === 'string' ? raw.moves : '',
     status: typeof raw.status === 'string' ? raw.status : 'started',
     ...(raw.winner === 'white' || raw.winner === 'black' ? { winner: raw.winner } : {}),
   };
+  // Los relojes, en milisegundos: de ahí salen los tiempos por jugada.
+  for (const campo of ['wtime', 'btime', 'winc', 'binc'] as const) {
+    const valor = raw[campo];
+    if (typeof valor === 'number' && Number.isFinite(valor)) estado[campo] = valor;
+  }
+  return estado;
 }
 
 export class LichessClient implements LichessPort {

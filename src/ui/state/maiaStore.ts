@@ -17,6 +17,7 @@ import {
   jugadasDeEstado,
   partidaEnCurso,
   resultadoDesdeLichess,
+  tiemposDesdeRelojes,
   type FalloMaia,
 } from '../../core/maia';
 import { buildGameRecord } from '../../core/game';
@@ -84,6 +85,8 @@ export function createMaiaStore(deps: MaiaDeps) {
   return create<MaiaState>((set, get) => {
     /** Último estado confirmado por el servidor, para revertir una jugada rechazada. */
     let ultimoEstadoConfirmado: EstadoPartidaLichess | null = null;
+    /** Todos los estados recibidos: sus relojes dicen cuánto tardó cada jugada. */
+    let estadosRecibidos: EstadoPartidaLichess[] = [];
     /**
      * La jugada propia que todavía no confirmó nadie, con el ply en el que se
      * jugó. Mientras exista el tablero no acepta otra, aunque el stream lo
@@ -95,6 +98,7 @@ export function createMaiaStore(deps: MaiaDeps) {
     /** Reconstruye el tablero desde la lista de jugadas que manda Lichess. */
     function aplicarEstado(estado: EstadoPartidaLichess) {
       ultimoEstadoConfirmado = estado;
+      estadosRecibidos.push(estado);
       const jugadas = jugadasDeEstado(estado.moves);
       // Si Lichess ya tiene una jugada en ese ply, la propia llegó (aunque se
       // haya perdido la respuesta del envío): no queda nada por reintentar.
@@ -148,7 +152,10 @@ export function createMaiaStore(deps: MaiaDeps) {
         const record = buildGameRecord({
             pgn,
             resultado,
-            tiemposPorJugadaMs: [],
+            // Del reloj de Lichess, no de un cronómetro propio: es el reloj
+            // declarado de la partida (RF-1.4d), y sin esto "donde más tiempo
+            // consumiste" del cálculo semanal (RF-7.2) nunca tenía datos.
+            tiemposPorJugadaMs: tiemposDesdeRelojes(estadosRecibidos),
             fuente: 'lichess',
             // Con reloj de Lichess: es una partida lenta de verdad, y así entra
             // al compromiso semanal (RF-11.7) y al detector de sobreajuste.
@@ -197,6 +204,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         abort = intento;
         chess = new Chess();
         ultimoEstadoConfirmado = null;
+        estadosRecibidos = [];
         jugadaEnViaje = null;
         set({
           phase: 'desafiando', bot, fallo: null, gameId: null, rival: '', guardada: false,
@@ -313,6 +321,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         abort = null;
         chess = new Chess();
         ultimoEstadoConfirmado = null;
+        estadosRecibidos = [];
         jugadaEnViaje = null;
         set({
           phase: 'inactivo', gameId: null, rival: '', fallo: null, guardada: false,

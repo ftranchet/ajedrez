@@ -8,6 +8,7 @@
 // Este archivo es dominio puro: qué bots hay, cuál corresponde a cada banda y
 // cómo se interpreta el estado de una partida de Lichess. El adaptador HTTP
 // vive en `services/lichess/` (CONTRIBUTING regla 4: core no hace fetch).
+import type { EstadoPartidaLichess } from './ports';
 import type { BandaElo, Color, Resultado } from './types';
 
 export interface BotMaia {
@@ -86,6 +87,53 @@ export function esTurnoDelUsuario(movesUci: string, color: Color): boolean {
 /** Lista de jugadas UCI del estado de Lichess, que las manda en una sola cadena. */
 export function jugadasDeEstado(movesUci: string): string[] {
   return movesUci.trim() === '' ? [] : movesUci.trim().split(/\s+/);
+}
+
+/**
+ * Milisegundos que consumió cada media jugada, a partir de los relojes que
+ * Lichess manda en cada estado de la partida. Indexado por ply desde 0, como
+ * `GameRecord.tiemposPorJugadaMs`: de acá sale "la jugada donde más tiempo
+ * consumiste" del cálculo semanal (RF-7.2).
+ *
+ * En cada estado, el reloj del lado que acaba de mover está detenido: es lo
+ * que le quedó después de esa jugada, con el incremento ya sumado. Lo que
+ * consumió es lo que tenía después de su jugada anterior, menos eso, más el
+ * incremento. Es la cuenta que hace Lichess para sus propios tiempos por
+ * jugada, con sus dos excepciones: la primera jugada de cada lado no tiene
+ * reloj previo (en Lichess el reloj arranca recién después de las dos), y la
+ * jugada que termina la partida —mate, ahogado— no recibe incremento.
+ *
+ * Una jugada sin los dos relojes que la rodean (la primera de cada lado, un
+ * estado que no llegó, un stream sin relojes) queda en 0, que en este campo
+ * quiere decir "sin dato": no se inventa.
+ */
+export function tiemposDesdeRelojes(estados: EstadoPartidaLichess[]): number[] {
+  /** Reloj de quien movió, después de cada ply. */
+  const restante = new Map<number, number>();
+  /** Plies después de los cuales la partida siguió: esos sí recibieron incremento. */
+  const siguio = new Set<number>();
+  const incremento: Partial<Record<Color, number>> = {};
+  let plies = 0;
+
+  for (const estado of estados) {
+    const n = jugadasDeEstado(estado.moves).length;
+    plies = Math.max(plies, n);
+    if (estado.winc !== undefined) incremento.w = estado.winc;
+    if (estado.binc !== undefined) incremento.b = estado.binc;
+    if (n === 0) continue;
+    const ply = n - 1;
+    const reloj = ply % 2 === 0 ? estado.wtime : estado.btime;
+    if (reloj !== undefined) restante.set(ply, reloj);
+    if (partidaEnCurso(estado.status)) siguio.add(ply);
+  }
+
+  return Array.from({ length: plies }, (_, ply) => {
+    const antes = restante.get(ply - 2);
+    const despues = restante.get(ply);
+    const inc = siguio.has(ply) ? incremento[ply % 2 === 0 ? 'w' : 'b'] : 0;
+    if (antes === undefined || despues === undefined || inc === undefined) return 0;
+    return Math.max(0, antes - despues + inc);
+  });
 }
 
 /** Traduce el desenlace de Lichess al resultado en notación PGN. */

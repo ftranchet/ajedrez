@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { posicionPropiaParaCalculo } from './calculoPosicion';
+import type { EstadoPartidaLichess } from './ports';
+import type { GameRecord, MoveAnalysisEntry } from './types';
 import {
   BOTS_MAIA,
   botParaBanda,
@@ -10,6 +13,7 @@ import {
   jugadasDeEstado,
   partidaEnCurso,
   resultadoDesdeLichess,
+  tiemposDesdeRelojes,
 } from './maia';
 
 describe('botParaBanda (ADR-0004)', () => {
@@ -124,5 +128,88 @@ describe('reintentos de una jugada (B12)', () => {
 
   it('un fallo definitivo no se reintenta', () => {
     expect(esperaParaReintentar('token-invalido', 0)).toBeNull();
+  });
+});
+
+describe('tiemposDesdeRelojes (RF-7.2, D21)', () => {
+  // 30+20, en milisegundos, como los manda Lichess.
+  const INICIAL = 1_800_000;
+  const INC = 20_000;
+  const JUGADAS = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5'];
+  const estado = (n: number, wtime: number, btime: number, status = 'started'): EstadoPartidaLichess => ({
+    moves: JUGADAS.slice(0, n).join(' '),
+    status,
+    wtime,
+    btime,
+    winc: INC,
+    binc: INC,
+  });
+
+  // Blancas tardan 12 s en 2.Cf3 y 45 s en 3.Ab5; negras, 3 s en 2...Cc6.
+  // La primera jugada de cada lado no mueve el reloj en Lichess.
+  const partidaNormal = [
+    estado(0, INICIAL, INICIAL),
+    estado(1, INICIAL, INICIAL),
+    estado(2, INICIAL, INICIAL),
+    estado(3, INICIAL - 12_000 + INC, INICIAL),
+    estado(4, INICIAL - 12_000 + INC, INICIAL - 3_000 + INC),
+    estado(5, INICIAL - 12_000 + INC - 45_000 + INC, INICIAL - 3_000 + INC),
+  ];
+
+  it('lo consumido en cada ply es la diferencia de reloj más el incremento', () => {
+    expect(tiemposDesdeRelojes(partidaNormal)).toEqual([0, 0, 12_000, 3_000, 45_000]);
+  });
+
+  it('la jugada que termina la partida no recibió incremento', () => {
+    const conMate = [...partidaNormal.slice(0, 5), estado(5, INICIAL - 12_000 + INC - 45_000, INICIAL - 3_000 + INC, 'mate')];
+    expect(tiemposDesdeRelojes(conMate)[4]).toBe(45_000);
+  });
+
+  it('un abandono después de la jugada no le quita el incremento', () => {
+    const final = partidaNormal[5];
+    expect(tiemposDesdeRelojes([...partidaNormal, { ...final, status: 'resign', winner: 'white' }])[4]).toBe(45_000);
+  });
+
+  it('sin los dos relojes que rodean una jugada, queda en 0 en vez de inventarla', () => {
+    // Falta el estado posterior a 2.Cf3: no hay forma de saber cuánto tardó
+    // en esa jugada, ni en la siguiente de blancas, que la necesita de base.
+    const sinUno = partidaNormal.filter((_, i) => i !== 3);
+    expect(tiemposDesdeRelojes(sinUno)).toEqual([0, 0, 0, 3_000, 0]);
+  });
+
+  it('un stream sin relojes da un cero por ply, alineado con la partida', () => {
+    expect(tiemposDesdeRelojes([{ moves: 'e2e4 e7e5 g1f3', status: 'started' }])).toEqual([0, 0, 0]);
+    expect(tiemposDesdeRelojes([])).toEqual([]);
+  });
+
+  // El índice es el mismo `ply` que usa el análisis: así el ejercicio de
+  // cálculo encuentra la jugada propia en la que más tiempo se consumió.
+  it('el ejercicio de cálculo elige la jugada propia donde más tiempo consumiste', () => {
+    const jugada = (ply: number): MoveAnalysisEntry => ({
+      ply,
+      san: '',
+      fenAntes: `fen-${ply}`,
+      ladoQueMueve: ply % 2 === 0 ? 'w' : 'b',
+      jugadaUsuario: JUGADAS[ply],
+      jugadaMotor: JUGADAS[ply],
+      cpAntes: 0,
+      cpDespues: 0,
+      cpPerdidos: 0,
+      clasificacion: 'buena',
+    });
+    const juego: GameRecord = {
+      id: 'maia-1',
+      pgn: '1. e4 e5 2. Nf3 Nc6 3. Bb5 *',
+      fuente: 'lichess',
+      ritmo: 'clasica',
+      resultado: '*',
+      tiemposPorJugadaMs: tiemposDesdeRelojes(partidaNormal),
+      analizada: true,
+      fecha: '2026-07-17T15:00:00.000Z',
+      jugadorColor: 'w',
+      analisis: { jugadas: JUGADAS.map((_, ply) => jugada(ply)), comparacionEvaluaciones: [], analizadaEn: '2026-07-17T16:00:00.000Z' },
+    };
+
+    expect(posicionPropiaParaCalculo([juego])).toMatchObject({ motivo: 'mas-tiempo', ply: 4, fen: 'fen-4', tiempoMs: 45_000 });
   });
 });

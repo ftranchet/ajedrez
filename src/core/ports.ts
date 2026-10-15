@@ -78,6 +78,12 @@ export interface EstadoPartidaLichess {
   moves: string;
   status: string;
   winner?: 'white' | 'black';
+  /** Milisegundos que le quedan a cada lado en el reloj, si Lichess los manda. */
+  wtime?: number;
+  btime?: number;
+  /** Incremento por jugada de cada lado, en milisegundos. */
+  winc?: number;
+  binc?: number;
 }
 
 export interface PartidaLichessIniciada {

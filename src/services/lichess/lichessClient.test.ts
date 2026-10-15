@@ -27,6 +27,9 @@ function streamSimulado(signal?: AbortSignal | null) {
     enviar(evento: unknown) {
       controller.enqueue(encoder.encode(`${JSON.stringify(evento)}\n`));
     },
+    cerrar() {
+      controller.close();
+    },
     get cancelado() {
       return cancelado;
     },
@@ -176,5 +179,29 @@ describe('lichessClient.desafiarBot — la partida es la del desafío (B11)', ()
 
     expect((error as LichessError).motivo).toBe('limite-de-tasa');
     expect(lichess.eventos.cancelado).toBe(true);
+  });
+});
+
+describe('lichessClient.seguirPartida — los relojes llegan al estado (D21)', () => {
+  it('pasa wtime, btime e incrementos del gameFull y de cada gameState', async () => {
+    const partida = streamSimulado();
+    partida.enviar({
+      ...gameFull('desafio1'),
+      state: { type: 'gameState', moves: '', status: 'started', wtime: 1_800_000, btime: 1_800_000, winc: 20_000, binc: 20_000 },
+    });
+    partida.enviar({ type: 'gameState', moves: 'e2e4', status: 'started', wtime: 1_800_000, btime: 1_800_000, winc: 20_000, binc: 20_000 });
+    // Un reloj que no es número no se pasa como si lo fuera.
+    partida.enviar({ type: 'gameState', moves: 'e2e4 e7e5', status: 'resign', winner: 'white', wtime: 'x' });
+    partida.cerrar();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(partida.body)));
+    const estados: unknown[] = [];
+
+    await new LichessClient().seguirPartida('token', 'desafio1', (e) => estados.push(e), new AbortController().signal);
+
+    expect(estados).toEqual([
+      { moves: '', status: 'started', wtime: 1_800_000, btime: 1_800_000, winc: 20_000, binc: 20_000 },
+      { moves: 'e2e4', status: 'started', wtime: 1_800_000, btime: 1_800_000, winc: 20_000, binc: 20_000 },
+      { moves: 'e2e4 e7e5', status: 'resign', winner: 'white' },
+    ]);
   });
 });

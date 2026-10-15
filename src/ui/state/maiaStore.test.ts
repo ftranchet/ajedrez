@@ -237,6 +237,25 @@ describe('maiaStore — la partida terminada entra al ciclo de análisis', () =>
     await vi.waitFor(() => expect(store.getState().guardada).toBe(true));
   });
 
+  // D21: las partidas contra Maia se guardaban con `tiemposPorJugadaMs: []`,
+  // así que "donde más tiempo consumiste" (RF-7.2) nunca tenía datos.
+  it('guarda lo que tardó cada jugada, leído de los relojes de Lichess', async () => {
+    const { store, guardadas, emitir } = crearDoble();
+    await store.getState().empezar('token', 'maia1');
+    const relojes = (wtime: number, btime: number) => ({ wtime, btime, winc: 20_000, binc: 20_000 });
+
+    emitir({ moves: 'e2e4', status: 'started', ...relojes(1_800_000, 1_800_000) });
+    emitir({ moves: 'e2e4 e7e5', status: 'started', ...relojes(1_800_000, 1_800_000) });
+    // 2.Cf3 en 90 s; 2...Cc6 en 5 s; 3.Ab5 en 30 s. El estado final dice mate
+    // (de mentira, alcanza para el test): la jugada que termina no suma incremento.
+    emitir({ moves: 'e2e4 e7e5 g1f3', status: 'started', ...relojes(1_730_000, 1_800_000) });
+    emitir({ moves: 'e2e4 e7e5 g1f3 b8c6', status: 'started', ...relojes(1_730_000, 1_815_000) });
+    emitir({ moves: 'e2e4 e7e5 g1f3 b8c6 f1b5', status: 'mate', winner: 'white', ...relojes(1_700_000, 1_815_000) });
+    await vi.waitFor(() => expect(guardadas).toHaveLength(1));
+
+    expect(guardadas[0].tiemposPorJugadaMs).toEqual([0, 0, 90_000, 5_000, 30_000]);
+  });
+
   // B19: el inicio de la partida era una variable de módulo. La segunda
   // instancia lo pisaba, y al terminar lo dejaba en null: la primera partida
   // no registraba su tiempo.

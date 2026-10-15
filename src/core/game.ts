@@ -52,9 +52,9 @@ export function buildGameRecord(args: BuildGameArgs): GameRecord {
 
 /**
  * Cantidad de medias jugadas de la partida, leída del PGN. A diferencia de
- * `tiemposPorJugadaMs.length` (que solo tiene datos para partidas jugadas
- * localmente, RF-1.5), esto vale para cualquier origen — incluida una
- * importada por PGN (RF-2.2), donde `tiemposPorJugadaMs` siempre está vacío.
+ * `tiemposPorJugadaMs.length` (que solo tiene datos si la partida tuvo reloj,
+ * como las de Maia), esto vale para cualquier origen — incluida la partida
+ * local, que se juega sin reloj y lo guarda vacío.
  */
 export function plyCountFromPgn(pgn: string): number {
   const chess = new Chess();
