@@ -209,6 +209,27 @@ describe('nivelCiegas', () => {
     expect(nivelCiegas(b, catalogo, mapa(legado('a', 3, 3), legado('b', 2, 2)))).toBe('fantasma');
   });
 
+  it('un registro legado que se vuelve a demostrar conserva la cota de sus repasos previos', () => {
+    // Revisión final de la etapa 1: al ganar contadores, el registro tiraba
+    // su historia. b falló cinco veces antes de los contadores y acierta una
+    // después: 1 de 1 llevaba el patrón a 100% y piezas fantasma. Es 1 de 6.
+    const sinContadores = (p: CurriculumProgress): CurriculumProgress => ({
+      id: p.id,
+      fsrs: p.fsrs,
+      demostracionesLimpias: p.demostracionesLimpias,
+      updatedAt: p.updatedAt,
+    });
+    const aLegada = sinContadores(demostrar('a', [true, true, true]));
+    const bLegada = sinContadores(demostrar('b', [false, false, false, false, false]));
+    expect(nivelCiegas(b, catalogo, mapa(aLegada, bLegada))).toBe('normal'); // 3/8
+    const bDespues = reviewCurriculumProgress(bLegada, true, now);
+    expect(bDespues.intentos).toBe(1);
+    expect(nivelCiegas(b, catalogo, mapa(aLegada, bDespues))).toBe('normal'); // 4/9
+    // Una racha que viene de antes de los contadores cuenta entera.
+    const cLegada = sinContadores(demostrar('c', [false, true, true]));
+    expect(nivelCiegas(b, catalogo, mapa(aLegada, reviewCurriculumProgress(cLegada, true, now)))).toBe('fantasma'); // 3/3 + 3/4
+  });
+
   it('jugando de verdad, en cualquier orden, alcanza los tres niveles y las coordenadas llegan después de las piezas fantasma', () => {
     // Recorre todas las formas de jugar un patrón de tres posiciones, hasta 7
     // demostraciones intercaladas en cualquier orden y sin servir las

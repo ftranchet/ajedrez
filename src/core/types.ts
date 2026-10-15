@@ -448,8 +448,8 @@ export interface CurriculumProgress {
    * (RF-6.5). Ni FSRS ni la racha lo dan: `fsrs.lapses` no cuenta los fallos
    * mientras el elemento se aprende y `demostracionesLimpias` vuelve a cero.
    * Opcionales porque los registros anteriores no los tienen; empiezan a
-   * contar en su próxima demostración (hasta entonces, `nivelCiegas` usa lo
-   * que se sabe seguro de ellos).
+   * contar en su próxima demostración. Lo anterior a los contadores lo
+   * estima `nivelCiegas` con una cota inferior (repasos FSRS y racha).
    */
   intentos?: number;
   aciertos?: number;

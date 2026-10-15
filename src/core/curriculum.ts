@@ -96,16 +96,25 @@ const REPS_MINIMAS_CIEGAS = 3;
 export type NivelCiegas = 'normal' | 'fantasma' | 'coordenadas';
 
 /**
- * Intentos y aciertos de una posición. Un registro anterior a los contadores
- * aporta lo que se sabe seguro de él: cada repaso de su FSRS fue una
- * demostración (`reps`), y su racha actual fueron aciertos. Los repasos
- * anteriores a la racha cuentan como fallos aunque alguno haya sido limpio:
- * el acierto puede quedar por debajo del real, nunca por encima.
+ * Intentos y aciertos de una posición, contando también lo anterior a los
+ * contadores (que nacieron después que el progreso guardado). Cada repaso de
+ * su FSRS fue una demostración, así que `reps` son todos los intentos. Son
+ * aciertos seguros los contados y la racha actual, que puede venir de antes
+ * de los contadores; los demás repasos anteriores cuentan como fallos aunque
+ * alguno haya sido limpio. El acierto puede quedar por debajo del real, nunca
+ * por encima. Con historial completo (`reps` igual a `intentos`) son
+ * exactamente los contadores.
+ *
+ * Tomar solo los contadores en cuanto existen tiraba la historia previa: una
+ * posición legada con cinco fallos y una limpia después de actualizar sumaba
+ * 1 de 1 al patrón, en vez de 1 de 6.
  */
 function medicionDe(progreso: CurriculumProgress | undefined): { intentos: number; aciertos: number } {
   if (!progreso) return { intentos: 0, aciertos: 0 };
-  if (progreso.intentos !== undefined) return { intentos: progreso.intentos, aciertos: progreso.aciertos ?? 0 };
-  return { intentos: progreso.fsrs.reps, aciertos: Math.min(progreso.demostracionesLimpias, progreso.fsrs.reps) };
+  return {
+    intentos: Math.max(progreso.intentos ?? 0, progreso.fsrs.reps),
+    aciertos: Math.max(progreso.aciertos ?? 0, Math.min(progreso.demostracionesLimpias, progreso.fsrs.reps)),
+  };
 }
 
 /**

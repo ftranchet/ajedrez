@@ -112,6 +112,21 @@ describe('posicionPropiaParaCalculo', () => {
       },
     });
     expect(posicionPropiaParaCalculo([juego])).toBeNull();
+
+    // Tampoco ocupan la ventana de recientes: diez partidas viejas sin color,
+    // analizadas hoy en un lote exprés, no tapan una propia anterior.
+    const propia = partida({
+      id: 'propia',
+      analisis: {
+        jugadas: [jugada({ ply: 2, ladoQueMueve: 'w', cpPerdidos: 300, fenAntes: 'fen-propia' })],
+        comparacionEvaluaciones: [],
+        analizadaEn: '2026-10-01T11:00:00.000Z',
+      },
+    });
+    const sinColor = Array.from({ length: 10 }, (_, i) =>
+      partida({ ...juego, id: `sin-color-${i}`, analisis: { ...juego.analisis!, analizadaEn: '2026-10-14T11:00:00.000Z' } }),
+    );
+    expect(posicionPropiaParaCalculo([propia, ...sinColor])?.fen).toBe('fen-propia');
   });
 
   it('mira solo las partidas analizadas más recientes', () => {
