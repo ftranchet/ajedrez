@@ -147,15 +147,17 @@ export function createMaiaStore(deps: MaiaDeps) {
       // a la Cola. Es el punto de todo esto — jugar contra un rival realista y
       // después analizarlo es el ejercicio tier-S del proyecto.
       if (!s.gameId || s.guardada) return;
+      // Del reloj de Lichess, no de un cronómetro propio: es el reloj declarado
+      // de la partida (RF-1.4d), y sin esto "donde más tiempo consumiste" del
+      // cálculo semanal (RF-7.2) nunca tenía datos. Se calcula antes de
+      // esperar el PGN: volver a la configuración vacía los estados.
+      const tiemposPorJugadaMs = tiemposDesdeRelojes(estadosRecibidos);
       try {
         const pgn = await deps.lichess.pgn(tokenActual, s.gameId);
         const record = buildGameRecord({
             pgn,
             resultado,
-            // Del reloj de Lichess, no de un cronómetro propio: es el reloj
-            // declarado de la partida (RF-1.4d), y sin esto "donde más tiempo
-            // consumiste" del cálculo semanal (RF-7.2) nunca tenía datos.
-            tiemposPorJugadaMs: tiemposDesdeRelojes(estadosRecibidos),
+            tiemposPorJugadaMs,
             fuente: 'lichess',
             // Con reloj de Lichess: es una partida lenta de verdad, y así entra
             // al compromiso semanal (RF-11.7) y al detector de sobreajuste.

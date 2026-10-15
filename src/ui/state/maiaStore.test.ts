@@ -256,6 +256,26 @@ describe('maiaStore — la partida terminada entra al ciclo de análisis', () =>
     expect(guardadas[0].tiemposPorJugadaMs).toEqual([0, 0, 90_000, 5_000, 30_000]);
   });
 
+  it('volver mientras llega el PGN no le borra los tiempos a la partida guardada', async () => {
+    let entregarPgn: (pgn: string) => void = () => {};
+    const { store, guardadas, emitir } = crearDoble({
+      pgn: () => new Promise<string>((resolve) => (entregarPgn = resolve)),
+    });
+    await store.getState().empezar('token', 'maia1');
+    const relojes = { winc: 20_000, binc: 20_000 };
+
+    emitir({ moves: 'e2e4', status: 'started', wtime: 1_800_000, btime: 1_800_000, ...relojes });
+    emitir({ moves: 'e2e4 e7e5', status: 'started', wtime: 1_800_000, btime: 1_800_000, ...relojes });
+    // 2.Cf3 en 10 s, y Maia abandona.
+    emitir({ moves: 'e2e4 e7e5 g1f3', status: 'started', wtime: 1_810_000, btime: 1_800_000, ...relojes });
+    emitir({ moves: 'e2e4 e7e5 g1f3', status: 'resign', winner: 'white', wtime: 1_810_000, btime: 1_800_000, ...relojes });
+    store.getState().volver();
+    entregarPgn('1. e4 e5 2. Nf3 1-0');
+    await vi.waitFor(() => expect(guardadas).toHaveLength(1));
+
+    expect(guardadas[0].tiemposPorJugadaMs).toEqual([0, 0, 10_000]);
+  });
+
   // B19: el inicio de la partida era una variable de módulo. La segunda
   // instancia lo pisaba, y al terminar lo dejaba en null: la primera partida
   // no registraba su tiempo.
