@@ -99,6 +99,7 @@ function finDeEncabezado(texto: string, desde: number): number {
  */
 function separarPartidas(texto: string): string[] {
   const cortes = [0];
+  const token = /[^\s{};[\]]+/y;
   let hayJugadas = false;
   let terminada = false;
   let i = 0;
@@ -118,7 +119,6 @@ function separarPartidas(texto: string): string[] {
       terminada = false;
       i = finDeEncabezado(texto, i);
     } else {
-      const token = /[^\s{};[\]]+/y;
       token.lastIndex = i;
       const palabra = token.exec(texto)?.[0] ?? c;
       if (terminada) cortes.push(i);
