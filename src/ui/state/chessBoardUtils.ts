@@ -59,7 +59,8 @@ export function sanDeLinea(fen: string, uciMoves: string[]): string[] {
  * un dato roto (auditoría 2026-10-15, N2). Ocultar el renglón también lo
  * escondería. Por los caminos normales no llega una jugada ilegal —la
  * solución del catálogo se verifica en los tests, la del motor sale de la
- * misma posición y la del usuario la valida el tablero—, pero sí puede llegar
+ * misma posición y la del usuario, de una partida que chess.js ya
+ * reprodujo—, pero sí puede llegar
  * con un respaldo restaurado, que valida la jugada de una tarjeta o de un
  * análisis solo como texto, o con un bug: una jugada del motor asociada a otra
  * posición, como la que producía su `bestmove` tardío (ver `descartarWorker`

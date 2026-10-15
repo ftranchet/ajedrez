@@ -278,6 +278,10 @@ test.describe('sesión simple: Radar', () => {
 
     await page.getByText('No era esa').waitFor({ timeout: 10_000 });
     await expect(page.locator('.cg-wrap').first()).toHaveAttribute('data-feedback', 'error');
+    // Una solución de una sola jugada se dice como jugada, no como "Línea
+    // completa: 4...Dh5" (auditoría 2026-10-15, N1).
+    await expect(page.getByText('Jugada correcta: Dh5')).toBeVisible();
+    await expect(page.getByText('Línea completa:')).toHaveCount(0);
     // El fallo no pinta casillas: el velo bajo el rey usaba el rojo del jaque
     // sobre la casilla del jaque, y se leía como un jaque inexistente.
     await expect(page.locator('square.feedback-error')).toHaveCount(0);
