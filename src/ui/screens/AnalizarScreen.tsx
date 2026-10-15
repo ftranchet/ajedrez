@@ -13,6 +13,7 @@ import { fraseSaltoVentaja } from '../format';
 import { t } from '../i18n/es';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
+import { sanDeJugada } from '../state/chessBoardUtils';
 
 export function AnalizarScreen() {
   const phase = useAnalysisStore((s) => s.phase);
@@ -311,7 +312,8 @@ function LecturaDelMomento() {
     : t.analisis.momentoLecturaDifiere
         .replace('{tuya}', String(jugadaDe(lectura.plyUsuario)))
         .replace('{motor}', String(jugadaDe(lectura.plyMotor)))
-        .replace('{san}', lectura.sanMotor);
+        // sanMotor es el SAN inglés de chess.js: se traduce como el resto (RNF-9).
+        .replace('{san}', aNotacion(lectura.sanMotor, readIdiomaNotacion()));
 
   return (
     <section
@@ -354,11 +356,13 @@ function ConfirmarErrores() {
               {t.analisis.confirmarProgreso.replace('{actual}', String(s.erroresConfirmados + 1)).replace('{total}', String(total))}
             </p>
             <p className="m-0 mt-1 font-display text-xl">{aNotacion(entry.san, readIdiomaNotacion())}</p>
+            {/* Las dos jugadas se guardan en UCI ("e2e4"), que no es notación
+                de ajedrez: se muestran en algebraica del idioma elegido (RNF-9). */}
             <p className="m-0 mt-2 text-sm text-secondary">
-              {t.analisis.confirmarJugadaJugada}: <span className="font-mono text-primary">{entry.jugadaUsuario}</span>
+              {t.analisis.confirmarJugadaJugada}: <span className="font-mono text-primary">{sanDeJugada(entry.fenAntes, entry.jugadaUsuario)}</span>
             </p>
             <p className="m-0 text-sm text-secondary">
-              {t.analisis.confirmarJugadaCorrecta}: <span className="font-mono text-primary">{entry.jugadaMotor}</span>
+              {t.analisis.confirmarJugadaCorrecta}: <span className="font-mono text-primary">{sanDeJugada(entry.fenAntes, entry.jugadaMotor)}</span>
             </p>
           </div>
 

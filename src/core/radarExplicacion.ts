@@ -22,14 +22,30 @@
 // después del corte de la línea, 8 posiciones del lote), no se dice nada sobre
 // material: contar "perdés 3 peones" sería cierto sobre el tablero y falso
 // sobre la partida. Se muestra la línea y se calla el resto.
+//
+// **En qué notación se escribe (RNF-9).** Toda jugada que termina en el texto
+// pasa por `aNotacion` con el idioma que elige el usuario, y el idioma es un
+// parámetro **obligatorio** de cada función que compone texto. Antes no lo
+// recibía: con la app en español, `lichess-0000D` mostraba "27...Rd8 28.Qxd8+
+// Bxd8", y en español "R" es el **rey** —la línea afirmaba una jugada que no
+// era la que se jugó—, mientras el mismo panel decía "Jugada correcta: Td8".
+// Un default habría dejado pasar el mismo error en silencio en el próximo
+// llamador; sin default, el compilador lo marca.
 import { Chess } from 'chess.js';
+import { aNotacion, type IdiomaNotacion } from './notacion';
 import type { RadarItem, TipoRadar } from './types';
 
 /** Valor material convencional; el rey no se cuenta. */
 const VALOR: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
+/**
+ * Hechos de la solución, no texto: todas las jugadas van en el SAN **inglés**
+ * que emite chess.js, igual que `carnada.san` y `carnada.refutacionSan` en el
+ * catálogo. Se traducen recién al componer lo que se muestra; traducir acá
+ * dejaría a cualquier consumidor sin forma de saber en qué idioma está "Rd8".
+ */
 export interface AnalisisSolucion {
-  /** La línea completa en SAN. Corta en la primera jugada ilegal. */
+  /** La línea completa en SAN inglés. Corta en la primera jugada ilegal. */
   lineaSan: string[];
   /** Jugadas del solucionador hasta el mate, o null si la línea no da mate. */
   mateEn: number | null;
@@ -46,9 +62,9 @@ export interface AnalisisSolucion {
    * número con el que se puede afirmar "quedás X arriba".
    */
   balanceFinal: number;
-  /** Jugadas verificadas como equivalentes (solo tranquilas), en SAN. */
+  /** Jugadas verificadas como equivalentes (solo tranquilas), en SAN inglés. */
   equivalentesSan: string[];
-  /** La jugada "familiar" del subtipo doble solución, en SAN. */
+  /** La jugada "familiar" del subtipo doble solución, en SAN inglés. */
   familiarSan: string | null;
 }
 
@@ -128,8 +144,13 @@ export function analizarSolucion(item: RadarItem): AnalisisSolucion {
   };
 }
 
-/** "1.Dxh7+ Rxh7 2.Th3#", numerada desde la jugada real de la posición. */
-export function formatearLinea(fen: string, lineaSan: string[]): string {
+/**
+ * "1.Dxh7+ Rxh7 2.Th3#", numerada desde la jugada real de la posición y en el
+ * idioma pedido. `lineaSan` tiene que venir en SAN inglés (el de chess.js):
+ * traducir dos veces no es inocuo, porque la "R" española del rey se leería
+ * como torre.
+ */
+export function formatearLinea(fen: string, lineaSan: string[], idioma: IdiomaNotacion): string {
   if (lineaSan.length === 0) return '';
   const campos = fen.split(' ');
   const blancasMueven = campos[1] !== 'b';
@@ -139,9 +160,10 @@ export function formatearLinea(fen: string, lineaSan: string[]): string {
   const partes: string[] = [];
   let turnoBlancas = blancasMueven;
   for (let i = 0; i < lineaSan.length; i++) {
-    if (turnoBlancas) partes.push(`${numero}.${lineaSan[i]}`);
-    else if (i === 0) partes.push(`${numero}...${lineaSan[i]}`);
-    else partes.push(lineaSan[i]);
+    const jugada = aNotacion(lineaSan[i], idioma);
+    if (turnoBlancas) partes.push(`${numero}.${jugada}`);
+    else if (i === 0) partes.push(`${numero}...${jugada}`);
+    else partes.push(jugada);
     if (!turnoBlancas) numero++;
     turnoBlancas = !turnoBlancas;
   }
@@ -307,9 +329,17 @@ const CP_MATE = 100_000;
  * generado, y cualquier reescritura del texto habría roto esa decisión en
  * silencio, duplicando la oración.
  */
-function fraseCarnada(item: RadarItem, analisis: AnalisisSolucion): { texto: string; nombraElMate: boolean } | null {
+function fraseCarnada(
+  item: RadarItem,
+  analisis: AnalisisSolucion,
+  idioma: IdiomaNotacion,
+): { texto: string; nombraElMate: boolean } | null {
   if (!item.carnada) return null;
-  const { san, ganaPeones, refutacionSan, costoCp } = item.carnada;
+  // El catálogo trae la carnada y su refutación en SAN inglés (las calcula el
+  // pipeline con chess.js): se traducen acá, que es donde se vuelven texto.
+  const san = aNotacion(item.carnada.san, idioma);
+  const refutacionSan = item.carnada.refutacionSan.map((jugada) => aNotacion(jugada, idioma));
+  const { ganaPeones, costoCp } = item.carnada;
   const cebo =
     ganaPeones >= 3
       ? `${san} parece ganar ${nombreMaterial(ganaPeones)} gratis`
@@ -336,14 +366,16 @@ function fraseCarnada(item: RadarItem, analisis: AnalisisSolucion): { texto: str
  * exactamente lo que había antes: esto nunca explica *menos* que la versión
  * anterior.
  */
-export function explicarPosicion(item: RadarItem, acierto: boolean): string {
+export function explicarPosicion(item: RadarItem, acierto: boolean, idioma: IdiomaNotacion): string {
   const analisis = analizarSolucion(item);
   const partes: string[] = [];
+  const enIdioma = (san: string) => aNotacion(san, idioma);
 
   // La jugada del motor. Puede faltar si la solución del catálogo resultara
   // ilegal desde su FEN: sin esta guarda, el texto salía con un "undefined"
   // impreso en la cara del usuario.
-  const jugadaDelMotor: string | undefined = analisis.lineaSan[0];
+  const primeraDeLaLinea: string | undefined = analisis.lineaSan[0];
+  const jugadaDelMotor = primeraDeLaLinea === undefined ? undefined : enIdioma(primeraDeLaLinea);
 
   if (item.tipo === 'tranquila') {
     partes.push(acierto ? GENERICA_ACIERTO.tranquila : GENERICA_FALLO.tranquila);
@@ -352,7 +384,7 @@ export function explicarPosicion(item: RadarItem, acierto: boolean): string {
       // el pipeline verificó como equivalente— se lee como si Ah3 estuviera
       // mal. La aclaración es la definición misma de "tranquila".
       partes.push(
-        `El motor prefiere ${jugadaDelMotor}, pero ${listaCorta(analisis.equivalentesSan)} ${
+        `El motor prefiere ${jugadaDelMotor}, pero ${listaCorta(analisis.equivalentesSan.map(enIdioma))} ${
           analisis.equivalentesSan.length > 1 ? 'también valían' : 'también valía'
         }: en una posición tranquila varias jugadas son prácticamente equivalentes.`,
       );
@@ -361,10 +393,10 @@ export function explicarPosicion(item: RadarItem, acierto: boolean): string {
   }
 
   if (item.tipo === 'envenenada') {
-    const carnada = fraseCarnada(item, analisis);
+    const carnada = fraseCarnada(item, analisis, idioma);
     partes.push(carnada?.texto ?? (acierto ? GENERICA_ACIERTO.envenenada : GENERICA_FALLO.envenenada));
     if (analisis.lineaSan.length > 0) {
-      partes.push(`Lo correcto era declinar con ${formatearLinea(item.fen, analisis.lineaSan)}.`);
+      partes.push(`Lo correcto era declinar con ${formatearLinea(item.fen, analisis.lineaSan, idioma)}.`);
     }
     const remate = fraseDesenlace(analisis);
     // No se repite el mate si la frase de la carnada ya lo nombró.
@@ -385,12 +417,12 @@ export function explicarPosicion(item: RadarItem, acierto: boolean): string {
     partes.push(`El mecanismo: ${motivos.slice(0, 2).join(' y ')}.`);
   }
   if (analisis.familiarSan && jugadaDelMotor) {
-    partes.push(`Ojo: ${analisis.familiarSan} también gana, pero ${jugadaDelMotor} es objetivamente mejor.`);
+    partes.push(`Ojo: ${enIdioma(analisis.familiarSan)} también gana, pero ${jugadaDelMotor} es objetivamente mejor.`);
   }
   return partes.join(' ');
 }
 
 /** La línea completa lista para mostrar, o vacío si no hay nada que mostrar. */
-export function lineaParaMostrar(item: RadarItem): string {
-  return formatearLinea(item.fen, analizarSolucion(item).lineaSan);
+export function lineaParaMostrar(item: RadarItem, idioma: IdiomaNotacion): string {
+  return formatearLinea(item.fen, analizarSolucion(item).lineaSan, idioma);
 }

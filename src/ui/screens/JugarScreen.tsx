@@ -21,6 +21,8 @@ import type { FinalPriorizado } from '../../core/finalesPrioridad';
 import type { VentajaDesperdiciada } from '../../core/conversion';
 import { esMate, formatDecimal } from '../format';
 import { t } from '../i18n/es';
+import { aNotacion } from '../../core/notacion';
+import { readIdiomaNotacion } from '../notacionPrefs';
 
 // La sub-ruta #/jugar/finales entra directo al modo finales (deep-link desde
 // Hoy), y elegir un modo actualiza el hash para que el botón "atrás" funcione.
@@ -190,9 +192,13 @@ function resultText(s: ReturnType<typeof useGameStore.getState>): string {
 }
 
 function MoveList({ moves }: { moves: string[] }) {
+  // `moves` es `chess.history()`, en SAN inglés: sin traducir, la partida se
+  // anotaba en inglés con la app en español (RNF-9).
+  const idioma = readIdiomaNotacion();
   const rows: Array<[number, string, string | undefined]> = [];
   for (let i = 0; i < moves.length; i += 2) {
-    rows.push([i / 2 + 1, moves[i], moves[i + 1]]);
+    const negras = moves[i + 1];
+    rows.push([i / 2 + 1, aNotacion(moves[i], idioma), negras === undefined ? undefined : aNotacion(negras, idioma)]);
   }
   return (
     <div className="max-h-48 overflow-y-auto rounded-lg border border-subtle bg-surface p-3 font-mono text-sm sm:max-h-80">

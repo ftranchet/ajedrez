@@ -24,7 +24,7 @@ async function empezarPartida(page: Page) {
 }
 
 async function esperarRespuestaDelMotor(page: Page) {
-  // La primera fila de la lista muestra jugada blanca y negra: "1. e4 Nf6"
+  // La primera fila de la lista muestra jugada blanca y negra: "1. e4 Cf6"
   await page.waitForFunction(
     () => {
       const li = document.querySelector('ol li');

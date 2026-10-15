@@ -24,6 +24,7 @@ import { calibrationRepo } from '../../services/storage/calibrationRepo';
 import { profileRepo } from '../../services/storage/profileRepo';
 import { useGameStore } from './gameStore';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
+import { readIdiomaNotacion } from '../notacionPrefs';
 
 export const DIAGNOSTICO_JUEGO1_NIVEL = 'nivel-2';
 export const DIAGNOSTICO_JUEGO2_NIVEL = 'nivel-4';
@@ -394,6 +395,8 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
       // haría inútil la declaración.
       const posicion = s.radarServidos + 1;
       const pedirConfianza = DIAGNOSTICO_POSICIONES_CONFIANZA.includes(posicion);
+      // Misma notación que "Jugada correcta" (sanDeJugada), RNF-9.
+      const idioma = readIdiomaNotacion();
 
       set({
         ...boardSnapshot(),
@@ -402,8 +405,8 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
         radarJugadaUsuario: jugadaUsuario,
         radarJugadaCorrecta: sanDeJugada(item.fen, item.solucion[0]),
         revision: acierto ? null : revisionDelError(item.fen, jugadaUsuario, item.solucion[0]),
-        radarLinea: lineaParaMostrar(item),
-        radarFeedbackTexto: explainFeedback(item, acierto),
+        radarLinea: lineaParaMostrar(item, idioma),
+        radarFeedbackTexto: explainFeedback(item, acierto, idioma),
         radarSubPhase: pedirConfianza ? 'confianza' : 'feedback',
         radarServidos: posicion,
         radarAciertos: s.radarAciertos + (acierto ? 1 : 0),
