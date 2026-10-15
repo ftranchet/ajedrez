@@ -8,6 +8,7 @@ import { MoveListPicker } from '../components/MoveListPicker';
 import { Chip } from '../components/Chip';
 import { useAnalysisStore } from '../state/analysisStore';
 import { detectedErrorMoves, lecturaMomentoCritico } from '../../core/analysis';
+import { TOPE_DIARIO_NUEVAS } from '../../core/errorCard';
 import type { CategoriaError } from '../../core/types';
 import { fraseSaltoVentaja } from '../format';
 import { t } from '../i18n/es';
@@ -395,12 +396,21 @@ function resumenErrores(n: number): string {
   return t.analisis.finResumenOtro.replace('{n}', String(n));
 }
 
+/** Aviso de los confirmados que, por el tope diario (RF-4.5), entran a repaso otro día. */
+function avisoDiferidos(n: number): string | null {
+  if (n === 0) return null;
+  const texto = n === 1 ? t.analisis.finDiferidasUno : t.analisis.finDiferidasOtro.replace('{n}', String(n));
+  return texto.replace('{tope}', String(TOPE_DIARIO_NUEVAS));
+}
+
 function Fin() {
   const s = useAnalysisStore();
+  const aviso = avisoDiferidos(s.erroresDiferidos);
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-center">
       <Encabezado titulo={t.analisis.finTitulo} />
       <p className="m-0 text-secondary">{resumenErrores(s.erroresConfirmados)}</p>
+      {aviso && <p className="m-0 text-sm text-secondary">{aviso}</p>}
       <button className="btn-primary" onClick={() => s.volver()}>
         {t.analisis.volver}
       </button>

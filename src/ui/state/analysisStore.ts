@@ -55,6 +55,8 @@ interface AnalysisState {
   analysis: GameAnalysis | null;
   erroresPendientes: MoveAnalysisEntry[];
   erroresConfirmados: number;
+  /** Confirmados que, por el tope diario de tarjetas nuevas (RF-4.5), entran a repaso otro día. */
+  erroresDiferidos: number;
   errorActualCategoria: CategoriaError;
 
   /** Progreso del lote exprés: qué partida se está analizando y cuántas van. */
@@ -118,6 +120,7 @@ const initialState = {
   analysis: null as GameAnalysis | null,
   erroresPendientes: [] as MoveAnalysisEntry[],
   erroresConfirmados: 0,
+  erroresDiferidos: 0,
   errorActualCategoria: 'tactico' as CategoriaError,
   loteProgreso: null as { actual: number; total: number } | null,
   loteCancelado: false,
@@ -189,6 +192,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     set({
       erroresPendientes: acumulados,
       erroresConfirmados: 0,
+      erroresDiferidos: 0,
       errorActualCategoria: 'tactico',
       loteFallidas: fallidas,
       progreso: null,
@@ -283,7 +287,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       set({ phase: 'fin' });
       return;
     }
-    set({ erroresPendientes: errores, erroresConfirmados: 0, errorActualCategoria: 'tactico', phase: 'confirmar-errores' });
+    set({ erroresPendientes: errores, erroresConfirmados: 0, erroresDiferidos: 0, errorActualCategoria: 'tactico', phase: 'confirmar-errores' });
   },
 
   elegirCategoria(categoria) {
@@ -295,7 +299,9 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     const entry = s.erroresPendientes[0];
     if (!entry) return;
     // Dedup por identidad + tope diario (RF-4.1/4.5): el mismo error en dos
-    // análisis no duplica la tarjeta, y no se avalancha la Cola.
+    // análisis no duplica la tarjeta, y no se avalancha la Cola. Pasado el
+    // tope la tarjeta se guarda igual —antes se descartaba y el error
+    // confirmado se perdía— y entra a repaso otro día; se cuenta para avisarlo.
     const cards = await errorCardRepo.list();
     const alta = altaErrorCard(cards, {
       fen: entry.fenAntes,
@@ -305,11 +311,13 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       categoria: s.errorActualCategoria,
       origen: 'partida',
     });
-    if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
+    await errorCardRepo.save(alta.card);
+    const diferida = alta.accion === 'crear' && alta.diferidaHasta !== undefined;
     const restantes = s.erroresPendientes.slice(1);
     set({
       erroresPendientes: restantes,
       erroresConfirmados: s.erroresConfirmados + 1,
+      erroresDiferidos: s.erroresDiferidos + (diferida ? 1 : 0),
       errorActualCategoria: 'tactico',
       phase: restantes.length === 0 ? 'fin' : 'confirmar-errores',
     });

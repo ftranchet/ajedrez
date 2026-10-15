@@ -438,7 +438,7 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
           categoria: categoriaFromTipo(item.tipo),
           origen: 'radar',
         });
-        if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
+        await errorCardRepo.save(alta.card);
       }
     },
 

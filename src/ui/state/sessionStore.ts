@@ -1186,7 +1186,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     if (!acierto && !ownError) {
       // Dedup por identidad + tope diario (RF-4.1/4.5): si ya hay una tarjeta
       // de esta posición se refuerza en vez de duplicar; superado el tope
-      // diario de tarjetas nuevas, se omite para no avalanchar la Cola.
+      // diario de tarjetas nuevas, se crea igual pero entra a la Cola otro día.
       const cards = await errorCardRepo.list();
       const alta = altaErrorCard(cards, {
         fen: item.fen,
@@ -1196,7 +1196,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         categoria: categoriaFromTipo(item.tipo),
         origen: 'radar',
       });
-      if (alta.accion !== 'omitir') await errorCardRepo.save(alta.card);
+      await errorCardRepo.save(alta.card);
     }
   }
 

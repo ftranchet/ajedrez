@@ -146,7 +146,7 @@ export function createFinalesStore(deps: FinalesDeps) {
               categoria: 'posicional',
               origen: 'final',
             });
-            if (alta.accion !== 'omitir') await deps.errors.save(alta.card);
+            await deps.errors.save(alta.card);
           }
         } catch {
           // El progreso del final ya quedó guardado; una falla secundaria del

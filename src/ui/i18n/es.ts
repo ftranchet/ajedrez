@@ -712,6 +712,10 @@ export const es = {
     finResumenUno: '1 error nuevo para repasar.',
     finResumenOtro: '{n} errores nuevos para repasar.',
     finResumenNinguno: 'Sin errores nuevos — no se confirmó ninguno.',
+    // Tope diario de tarjetas nuevas (RF-4.5): pasado el tope se guardan igual
+    // y entran a repaso en los días siguientes.
+    finDiferidasUno: '1 de estas tarjetas entra a tu repaso en los próximos días, para no sumar más de {tope} nuevas por día.',
+    finDiferidasOtro: '{n} de estas tarjetas entran a tu repaso en los próximos días, para no sumar más de {tope} nuevas por día.',
   },
   panel: {
     titulo: 'Panel',
