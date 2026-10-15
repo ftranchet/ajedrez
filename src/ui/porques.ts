@@ -12,11 +12,20 @@
 //   afirmaba lo contrario de lo que pasaba. Ahora se dice el porcentaje.
 import type { DietaSesion } from '../core/prescriptor';
 import type { TipoRadar } from '../core/types';
+import { formatDecimal } from './format';
 import { t } from './i18n/es';
 
-/** Porcentaje de errores tácticos que midió la fuga, para decirlo tal cual. */
-const porcentajeTactico = (dieta: Pick<DietaSesion, 'ajusteFugas'>): string =>
-  String(Math.round(dieta.ajusteFugas.proporcion * 100));
+/**
+ * Porcentaje de errores tácticos que midió la fuga, para decirlo tal cual. La
+ * fuga se activa con más del 35%, y redondear 6 de 17 (35,3%) a "El 35%"
+ * contradecía esa regla, que la app enuncia. Entre 35 y 35,5 va un decimal,
+ * redondeado hacia arriba para no caer en "35,0".
+ */
+const porcentajeTactico = (dieta: Pick<DietaSesion, 'ajusteFugas'>): string => {
+  const pct = dieta.ajusteFugas.proporcion * 100;
+  if (pct > 35 && pct < 35.5) return formatDecimal(Math.ceil(pct * 10) / 10, 1);
+  return String(Math.round(pct));
+};
 
 export function porqueCriterio(dieta: Pick<DietaSesion, 'motivoCriterio' | 'ajusteCalculo' | 'ajusteFugas'>): string {
   const conDatos = (texto: string) =>

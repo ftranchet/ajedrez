@@ -96,6 +96,24 @@ describe('posicionPropiaParaCalculo', () => {
     expect(posicionPropiaParaCalculo([juego])?.fen).toBe('fen-propia');
   });
 
+  it('una partida sin el color del usuario no aporta posiciones: no se sabe cuáles jugadas son suyas', () => {
+    // Revisión final de la etapa 1: sin color se tomaban las jugadas de los
+    // dos lados, y el error del rival se servía como "tu ventaja pasó de…".
+    const juego = partida({
+      jugadorColor: undefined,
+      tiemposPorJugadaMs: [0, 30_000, 5_000],
+      analisis: {
+        jugadas: [
+          jugada({ ply: 1, ladoQueMueve: 'b', cpPerdidos: 900, fenAntes: 'fen-negras' }),
+          jugada({ ply: 2, ladoQueMueve: 'w', cpPerdidos: 200, fenAntes: 'fen-blancas' }),
+        ],
+        comparacionEvaluaciones: [],
+        analizadaEn: '2026-07-20T11:00:00.000Z',
+      },
+    });
+    expect(posicionPropiaParaCalculo([juego])).toBeNull();
+  });
+
   it('mira solo las partidas analizadas más recientes', () => {
     const vieja = partida({
       id: 'vieja',

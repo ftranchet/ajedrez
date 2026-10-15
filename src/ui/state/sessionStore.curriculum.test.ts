@@ -137,6 +137,55 @@ describe('sessionStore — bloque de currículo', () => {
     // Quedan 7 patrones vencidos (8 menos el automatizado), pero la dieta topa a CURRICULUM_MAX.
     expect(s.curriculumQueue).toHaveLength(CURRICULUM_MAX);
   });
+
+  // RF-6.5: las coordenadas solas llegan después de una limpia con piezas
+  // fantasma, así que la demostración tiene que guardar si se hizo a ciegas,
+  // con el mismo nivel que mostró la pantalla.
+  it('guarda si la demostración se hizo a ciegas', async () => {
+    const objetivo = seedCurriculumItems.find((i) => i.id === 'patron-mate-pasillo-1');
+    if (!objetivo) throw new Error('falta el patrón del pasillo en el catálogo');
+    // El resto del catálogo, automatizado sin fallos: el pasillo queda en
+    // 100% de acierto y el objetivo es lo único que se sirve.
+    await db.curriculumProgress.bulkPut(
+      seedCurriculumItems
+        .filter((i) => i.id !== objetivo.id)
+        .map((i) => ({
+          id: i.id,
+          fsrs: {
+            due: '2026-01-01T00:00:00.000Z',
+            stability: 5,
+            difficulty: 5,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 3,
+            lapses: 0,
+            learningSteps: 0,
+            state: 'review' as const,
+            lastReview: '2026-01-01T00:00:00.000Z',
+          },
+          demostracionesLimpias: 3,
+          intentos: 3,
+          aciertos: 3,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        })),
+    );
+
+    await useSessionStore.getState().start();
+    const s = useSessionStore.getState();
+    expect(s.curriculumQueue.map((i) => i.id)).toEqual([objetivo.id]);
+    await s.curriculumUserMove(objetivo.solucion[0].slice(0, 2) as never, objetivo.solucion[0].slice(2, 4) as never);
+
+    expect((await db.curriculumProgress.get(objetivo.id))?.ultimaACiegas).toBe(true);
+  });
+
+  it('sin el patrón dominado, la demostración queda como hecha con el tablero normal', async () => {
+    await useSessionStore.getState().start();
+    const s = useSessionStore.getState();
+    const item = s.curriculumQueue[0];
+    await s.curriculumUserMove(item.solucion[0].slice(0, 2) as never, item.solucion[0].slice(2, 4) as never);
+
+    expect((await db.curriculumProgress.get(item.id))?.ultimaACiegas).toBe(false);
+  });
 });
 
 // El fallo que motivó el plan diario (RF-11.1): completar Patrones, volver a

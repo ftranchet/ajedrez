@@ -25,15 +25,23 @@ export function isAutomatizado(progress: CurriculumProgress): boolean {
  * suma al contador y espacia la reaparición (como un acierto FSRS); un fallo
  * reinicia el contador a cero y la reaparición se adelanta (como un fallo
  * FSRS) — automatizar exige rachas limpias, no un promedio. El promedio se
- * lleva aparte, en `intentos`/`aciertos`, para el modo a ciegas (RF-6.5).
+ * lleva aparte, en `intentos`/`aciertos`, para el modo a ciegas (RF-6.5), y
+ * también si la demostración se hizo a ciegas (`aCiegas`: el nivel con que se
+ * mostró no fue el normal).
  */
-export function reviewCurriculumProgress(progress: CurriculumProgress, limpia: boolean, now: Date = new Date()): CurriculumProgress {
+export function reviewCurriculumProgress(
+  progress: CurriculumProgress,
+  limpia: boolean,
+  now: Date = new Date(),
+  aCiegas = false,
+): CurriculumProgress {
   return {
     ...progress,
     fsrs: reviewFsrsState(progress.fsrs, limpia, now),
     demostracionesLimpias: limpia ? progress.demostracionesLimpias + 1 : 0,
     intentos: (progress.intentos ?? 0) + 1,
     aciertos: (progress.aciertos ?? 0) + (limpia ? 1 : 0),
+    ultimaACiegas: aCiegas,
     updatedAt: now.toISOString(),
   };
 }
@@ -88,11 +96,24 @@ const REPS_MINIMAS_CIEGAS = 3;
 export type NivelCiegas = 'normal' | 'fantasma' | 'coordenadas';
 
 /**
+ * Intentos y aciertos de una posición. Un registro anterior a los contadores
+ * aporta lo que se sabe seguro de él: cada repaso de su FSRS fue una
+ * demostración (`reps`), y su racha actual fueron aciertos. Los repasos
+ * anteriores a la racha cuentan como fallos aunque alguno haya sido limpio:
+ * el acierto puede quedar por debajo del real, nunca por encima.
+ */
+function medicionDe(progreso: CurriculumProgress | undefined): { intentos: number; aciertos: number } {
+  if (!progreso) return { intentos: 0, aciertos: 0 };
+  if (progreso.intentos !== undefined) return { intentos: progreso.intentos, aciertos: progreso.aciertos ?? 0 };
+  return { intentos: progreso.fsrs.reps, aciertos: Math.min(progreso.demostracionesLimpias, progreso.fsrs.reps) };
+}
+
+/**
  * Modificador a ciegas progresivo (RF-6.5): sobre un **patrón** con más de
  * 80% de acierto (y unos pocos intentos, para no activarlo con una sola
  * casualidad), sube la dificultad deseable (Bjork) ocultando primero las
  * piezas ("fantasma") y, si el usuario sigue acertando limpio esta posición
- * camino a su automatización (RF-6.3), también las coordenadas.
+ * con las piezas ocultas, también las coordenadas.
  *
  * **El acierto es del patrón, no de la posición suelta.** Se suman los
  * intentos y aciertos de todas las posiciones del mismo `patternKey`,
@@ -100,18 +121,26 @@ export type NivelCiegas = 'normal' | 'fantasma' | 'coordenadas';
  * posición deja de servirse al lograr tres demostraciones limpias seguidas,
  * así que mientras se sirve nunca supera el 80% con tres intentos o más (el
  * máximo es 4 de 5). Por patrón es lo que pide RF-6.5 y lo que tiene sentido
- * ajedrecístico: quien ya domina el mate del pasillo en una posición recibe
- * las otras posiciones de ese mate a ciegas. Un patrón con una sola posición
- * no puede demostrar dominio y no activa el modo.
+ * ajedrecístico: quien acierta más del 80% del mate del pasillo, sumando sus
+ * posiciones (por ejemplo, tres limpias de tres en una), recibe las otras a
+ * ciegas; automatizar una posición después de un fallo (3 de 4) no alcanza. Un
+ * patrón con una sola posición no puede demostrar dominio y no activa el modo.
  *
  * **El acierto sale de `aciertos / intentos`, no de FSRS.** `(reps − lapses) /
  * reps` parecía lo mismo, pero ts-fsrs solo cuenta un lapso cuando falla un
  * elemento que ya estaba en repaso: tres fallos seguidos desde un patrón
  * nuevo daban "100% de acierto" y el tablero pasaba a piezas fantasma justo
- * después de demostrar que el patrón no estaba. Los registros anteriores a los
- * contadores no aportan nada a la suma: el pasado no se reconstruye porque no
- * se puede (FSRS no guarda qué repasos fallaron), y subir la dificultad sobre
- * un acierto supuesto es justamente el error que esto corrige.
+ * después de demostrar que el patrón no estaba. De un registro anterior a los
+ * contadores se toma solo lo seguro (`medicionDe`): subir la dificultad sobre
+ * un acierto supuesto es justamente el error que esto corrige, pero ignorarlo
+ * dejaba sin modo a ciegas, para siempre, a un patrón con sus otras posiciones
+ * ya automatizadas, porque una posición automatizada no se vuelve a servir.
+ *
+ * **Las coordenadas solas, solo después de las piezas fantasma.** Hacen falta
+ * dos demostraciones limpias seguidas de esta posición y que la última haya
+ * sido a ciegas (`ultimaACiegas`). Con la racha sola, una posición servida
+ * normal mientras el patrón no llegaba al umbral pasaba directo a coordenadas
+ * al cruzarlo, sin haber visto nunca las piezas fantasma.
  */
 export function nivelCiegas(
   item: CurriculumItem,
@@ -122,12 +151,13 @@ export function nivelCiegas(
   let aciertos = 0;
   for (const otro of items) {
     if (otro.tipo !== item.tipo || otro.patternKey !== item.patternKey) continue;
-    const progreso = progressById.get(otro.id);
-    intentos += progreso?.intentos ?? 0;
-    aciertos += progreso?.aciertos ?? 0;
+    const medicion = medicionDe(progressById.get(otro.id));
+    intentos += medicion.intentos;
+    aciertos += medicion.aciertos;
   }
   if (intentos < REPS_MINIMAS_CIEGAS || aciertos / intentos <= UMBRAL_CIEGAS) return 'normal';
-  return (progressById.get(item.id)?.demostracionesLimpias ?? 0) >= 2 ? 'coordenadas' : 'fantasma';
+  const propio = progressById.get(item.id);
+  return (propio?.demostracionesLimpias ?? 0) >= 2 && propio?.ultimaACiegas === true ? 'coordenadas' : 'fantasma';
 }
 
 function uciAObjeto(uci: string) {

@@ -25,6 +25,16 @@ describe('porqueCriterio', () => {
     expect(texto).not.toMatch(/sobre todo|mayoría/);
   });
 
+  // Revisión final de la etapa 1: 6 de 17 activa la fuga (35,3%), y "El 35%"
+  // contradecía la regla de "más del 35%" que muestran Ajustes y el Panel.
+  it('con 6 tácticos de 17 (35,3%) no redondea al umbral', () => {
+    const texto = porqueCriterio({ motivoCriterio: 'tactica', ajusteCalculo: sinFugaCalculo, ajusteFugas: fugaTactica(6 / 17) });
+    expect(texto).toContain('El 35,3%');
+    expect(porqueRadar({ ajusteFugas: fugaTactica(6 / 17) }, [])).toBe('Reforzado: el 35,3% de tus errores recientes de partida son tácticos.');
+    // Apenas por encima del umbral, tampoco "35,0".
+    expect(porqueRadar({ ajusteFugas: fugaTactica(0.35001) }, [])).toContain('el 35,1%');
+  });
+
   it('con la fuga de cálculo sola, no afirma errores tácticos: dice cuántas veces fallaste líneas forzadas', () => {
     const texto = porqueCriterio({ motivoCriterio: 'calculo', ajusteCalculo: fugaCalculo, ajusteFugas: sinFugaTactica });
     expect(texto).not.toContain('tácticos');
@@ -35,7 +45,8 @@ describe('porqueCriterio', () => {
   it('con las dos fugas, nombra las dos con sus datos', () => {
     const texto = porqueCriterio({ motivoCriterio: 'ambas', ajusteCalculo: fugaCalculo, ajusteFugas: fugaTactica(0.5) });
     expect(texto).toContain('El 50%');
-    expect(texto).toContain('6 de 10');
+    // Son intentos, no posiciones distintas: el Radar repite posiciones.
+    expect(texto).toContain('6 de 10 veces');
     expect(texto).toContain('línea forzada');
   });
 

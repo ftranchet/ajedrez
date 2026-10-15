@@ -22,8 +22,7 @@ import { TRIAGE_SESSION_SIZE, useSessionStore } from '../state/sessionStore';
 import { useDiagnosticoStore } from '../state/diagnosticoStore';
 import { useGameStore } from '../state/gameStore';
 import { DiagnosticoScreen } from './DiagnosticoScreen';
-import { nivelCiegas } from '../../core/curriculum';
-import { readBlindTrainingEnabled } from '../trainingPrefs';
+import { nivelCiegasServido } from '../trainingPrefs';
 import { normalizeSensoryPreferences } from '../../core/sensory';
 import { playMoveCue, playResolutionCue, unlockSoundFeedback } from '../../services/sensory/feedback';
 import { useSlowLoading } from '../hooks/useSlowLoading';
@@ -634,8 +633,8 @@ function SesionActiva() {
   // en feedback se ve la posición entera, para poder revisarla.
   const curriculumItemActual = enCurriculo ? s.curriculumQueue[s.curriculumIndex] : null;
   const blindMode =
-    readBlindTrainingEnabled() && enCurriculo && s.curriculumSubPhase === 'jugando' && curriculumItemActual
-      ? nivelCiegas(curriculumItemActual, s.curriculumItemsAll, s.curriculumProgressById)
+    enCurriculo && s.curriculumSubPhase === 'jugando' && curriculumItemActual
+      ? nivelCiegasServido(curriculumItemActual, s.curriculumItemsAll, s.curriculumProgressById)
       : 'normal';
 
   return (
@@ -776,7 +775,7 @@ function CurriculumPanel() {
     s.curriculumSubPhase === 'feedback',
   );
   const item = s.curriculumQueue[s.curriculumIndex];
-  const nivel = readBlindTrainingEnabled() && s.curriculumSubPhase === 'jugando' && item ? nivelCiegas(item, s.curriculumItemsAll, s.curriculumProgressById) : 'normal';
+  const nivel = s.curriculumSubPhase === 'jugando' && item ? nivelCiegasServido(item, s.curriculumItemsAll, s.curriculumProgressById) : 'normal';
 
   return (
     <div className="flex flex-col gap-3">

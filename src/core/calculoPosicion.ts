@@ -45,11 +45,17 @@ export interface PosicionPropia {
   tiempoMs?: number;
 }
 
-/** Jugadas del usuario en una partida analizada, con su tiempo si existe. */
+/**
+ * Jugadas del usuario en una partida analizada, con su tiempo si existe. Sin
+ * su color (partidas previas a ese campo) no hay forma de saber cuáles son
+ * suyas, y la partida no aporta ninguna: antes aportaba las de los dos lados,
+ * y el ejercicio podía servir el error del rival como "tu ventaja pasó de
+ * mate a favor a −5,0".
+ */
 function jugadasDelUsuario(game: GameRecord): { entry: MoveAnalysisEntry; tiempoMs?: number }[] {
   const jugadas = game.analisis?.jugadas ?? [];
   return jugadas
-    .filter((entry) => (game.jugadorColor ? entry.ladoQueMueve === game.jugadorColor : true))
+    .filter((entry) => entry.ladoQueMueve === game.jugadorColor)
     .map((entry) => ({ entry, tiempoMs: game.tiemposPorJugadaMs[entry.ply] }));
 }
 

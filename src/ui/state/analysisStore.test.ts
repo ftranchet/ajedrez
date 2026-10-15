@@ -211,6 +211,14 @@ describe('analysisStore — fase 2 y confirmación de errores', () => {
       // Empezar otro análisis no arrastra el aviso del anterior.
       useAnalysisStore.getState().volver();
       expect(useAnalysisStore.getState().erroresDiferidos).toBe(0);
+
+      // Otra partida repite un error que quedó para mañana: la tarjeta sigue
+      // esperando su día, así que el cierre tiene que avisarlo igual.
+      useAnalysisStore.setState({ erroresPendientes: [errores[11]!], erroresConfirmados: 0, phase: 'confirmar-errores' });
+      await useAnalysisStore.getState().confirmarErrorActual();
+      expect(await db.errorCards.count()).toBe(12);
+      expect(useAnalysisStore.getState().erroresConfirmados).toBe(1);
+      expect(useAnalysisStore.getState().erroresDiferidos).toBe(1);
     } finally {
       vi.useRealTimers();
     }

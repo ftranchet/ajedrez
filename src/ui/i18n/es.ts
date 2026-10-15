@@ -264,7 +264,7 @@ export const es = {
     bloqueTriage: '¿Calcular o ya alcanza? — {n} posiciones',
     bloqueTriagePorque: 'El {pct}% de tus errores recientes de partida son tácticos: conviene afinar cuándo hay que detenerse a calcular.',
     bloqueTriagePorqueCalculo: 'En los últimos 30 días fallaste {fallos} de {total} veces en posiciones cuya solución es una línea forzada: conviene afinar cuándo hay que detenerse a calcular.',
-    bloqueTriagePorqueAmbas: 'El {pct}% de tus errores recientes de partida son tácticos y fallaste {fallos} de {total} posiciones con una línea forzada: conviene afinar cuándo hay que detenerse a calcular.',
+    bloqueTriagePorqueAmbas: 'El {pct}% de tus errores recientes de partida son tácticos y fallaste {fallos} de {total} veces en posiciones con una línea forzada: conviene afinar cuándo hay que detenerse a calcular.',
     bloqueTriagePorquePlan: 'Entró al plan de hoy porque más del 35% de tus errores recientes de partida eran tácticos o venías fallando posiciones cuya solución es una línea forzada.',
     bloqueTriageExplica: 'Para cada posición decidís si pide cálculo profundo o alcanza con una jugada sólida. Entrena la calibración del esfuerzo —no jugar en automático una posición crítica, ni quemar tu concentración en una tranquila—. Sin reloj.',
     bloqueRadar: 'Radar — {n} posiciones',
@@ -690,10 +690,13 @@ export const es = {
     momentoLecturaMate: 'Con esa jugada la evaluación pasó de {antes} a {despues}.',
     // La jugada que dio vuelta la partida puede ser del rival: se dice, y la
     // evaluación se lee desde tu lado, sin costo (para vos no fue una pérdida).
-    momentoLecturaRival: 'Fue una jugada de tu rival: tu evaluación pasó de {antes} a {despues}.',
-    // Partidas viejas sin el color del usuario: se nombra el bando, para que
-    // "mate a favor" no se lea como propio.
-    momentoLecturaLado: 'Jugaban las {lado}.',
+    // "La evaluación", no "tu evaluación": en esta pantalla "tus evaluaciones"
+    // son las que diste en la fase 1.
+    momentoLecturaRival: 'Fue una jugada de tu rival: la evaluación, desde tu lado, pasó de {antes} a {despues}.',
+    // Partidas viejas sin el color del usuario: se nombra el bando y se dice
+    // que la evaluación es desde su lado, para que "mate a favor" no se lea
+    // como propio.
+    momentoLecturaLado: 'Jugaban las {lado}, y la evaluación se cuenta desde su lado.',
     ladoBlancas: 'blancas',
     ladoNegras: 'negras',
     curvaTitulo: 'Curva de evaluación',

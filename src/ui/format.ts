@@ -58,15 +58,6 @@ export function formatVentaja(cp: number): string {
   return `${signo}${formatDecimal(Math.abs(redondeado), 1)}`;
 }
 
-/**
- * Lo que **costó** una jugada, en peones. Va sin signo a propósito: es una
- * magnitud, no una evaluación. "Perdiste −2,5" es una doble negación, y el
- * lector tiene que deshacerla para entender que perdió dos peones y medio.
- */
-export function formatPeones(cp: number): string {
-  return formatDecimal(Math.abs(cp) / 100, 1);
-}
-
 /** Décimos de peón tal como los redondea `formatVentaja`. */
 const decimosVisibles = (cp: number): number => Math.round((cp / 100) * 10);
 
@@ -79,7 +70,8 @@ const decimosVisibles = (cp: number): number => Math.round((cp / 100) * 10);
  * peones), que sirve para clasificar y ordenar, pero deja de cuadrar con el
  * salto apenas un extremo pasa de diez: "costó 11,0 peones: pasó de +12,4 a
  * −1,0" pide al lector una cuenta que da 13,4. Se resta en décimos ya
- * redondeados para que también el redondeo cierre.
+ * redondeados para que también el redondeo cierre. El costo va sin signo: es
+ * una magnitud, y "perdiste −2,5" sería una doble negación.
  *
  * Con un mate en cualquiera de los dos extremos se usa `mate`, que no lleva
  * costo: el mate no tiene valor en peones, y nombrado ya dice qué se perdió.
@@ -105,7 +97,8 @@ export function fraseSaltoVentaja(
  * favor a −5,0" le hacía creer al usuario que él había tenido el mate que en
  * realidad desperdició su rival. Si la jugada fue del rival se dice así, con
  * la evaluación desde el lado del usuario y sin costo. Si no se sabe con qué
- * color jugó (partidas viejas), se nombra el bando.
+ * color jugó (partidas viejas), se nombra el bando y se aclara que la
+ * evaluación es desde su lado.
  */
 export function fraseLecturaMomento(lectura: LecturaMomentoCritico, jugadorColor: Color | undefined): string {
   const salto = fraseSaltoVentaja({ costo: t.analisis.momentoLecturaCosto, mate: t.analisis.momentoLecturaMate }, lectura);

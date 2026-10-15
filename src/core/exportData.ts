@@ -407,7 +407,8 @@ function esCurriculumProgressValido(x: unknown): boolean {
     // de texto entraba y después la suma lo concatenaba ("31"), y el modo a
     // ciegas leía un acierto inventado.
     ((x.intentos === undefined && x.aciertos === undefined) ||
-      (esEnteroNoNegativo(x.intentos) && esEnteroNoNegativo(x.aciertos) && Number(x.aciertos) <= Number(x.intentos)))
+      (esEnteroNoNegativo(x.intentos) && esEnteroNoNegativo(x.aciertos) && Number(x.aciertos) <= Number(x.intentos))) &&
+    opcional(x.ultimaACiegas, esBooleano)
   );
 }
 

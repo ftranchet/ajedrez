@@ -312,7 +312,9 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       origen: 'partida',
     });
     await errorCardRepo.save(alta.card);
-    const diferida = alta.accion === 'crear' && alta.diferidaHasta !== undefined;
+    // También la que ya existía y todavía espera su día: no entra hoy aunque
+    // el error se haya vuelto a confirmar.
+    const diferida = alta.diferidaHasta !== undefined;
     const restantes = s.erroresPendientes.slice(1);
     set({
       erroresPendientes: restantes,

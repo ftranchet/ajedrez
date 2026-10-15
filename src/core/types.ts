@@ -448,10 +448,20 @@ export interface CurriculumProgress {
    * (RF-6.5). Ni FSRS ni la racha lo dan: `fsrs.lapses` no cuenta los fallos
    * mientras el elemento se aprende y `demostracionesLimpias` vuelve a cero.
    * Opcionales porque los registros anteriores no los tienen; empiezan a
-   * contar en su próxima demostración.
+   * contar en su próxima demostración (hasta entonces, `nivelCiegas` usa lo
+   * que se sabe seguro de ellos).
    */
   intentos?: number;
   aciertos?: number;
+  /**
+   * Si la última demostración se hizo a ciegas: con piezas fantasma o solo
+   * coordenadas (RF-6.5). Las coordenadas solas llegan solo después de una
+   * demostración limpia con piezas fantasma, y ese nivel anterior no se puede
+   * deducir de los contadores: depende de lo que habían sumado en ese momento
+   * las otras posiciones del patrón. Ausente en los registros anteriores, que
+   * cuentan como no hechas a ciegas.
+   */
+  ultimaACiegas?: boolean;
   updatedAt: string; // ISO 8601
 }
 

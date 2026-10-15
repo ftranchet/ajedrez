@@ -102,16 +102,22 @@ export type AltaTarjeta =
       /** Solo si el cupo de hoy estaba lleno: instante (ISO) en que la tarjeta entra a repaso. */
       diferidaHasta?: string;
     }
-  | { accion: 'reforzar'; card: ErrorCard };
+  | {
+      accion: 'reforzar';
+      card: ErrorCard;
+      /** Solo si la tarjeta todavía espera su día de entrada: instante (ISO) en que entra a repaso. */
+      diferidaHasta?: string;
+    };
 
 /**
  * Decide qué hacer ante un nuevo fallo, antes de tocar el almacenamiento
  * (RF-4.1/4.5):
  * - si ya existe una tarjeta con la misma identidad → **reforzar** (un fallo
  *   sobre la existente, que adelanta su repaso), en vez de duplicar. Si esa
- *   tarjeta todavía espera su día de entrada, queda como está: el error ya
- *   está registrado, y adelantarla a hoy la sumaría por encima del cupo (el
- *   mismo error de apertura repetido en dos partidas de un lote exprés);
+ *   tarjeta todavía espera su día de entrada, queda como está y se devuelve
+ *   ese día, para avisar que no entra hoy: el error ya está registrado, y
+ *   adelantarla a hoy la sumaría por encima del cupo (el mismo error de
+ *   apertura repetido en dos partidas de un lote exprés);
  * - si no → **crear** una tarjeta nueva, siempre. Si el cupo de hoy ya está
  *   lleno, la tarjeta nace con su `due` en el inicio del primer día local con
  *   cupo, y ese día queda fijado en `entraEn`: el excedente se reparte de a
@@ -131,7 +137,7 @@ export function altaErrorCard(
   const now = args.now ?? new Date();
   const existente = tarjetaEquivalente(cards, args.fen, args.jugadaCorrecta);
   if (existente) {
-    if (esperaSuDia(existente, now)) return { accion: 'reforzar', card: existente };
+    if (esperaSuDia(existente, now)) return { accion: 'reforzar', card: existente, diferidaHasta: existente.fsrs.due };
     return { accion: 'reforzar', card: reviewErrorCard(existente, false, now) };
   }
   const card = buildErrorCard({ ...args, now });

@@ -62,6 +62,7 @@ import { sessionRepo } from '../../services/storage/sessionRepo';
 import { trainingEventRepo } from '../../services/storage/trainingEventRepo';
 import { computeDests, sanDeJugada } from './chessBoardUtils';
 import { readIdiomaNotacion } from '../notacionPrefs';
+import { nivelCiegasServido } from '../trainingPrefs';
 import { singleFlight } from './singleFlight';
 import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRepo';
 
@@ -1008,7 +1009,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       chess.move({ from, to, promotion: promo });
 
       const progresoPrevio = s.curriculumProgressById.get(item.id) ?? newCurriculumProgress(item.id);
-      const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia);
+      // Con el mismo progreso con que se mostró: si se jugó a ciegas, la
+      // próxima vez puede tocar el nivel siguiente (RF-6.5).
+      const aCiegas = nivelCiegasServido(item, s.curriculumItemsAll, s.curriculumProgressById) !== 'normal';
+      const progresoNuevo = reviewCurriculumProgress(progresoPrevio, limpia, new Date(), aCiegas);
       await curriculumProgressRepo.save(progresoNuevo);
       updateTrackedSession((record) => recordSessionItem(record, 'curriculo'));
       updateTrackedAssignment('curriculo', item.id);

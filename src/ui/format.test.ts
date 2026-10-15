@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildGameAnalysis, lecturaMomentoCritico, type EngineEvalAtPly } from '../core/analysis';
+import { buildGameAnalysis, lecturaMomentoCritico, type EngineEvalAtPly, type LecturaMomentoCritico } from '../core/analysis';
 import { posicionPropiaParaCalculo } from '../core/calculoPosicion';
 import { ventajaDesperdiciada } from '../core/conversion';
 import { CP_MATE } from '../core/engineLevels';
 import type { Color, GameRecord, PhaseOneData } from '../core/types';
-import { esMate, formatDecimal, formatDuracion, formatPeones, formatVentaja, fraseLecturaMomento, fraseSaltoVentaja, textoVentajaDesperdiciada } from './format';
+import { esMate, formatDecimal, formatDuracion, formatVentaja, fraseLecturaMomento, fraseSaltoVentaja, textoVentajaDesperdiciada } from './format';
 import { t } from './i18n/es';
 
 describe('formato numérico de interfaz', () => {
@@ -171,17 +171,35 @@ describe('una partida cuyo error más caro desperdicia un mate', () => {
     const lectura = lecturaMomentoCritico(buildGameAnalysis(negrasTiranElMate, fase1), fase1)!;
     expect(lectura.plyMotor).toBe(3);
     expect(lectura.ladoQueMueve).toBe('b');
-    expect(fraseLecturaMomento(lectura, 'w')).toBe('Fue una jugada de tu rival: tu evaluación pasó de mate en contra a +5,0.');
+    // "La evaluación": "tus evaluaciones" son, en esta pantalla, las de la fase 1.
+    expect(fraseLecturaMomento(lectura, 'w')).toBe('Fue una jugada de tu rival: la evaluación, desde tu lado, pasó de mate en contra a +5,0.');
   });
 
   it('si el vuelco lo hizo el usuario, la frase es la del salto con su costo', () => {
+    const lectura: LecturaMomentoCritico = {
+      plyUsuario: 4,
+      plyMotor: 4,
+      ladoQueMueve: 'w',
+      cpPerdidos: 320,
+      ventajaAntes: 150,
+      ventajaDespues: -170,
+      sanMotor: 'Cf3',
+      coincide: true,
+      distanciaJugadas: 0,
+    };
+    expect(fraseLecturaMomento(lectura, 'w')).toBe('Esa jugada costó 3,2 peones: la evaluación pasó de +1,5 a −1,7.');
+  });
+
+  it('si el vuelco con mate lo hizo el usuario, la frase es la del salto, sin costo', () => {
     const lectura = lecturaMomentoCritico(buildGameAnalysis(negrasTiranElMate, fase1), fase1)!;
     expect(fraseLecturaMomento(lectura, 'b')).toBe('Con esa jugada la evaluación pasó de mate a favor a −5,0.');
   });
 
-  it('sin el color del usuario nombra el bando, para no atribuirle el mate a nadie', () => {
+  it('sin el color del usuario nombra el bando y dice que la evaluación es desde su lado', () => {
     const lectura = lecturaMomentoCritico(buildGameAnalysis(negrasTiranElMate, fase1), fase1)!;
-    expect(fraseLecturaMomento(lectura, undefined)).toBe('Jugaban las negras. Con esa jugada la evaluación pasó de mate a favor a −5,0.');
+    expect(fraseLecturaMomento(lectura, undefined)).toBe(
+      'Jugaban las negras, y la evaluación se cuenta desde su lado. Con esa jugada la evaluación pasó de mate a favor a −5,0.',
+    );
   });
 
   it('la posición propia de Cálculo, con negras: el mate es de quien movió', () => {
@@ -206,14 +224,5 @@ describe('una partida cuyo error más caro desperdicia un mate', () => {
     const ventaja = ventajaDesperdiciada(partida('w', blancasTiranElMate, '1/2-1/2'))!;
     expect(textoVentajaDesperdiciada(ventaja)).toBe('Tenías mate forzado en la jugada 3');
     expect(textoVentajaDesperdiciada({ ply: 4, ventajaCp: 450 })).toBe('Ventaja de +4,5 en la jugada 3');
-  });
-});
-
-describe('formatPeones', () => {
-  // Lo que costó una jugada es una magnitud: "perdiste −2,5" es doble negación.
-  it('no lleva signo: es cuánto costó, no una evaluación', () => {
-    expect(formatPeones(250)).toBe('2,5');
-    expect(formatPeones(-250)).toBe('2,5');
-    expect(formatPeones(0)).toBe('0,0');
   });
 });

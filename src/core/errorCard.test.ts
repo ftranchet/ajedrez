@@ -262,6 +262,8 @@ describe('altaErrorCard — pasado el tope, difiere; nunca descarta (B2, RF-4.5)
     const alta = altaErrorCard(cards, distinta(10, local(17, 18)));
     expect(alta.accion).toBe('reforzar');
     expect(alta.card).toEqual(cards[10]);
+    // Devuelve su día, para que el cierre del análisis avise que no entra hoy.
+    expect(alta.diferidaHasta).toBe(local(18, 0).toISOString());
     expect(dueErrorCards([alta.card], local(17, 23))).toEqual([]);
     expect(tarjetasNuevasHoy([...cards.slice(0, 10), alta.card], local(17, 23))).toBe(10);
   });
@@ -271,6 +273,7 @@ describe('altaErrorCard — pasado el tope, difiere; nunca descarta (B2, RF-4.5)
     const alta = altaErrorCard(cards, distinta(10, local(18, 18)));
     expect(alta.accion).toBe('reforzar');
     expect(alta.card.fsrs.reps).toBe(1);
+    expect(alta.diferidaHasta).toBeUndefined();
   });
 
   it('la diferida guarda su día de entrada', () => {
