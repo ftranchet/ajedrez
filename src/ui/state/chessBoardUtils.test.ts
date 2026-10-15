@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Chess } from 'chess.js';
-import { computeDests, sanDeLinea } from './chessBoardUtils';
+import { t } from '../i18n/es';
+import { computeDests, sanDeJugada, sanDeLinea } from './chessBoardUtils';
 
 // Este módulo no tenía tests, y alimenta tres pantallas distintas: el mapa de
 // destinos de todos los tableros, y la notación de las líneas que se revelan en
@@ -61,6 +62,25 @@ describe('sanDeLinea', () => {
   it('el enroque sale con su notación, no como jugada del rey', () => {
     expect(sanDeLinea('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', ['e1g1'])).toEqual(['O-O']);
     expect(sanDeLinea('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', ['e1c1'])).toEqual(['O-O-O']);
+  });
+});
+
+describe('sanDeJugada', () => {
+  const INICIAL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+  it('una jugada legal sale en la notación elegida', () => {
+    expect(sanDeJugada(INICIAL, 'g1f3')).toBe('Cf3');
+  });
+
+  // Regresión del hallazgo N2 de la auditoría 2026-10-15: una jugada que no
+  // es legal en la posición caía al UCI crudo ("a1a8"), que RNF-9 prohíbe en
+  // pantalla y que además pasaba por una respuesta válida.
+  it('una jugada que no es legal en la posición no se muestra en UCI: se dice que no es legal', () => {
+    expect(sanDeJugada(INICIAL, 'a1a8')).toBe(t.tablero.jugadaNoLegal);
+    // Del bando que no mueve: legal en otra posición, no en esta.
+    expect(sanDeJugada(INICIAL, 'e7e5')).toBe(t.tablero.jugadaNoLegal);
+    // La jugada vacía que el análisis guarda para la posición final.
+    expect(sanDeJugada(INICIAL, '')).toBe(t.tablero.jugadaNoLegal);
   });
 });
 

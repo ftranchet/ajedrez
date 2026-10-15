@@ -3,6 +3,7 @@
 import { Chess } from 'chess.js';
 import { aNotacion } from '../../core/notacion';
 import { readIdiomaNotacion } from '../notacionPrefs';
+import { t } from '../i18n/es';
 
 export function computeDests(c: Chess): Map<string, string[]> {
   const dests = new Map<string, string[]>();
@@ -51,9 +52,19 @@ export function sanDeLinea(fen: string, uciMoves: string[]): string[] {
 /**
  * SAN de una jugada suelta para mostrarla en el feedback (design system §5,
  * MoveList: "font-mono" pero notación legible, no UCI crudo); `fen` es la
- * posición **antes** de la jugada. Cae a UCI si resultara ilegal — no debería
- * pasar: sale de la solución del ítem, de la tarjeta o del motor.
+ * posición **antes** de la jugada.
+ *
+ * Si la jugada no es legal en esa posición no hay notación que mostrar, y el
+ * texto lo dice. Antes caía al UCI: rompía RNF-9 y presentaba como respuesta
+ * un dato roto (auditoría 2026-10-15, N2). Ocultar el renglón también lo
+ * escondería. Por los caminos normales no llega una jugada ilegal —la
+ * solución del catálogo se verifica en los tests, la del motor sale de la
+ * misma posición y la del usuario la valida el tablero—, pero sí puede llegar
+ * con un respaldo restaurado, que valida la jugada de una tarjeta o de un
+ * análisis solo como texto, o con un bug: una jugada del motor asociada a otra
+ * posición, como la que producía su `bestmove` tardío (ver `descartarWorker`
+ * en stockfishEngine.ts), se vería exactamente así.
  */
 export function sanDeJugada(fen: string, jugadaUci: string): string {
-  return sanDeLinea(fen, [jugadaUci])[0] ?? jugadaUci;
+  return sanDeLinea(fen, [jugadaUci])[0] ?? t.tablero.jugadaNoLegal;
 }

@@ -16,6 +16,7 @@ import { buildErrorCard } from '../../core/errorCard';
 import { curriculumItemRepo } from '../../services/storage/curriculumItemRepo';
 import { radarItemRepo } from '../../services/storage/radarItemRepo';
 import { sessionRepo } from '../../services/storage/sessionRepo';
+import { t } from '../i18n/es';
 
 // Perfil por defecto (sin diagnóstico): fija cuántas posiciones sirve el
 // Radar por sesión para que estos tests no dependan del Prescriptor.
@@ -530,6 +531,27 @@ describe('sessionStore — bloque Cola', () => {
     const after = useSessionStore.getState();
     expect(after.colaJugadaCorrecta).toBe('Ac5');
     expect(after.colaJugadaCorrecta).not.toBe('f8c5');
+  });
+
+  // N2 (auditoría 2026-10-15): la tarjeta de un respaldo restaurado solo se
+  // valida como texto, así que su jugada correcta puede no ser legal en su
+  // posición. El feedback la mostraba en UCI crudo, como si fuera la respuesta.
+  it('si la jugada correcta guardada no es legal en la posición, el feedback lo dice en vez de mostrar UCI', async () => {
+    const vencida = buildErrorCard({
+      fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
+      ladoAMover: 'b',
+      jugadaUsuario: 'g8f6',
+      jugadaCorrecta: 'e1g1', // el enroque blanco, con las negras a mover
+      categoria: 'tactico',
+      origen: 'partida',
+    });
+    await db.errorCards.put(vencida);
+    await useSessionStore.getState().start();
+
+    await useSessionStore.getState().colaUserMove('g8' as never, 'f6' as never);
+    const after = useSessionStore.getState();
+    expect(after.colaSubPhase).toBe('feedback');
+    expect(after.colaJugadaCorrecta).toBe(t.tablero.jugadaNoLegal);
   });
 
   // Decir "la jugada correcta era Ac5" y dejar al usuario buscándola en el

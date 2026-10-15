@@ -526,6 +526,10 @@ export const es = {
       yellow: 'Amarillo',
     },
     borrarAnotaciones: 'Borrar marcas',
+    // Ocupa el lugar de una jugada guardada que no es legal en su posición
+    // (un dato roto): mostrarla en UCI violaba RNF-9 y la hacía pasar por una
+    // respuesta válida.
+    jugadaNoLegal: '(no es una jugada legal en esta posición)',
   },
   // Una evaluación que es mate no se muestra como número (RNF-10): el
   // análisis la guarda como un centinela que, dividido por cien, daba
