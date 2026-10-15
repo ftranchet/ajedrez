@@ -15,7 +15,8 @@
 // consumiste más tiempo. Ahí no hay `mejorLinea` precalculada, así que el motor
 // evalúa en el dispositivo al revelar y su variante principal hace de
 // referencia — es una sola posición, sin reloj, y el motor ya está cargado.
-// Sin partidas analizadas cae al catálogo minado.
+// Sin partidas analizadas, o con todas sus posiciones ya hechas, cae al
+// catálogo minado; la práctica libre sale siempre de ahí.
 import { create } from 'zustand';
 import type { EvalSymbol, StoykoItem } from '../../core/types';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from '../../core/stoyko';
@@ -133,10 +134,20 @@ function estadoInicial(origen: OrigenPosicion, practica: boolean) {
 
 /**
  * Posición a servir: primero una de tus partidas analizadas (ADR-0015, punto 4)
- * y, si no hay ninguna, el catálogo minado.
+ * que no hayas hecho ya y, si no queda ninguna, el catálogo minado.
+ *
+ * La práctica libre sale siempre del catálogo. No se guarda —ese es su
+ * punto—, así que una posición propia servida ahí no quedaría marcada como
+ * usada y volvería como ejercicio de la semana siguiente con la respuesta del
+ * motor ya vista: justo la medición que la práctica no tiene que tocar.
  */
-async function elegirPosicion(): Promise<{ origen: OrigenPosicion; pool: StoykoItem[] } | null> {
-  const propia = posicionPropiaParaCalculo(await gameRepo.list());
+async function elegirPosicion(practica: boolean): Promise<{ origen: OrigenPosicion; pool: StoykoItem[] } | null> {
+  const propia = practica
+    ? null
+    : posicionPropiaParaCalculo(
+      await gameRepo.list(),
+      (await calculoAttemptRepo.list()).flatMap((intento) => (intento.origen ? [intento.origen] : [])),
+    );
   await stoykoItemRepo.ensureSeeded();
   const pool = await stoykoItemRepo.list();
   if (propia) return { origen: { tipo: 'propia', posicion: propia }, pool };
@@ -185,7 +196,7 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
           set({ phase: 'enfriamiento', proximaDisponibleEn: stoykoProximaDisponibleEn(profile) });
           return;
         }
-        const elegida = await elegirPosicion();
+        const elegida = await elegirPosicion(false);
         if (generation !== loadGeneration) return;
         if (!elegida) {
           set({ phase: 'sinContenido', pool: [] });
@@ -203,15 +214,16 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
   },
 
   // Repetir/practicar durante el enfriamiento (pedido explícito del usuario):
-  // sirve una posición saltando el chequeo semanal, pero en modo práctica —al
-  // terminar no resetea el enfriamiento ni guarda calibración/intento—, para no
-  // diluir la medición de "uno por semana" (RF-7.2).
+  // sirve una posición del catálogo saltando el chequeo semanal, pero en modo
+  // práctica —al terminar no resetea el enfriamiento ni guarda
+  // calibración/intento—, para no diluir la medición de "uno por semana"
+  // (RF-7.2). Por qué del catálogo y no propia: ver `elegirPosicion`.
   async practicar() {
     const generation = ++loadGeneration; // invalida cualquier empezar() en vuelo
     loadPromise = null;
     set({ phase: 'cargando' });
     try {
-      const elegida = await elegirPosicion();
+      const elegida = await elegirPosicion(true);
       if (generation !== loadGeneration) return;
       if (!elegida) {
         set({ phase: 'sinContenido', pool: [] });

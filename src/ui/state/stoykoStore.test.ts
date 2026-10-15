@@ -347,4 +347,72 @@ describe('stoykoStore — preset abierto', () => {
     const [intento] = await db.calculoAttempts.toArray();
     expect(intento).toMatchObject({ origen: { gameId: 'g-propia', ply: 4 }, profundidadVista: 3 });
   });
+
+  // Auditoría 2026-10-15, B6: la elección era determinista y no miraba lo ya
+  // hecho, así que la semana siguiente servía la misma posición, ya con la
+  // respuesta del motor vista.
+  describe('posiciones propias ya hechas', () => {
+    const FEN_SEGUNDA = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+
+    async function hacerLaDeLaSemana() {
+      vi.spyOn(engine, 'evaluate').mockResolvedValue({ move: 'f1c4', cp: 30, mateIn: null, pv: ['f1c4', 'f8c5', 'e1g1'] });
+      await useStoykoStore.getState().empezar(true);
+      declararRama(['f1c4', 'f8c5'], '=');
+      declararRama(['d2d4', 'e5d4'], '±');
+      useStoykoStore.getState().terminarAnalisis();
+      await useStoykoStore.getState().confirmarConfianza(60);
+    }
+
+    /** Pasó la semana: el enfriamiento ya venció. */
+    async function pasaLaSemana() {
+      await db.profile.update('principal', { stoykoUltimaCompletadaEn: '2026-07-01T00:00:00.000Z' });
+    }
+
+    it('la semana siguiente sirve la próxima posición propia, no la misma', async () => {
+      await db.games.put(partidaAnalizada('g-propia', [
+        { ply: 4, cpPerdidos: 300 },
+        { ply: 6, cpPerdidos: 150, fenAntes: FEN_SEGUNDA },
+      ]));
+      await hacerLaDeLaSemana();
+      expect(useStoykoStore.getState().origen).toMatchObject({ tipo: 'propia', posicion: { ply: 4 } });
+
+      await pasaLaSemana();
+      await useStoykoStore.getState().empezar(true);
+      const s = useStoykoStore.getState();
+      expect(s.phase).toBe('analizando');
+      expect(s.origen).toMatchObject({ tipo: 'propia', posicion: { gameId: 'g-propia', ply: 6 } });
+      expect(s.fen).toBe(FEN_SEGUNDA);
+    });
+
+    it('hechas todas las posiciones propias, cae al catálogo', async () => {
+      await db.games.put(partidaAnalizada('g-propia', [{ ply: 4 }]));
+      await hacerLaDeLaSemana();
+
+      await pasaLaSemana();
+      await useStoykoStore.getState().empezar(true);
+      expect(useStoykoStore.getState().origen).toMatchObject({ tipo: 'catalogo', item: { id: item.id } });
+    });
+
+    // La práctica no se guarda: una posición propia servida ahí no quedaría
+    // marcada y volvería como el ejercicio medido de la semana siguiente con la
+    // respuesta vista. Tampoco puede repetir la que se acaba de hacer.
+    it('la práctica libre no gasta posiciones propias: sale del catálogo', async () => {
+      await db.games.put(partidaAnalizada('g-propia', [
+        { ply: 4, cpPerdidos: 300 },
+        { ply: 6, cpPerdidos: 150, fenAntes: FEN_SEGUNDA },
+      ]));
+      await hacerLaDeLaSemana();
+
+      await useStoykoStore.getState().empezar(true);
+      expect(useStoykoStore.getState().phase).toBe('enfriamiento');
+      await useStoykoStore.getState().practicar();
+      expect(useStoykoStore.getState().practica).toBe(true);
+      expect(useStoykoStore.getState().origen).toMatchObject({ tipo: 'catalogo', item: { id: item.id } });
+
+      // Y la de la semana siguiente sigue siendo la próxima propia, intacta.
+      await pasaLaSemana();
+      await useStoykoStore.getState().empezar(true);
+      expect(useStoykoStore.getState().origen).toMatchObject({ tipo: 'propia', posicion: { ply: 6 } });
+    });
+  });
 });

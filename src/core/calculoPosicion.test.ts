@@ -146,7 +146,46 @@ describe('posicionPropiaParaCalculo', () => {
         analizadaEn: '2026-07-25T00:00:00.000Z',
       },
     });
-    expect(posicionPropiaParaCalculo([vieja, nueva], 1)?.fen).toBe('fen-nueva');
+    expect(posicionPropiaParaCalculo([vieja, nueva], [], 1)?.fen).toBe('fen-nueva');
+  });
+
+  // Auditoría 2026-10-15, B6: la elección es determinista y no miraba lo ya
+  // servido, así que la misma posición volvía todas las semanas.
+  describe('posiciones ya usadas', () => {
+    const conDosErrores = partida({
+      tiemposPorJugadaMs: [0, 0, 1_000, 0, 2_000, 0, 90_000],
+      analisis: {
+        jugadas: [
+          jugada({ ply: 2, cpPerdidos: 320, fenAntes: 'fen-peor' }),
+          jugada({ ply: 4, cpPerdidos: 150, fenAntes: 'fen-segunda' }),
+          jugada({ ply: 6, cpPerdidos: 30, fenAntes: 'fen-lenta' }),
+        ],
+        comparacionEvaluaciones: [],
+        analizadaEn: '2026-07-20T11:00:00.000Z',
+      },
+    });
+
+    it('no vuelve a servir una posición usada: pasa a la siguiente candidata', () => {
+      expect(posicionPropiaParaCalculo([conDosErrores], [{ gameId: 'g1', ply: 2 }])).toMatchObject({
+        fen: 'fen-segunda',
+        ply: 4,
+        motivo: 'mas-centipeones',
+      });
+    });
+
+    it('la misma media jugada de otra partida no cuenta como usada', () => {
+      expect(posicionPropiaParaCalculo([conDosErrores], [{ gameId: 'otra', ply: 2 }])?.fen).toBe('fen-peor');
+    });
+
+    it('agotados los errores, pasa a la jugada que más tiempo consumió; agotado todo, al catálogo', () => {
+      const errores = [{ gameId: 'g1', ply: 2 }, { gameId: 'g1', ply: 4 }];
+      expect(posicionPropiaParaCalculo([conDosErrores], errores)).toMatchObject({
+        fen: 'fen-lenta',
+        motivo: 'mas-tiempo',
+        tiempoMs: 90_000,
+      });
+      expect(posicionPropiaParaCalculo([conDosErrores], [...errores, { gameId: 'g1', ply: 6 }])).toBeNull();
+    });
   });
 
   it('una partida analizada sin jugadas ni tiempos no fuerza una posición', () => {

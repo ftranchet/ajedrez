@@ -59,6 +59,16 @@ function jugadasDelUsuario(game: GameRecord): { entry: MoveAnalysisEntry; tiempo
     .map((entry) => ({ entry, tiempoMs: game.tiemposPorJugadaMs[entry.ply] }));
 }
 
+/** Una posición propia ya servida en un ejercicio: partida y media jugada (`CalculoAttempt.origen`). */
+export interface PosicionUsada {
+  gameId: string;
+  ply: number;
+}
+
+// El ply va adelante y no tiene ':', así que la clave no se puede confundir
+// aunque el id de la partida lo tenga.
+const clave = (gameId: string, ply: number): string => `${ply}:${gameId}`;
+
 /**
  * La posición de tu propia partida donde más caro salió pensar: primero la
  * jugada que más centipeones perdió; si ninguna perdió lo suficiente, la que
@@ -66,15 +76,28 @@ function jugadasDelUsuario(game: GameRecord): { entry: MoveAnalysisEntry; tiempo
  * que vale volver a mirar—. Null si no hay partidas analizadas con tu color:
  * ahí el ejercicio cae al catálogo minado. Las que no lo tienen no entran en
  * la ventana de recientes, porque no pueden aportar posiciones propias.
+ *
+ * Las posiciones de `usadas` no se vuelven a servir: la elección es
+ * determinista, y sin esto la misma posición —ya con la respuesta del motor
+ * vista— volvía todas las semanas hasta que se analizara otra partida con un
+ * error mayor. Se pasa a la siguiente candidata con el mismo criterio y, si no
+ * queda ninguna, a null (el catálogo).
  */
-export function posicionPropiaParaCalculo(games: GameRecord[], recientes = PARTIDAS_RECIENTES): PosicionPropia | null {
+export function posicionPropiaParaCalculo(
+  games: GameRecord[],
+  usadas: readonly PosicionUsada[] = [],
+  recientes = PARTIDAS_RECIENTES,
+): PosicionPropia | null {
+  const yaUsadas = new Set(usadas.map(({ gameId, ply }) => clave(gameId, ply)));
   const analizadas = games
     .filter((game) => game.analisis?.analizadaEn && game.jugadorColor)
     .sort((a, b) => (b.analisis?.analizadaEn ?? '').localeCompare(a.analisis?.analizadaEn ?? ''))
     .slice(0, recientes);
 
   const candidatas = analizadas.flatMap((game) =>
-    jugadasDelUsuario(game).map(({ entry, tiempoMs }) => ({ game, entry, tiempoMs })),
+    jugadasDelUsuario(game)
+      .filter(({ entry }) => !yaUsadas.has(clave(game.id, entry.ply)))
+      .map(({ entry, tiempoMs }) => ({ game, entry, tiempoMs })),
   );
   if (candidatas.length === 0) return null;
 
