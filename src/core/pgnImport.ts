@@ -21,8 +21,7 @@ export type PgnParseResult = {
   whiteElo?: number;
   blackElo?: number;
   playedAt?: string;
-} | { ok: false; error: Exclude<PgnParseError, 'varias-partidas'> }
-  | { ok: false; error: 'varias-partidas'; partidas: number };
+} | { ok: false; error: PgnParseError };
 
 function normalizeResultado(raw: string | undefined): Resultado {
   return raw === '1-0' || raw === '0-1' || raw === '1/2-1/2' ? raw : '*';
@@ -96,11 +95,10 @@ function finDeEncabezado(texto: string, desde: number): number {
  * Corta un texto con varias partidas en una por partida. Empieza otra cuando
  * aparece un encabezado después de jugadas, o jugadas después de la marca de
  * resultado (`1-0`, `0-1`, `1/2-1/2`, `*`) que cierra la anterior. Saltea los
- * comentarios (ahí adentro viven los `[%clk]`) y las variantes.
+ * comentarios: ahí adentro viven los `[%clk]`, que no son encabezados.
  */
 function separarPartidas(texto: string): string[] {
   const cortes = [0];
-  let profundidad = 0;
   let hayJugadas = false;
   let terminada = false;
   let i = 0;
@@ -114,23 +112,18 @@ function separarPartidas(texto: string): string[] {
       i = fin === -1 ? texto.length : fin;
     } else if (/\s/.test(c)) {
       i++;
-    } else if (c === '(' || c === ')') {
-      profundidad = Math.max(0, profundidad + (c === '(' ? 1 : -1));
-      i++;
-    } else if (c === '[' && profundidad === 0) {
+    } else if (c === '[') {
       if (hayJugadas) cortes.push(i);
       hayJugadas = false;
       terminada = false;
       i = finDeEncabezado(texto, i);
     } else {
-      const token = /[^\s{}();[\]]+/y;
+      const token = /[^\s{};[\]]+/y;
       token.lastIndex = i;
       const palabra = token.exec(texto)?.[0] ?? c;
-      if (profundidad === 0) {
-        if (terminada) cortes.push(i);
-        terminada = MARCA_DE_RESULTADO.test(palabra);
-        hayJugadas = true;
-      }
+      if (terminada) cortes.push(i);
+      terminada = MARCA_DE_RESULTADO.test(palabra);
+      hayJugadas = true;
       i += palabra.length;
     }
   }
@@ -162,10 +155,11 @@ export function parsePastedPgn(raw: string): PgnParseResult {
     // Decir "no es un PGN válido" era falso: es válido, lo que no se soporta
     // es más de una (B14). Antes de afirmarlo se exige que las dos primeras
     // carguen solas, para no tomar por otra partida la basura que siga al
-    // resultado; validarlas todas congelaría la pantalla con una base entera.
+    // resultado. No se cuentan: validarlas todas congelaría la pantalla con
+    // una base entera, y contar sin validar podría sumar basura como partida.
     const partidas = separarPartidas(pgn);
     if (partidas.length > 1 && partidas.slice(0, 2).every((partida) => cargar(partida) !== null)) {
-      return { ok: false, error: 'varias-partidas', partidas: partidas.length };
+      return { ok: false, error: 'varias-partidas' };
     }
     return { ok: false, error: 'invalido' };
   }

@@ -85,9 +85,9 @@ describe('buildGameRecord', () => {
 
 describe('plyCountFromPgn', () => {
   it('cuenta medias jugadas de un PGN, sin depender de tiemposPorJugadaMs (RF-2.2)', () => {
-    // tiemposPorJugadaMs queda vacío en casi todas las partidas (las locales no
-    // se cronometran, RF-1.5; las importadas solo lo llenan si traen [%clk]);
-    // esto lee el PGN en sí.
+    // tiemposPorJugadaMs queda vacío en casi todas las partidas (las locales ya
+    // no se cronometran, RF-1.5; las importadas solo lo llenan si traen
+    // [%clk]); esto lee el PGN en sí.
     expect(plyCountFromPgn('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *')).toBe(6);
   });
 

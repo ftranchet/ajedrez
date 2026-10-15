@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CalculoAttempt, CalibrationRecord, Color, CurriculumProgress, DobleSolucionAttempt, GameRecord, N1Experiment, Profile, RadarAttempt, Ritmo, SessionRecord, TrainingEvent, TransferMeasurement, TriageAttempt } from '../../core/types';
 import { buildGameRecord, plyCountFromPgn } from '../../core/game';
-import { parsePastedPgn, partidaYaGuardada, ritmoDelPgn, type PgnParseResult } from '../../core/pgnImport';
+import { parsePastedPgn, partidaYaGuardada, ritmoDelPgn, type PgnParseError } from '../../core/pgnImport';
 import { erroresGravesPorPartidaMediaMovil, mejoraErroresGraves, ratingDePartidasLentas, serieErroresGraves, tendenciaSerie } from '../../core/panel';
 import { admiteAnalisisExpres } from '../../core/analysis';
 import { brechaCalibracion, brierScore, calibrationCurve, calibrationInsight, serieBrechaCalibracion } from '../../core/calibration';
@@ -1113,11 +1113,11 @@ function CriterioReportPanel({ attempts }: { attempts: TriageAttempt[] | null })
 
 const RITMOS: Ritmo[] = ['rapida', 'clasica', 'blitz', 'bullet', 'sin-reloj'];
 
-function errorMensaje(fallo: Extract<PgnParseResult, { ok: false }>): string {
-  if (fallo.error === 'vacio') return t.panel.importarPgnErrorVacio;
-  if (fallo.error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
-  if (fallo.error === 'posicion-inicial-no-estandar') return t.panel.importarPgnErrorPosicionNoEstandar;
-  if (fallo.error === 'varias-partidas') return t.panel.importarPgnErrorVariasPartidas.replace('{n}', String(fallo.partidas));
+function errorMensaje(error: PgnParseError): string {
+  if (error === 'vacio') return t.panel.importarPgnErrorVacio;
+  if (error === 'sin-jugadas') return t.panel.importarPgnErrorSinJugadas;
+  if (error === 'posicion-inicial-no-estandar') return t.panel.importarPgnErrorPosicionNoEstandar;
+  if (error === 'varias-partidas') return t.panel.importarPgnErrorVariasPartidas;
   return t.panel.importarPgnErrorInvalido;
 }
 
@@ -1173,7 +1173,7 @@ function ImportarPartidaSection({ onImported }: { onImported: () => void }) {
   async function handleImportar() {
     const resultado = parsePastedPgn(pgn);
     if (!resultado.ok) {
-      setMensaje(errorMensaje(resultado));
+      setMensaje(errorMensaje(resultado.error));
       return;
     }
     setGuardando(true);

@@ -2,7 +2,7 @@
 //
 // Las partidas jugadas en la app ya no se cronometran (RF-1.5): los tiempos
 // por jugada solo pueden venir de un reloj real, y los PGN de Lichess y
-// Chess.com lo traen escrito. El encabezado `TimeControl` dice el ritmo, y el
+// Chess.com suelen traerlo escrito. El encabezado `TimeControl` dice el ritmo, y el
 // comentario `[%clk h:mm:ss]` de cada jugada dice cuánto le quedaba al que
 // movió. De ahí sale lo que tardó cada jugada, que es lo que necesita el
 // ejercicio de cálculo para caer en "donde consumiste más tiempo" (RF-7.2).

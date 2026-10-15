@@ -52,8 +52,8 @@ export function buildGameRecord(args: BuildGameArgs): GameRecord {
 
 /**
  * Cantidad de medias jugadas de la partida, leída del PGN. A diferencia de
- * `tiemposPorJugadaMs.length` (que solo tiene datos si la partida tuvo un
- * reloj real: las de Maia, o un PGN importado con `[%clk]`; las locales no se
+ * `tiemposPorJugadaMs.length` (que hoy solo se llena con un reloj real: las
+ * partidas contra Maia o un PGN importado con `[%clk]`; las locales ya no se
  * cronometran, RF-1.5), esto vale para cualquier origen.
  */
 export function plyCountFromPgn(pgn: string): number {

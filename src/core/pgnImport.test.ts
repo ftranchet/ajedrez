@@ -113,33 +113,36 @@ describe('parsePastedPgn', () => {
   // B14: chess.js lee una sola partida y rechaza el texto entero si trae más;
   // el mensaje decía "no es un PGN válido", y era falso.
   describe('varias partidas', () => {
-    it('detecta varias partidas con encabezados y dice cuántas', () => {
+    const VARIAS = { ok: false, error: 'varias-partidas' };
+
+    it('detecta varias partidas con encabezados, aunque traigan relojes', () => {
       const tres = [
         '[Event "A"]\n[Result "1-0"]\n\n1. e4 { [%clk 0:03:00] } 1... e5 { [%clk 0:03:00] } 1-0',
         '[Event "B"]\n[Result "0-1"]\n\n1. d4 d5 0-1',
         '[Event "C"]\n[Result "*"]\n\n1. c4 *',
       ].join('\n\n');
-      expect(parsePastedPgn(tres)).toEqual({ ok: false, error: 'varias-partidas', partidas: 3 });
+      expect(parsePastedPgn(tres)).toEqual(VARIAS);
     });
 
     it('detecta varias partidas sin encabezados, separadas por su resultado', () => {
-      expect(parsePastedPgn('1. e4 e5 1-0\n\n1. d4 d5 0-1')).toEqual({
-        ok: false,
-        error: 'varias-partidas',
-        partidas: 2,
-      });
+      expect(parsePastedPgn('1. e4 e5 1-0\n\n1. d4 d5 0-1')).toEqual(VARIAS);
     });
 
     it('detecta un encabezado nuevo aunque la partida anterior no cierre con resultado', () => {
-      expect(parsePastedPgn('[Event "A"]\n\n1. e4 e5\n\n[Event "B"]\n\n1. d4 d5')).toEqual({
-        ok: false,
-        error: 'varias-partidas',
-        partidas: 2,
-      });
+      expect(parsePastedPgn('[Event "A"]\n\n1. e4 e5\n\n[Event "B"]\n\n1. d4 d5')).toEqual(VARIAS);
+    });
+
+    it('un resultado dentro de un comentario no corta la partida', () => {
+      // Una sola partida rota (1... d4 es ilegal) no pasa por dos partidas
+      // porque un comentario diga "1-0".
+      expect(parsePastedPgn('1. e4 {1-0} 1. d4 *')).toEqual({ ok: false, error: 'invalido' });
     });
 
     it('texto suelto después del resultado no es otra partida: sigue siendo inválido', () => {
       expect(parsePastedPgn('1. e4 e5 1-0 gracias por la partida')).toEqual({ ok: false, error: 'invalido' });
+      // Con dos partidas reales delante, sí son varias (no se cuentan: la
+      // basura del final sumaría una de más).
+      expect(parsePastedPgn('1. e4 e5 1-0\n\n1. d4 d5 0-1\n\ngracias')).toEqual(VARIAS);
     });
   });
 
