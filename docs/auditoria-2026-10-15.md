@@ -16,6 +16,24 @@ Revisión completa del repositorio (código de `src/`, `scripts/`, `e2e/`, CI y 
 
 El proyecto está en buen estado estructural: el dominio (`core/`) es puro y está muy testeado, las migraciones tienen tests y comparten código con la restauración de respaldos, y la documentación es inusualmente honesta sobre sus límites. Los problemas se concentran en tres lugares: **las fronteras entre módulos** (notación, fechas locales, el tope diario de tarjetas), **la documentación que no acompañó los últimos cambios**, y **duplicación estructural** en exportación/importación y en el esquema de Dexie.
 
+## Estado
+
+**Etapa 1 resuelta** (rama `claude/code-docs-audit-ea8fs2`): B1, B2, B3, B4, B7, B8, B9, B10 y B17, cada uno con su test de regresión comprobado contra el código sin arreglar; T1, T2, T3, T5, T6, T7, T8 y T10; D23, y de D22 la copia de `CP_MATE` y el JSDoc de `validateImportBundle`. Decisión de B2 en ADR-0017. Una revisión adversarial del conjunto encontró 17 problemas más en los propios arreglos, todos corregidos en la misma etapa. Los dos de más peso cambiaron el diseño:
+
+- **El modo a ciegas se mide por patrón.** Con el acierto bien medido por posición, RF-6.5 quedaba inalcanzable: una posición deja de servirse al automatizarse (RF-6.3), así que mientras se sirve nunca supera el 80% con tres intentos o más. Se mide sumando las posiciones del mismo patrón, que es lo que dice RF-6.5 (PRD actualizado). Un patrón de una sola posición (hoy, "descubierta") no lo activa.
+- **El día de entrada de una tarjeta diferida queda fijo** (`ErrorCard.entraEn`): deducirlo del vencimiento hacía que el mismo error entrara hoy o en tres días según el orden en que el usuario repasaba y analizaba.
+
+Validación al cerrar la etapa: lint, typecheck, 982 tests unitarios (en UTC, UTC+14 y UTC−11) y 53 E2E con las dos bases de despliegue.
+
+**Hallazgos nuevos durante la etapa 1**, para las etapas siguientes:
+
+- **N1.** `FeedbackPanel` muestra "Línea completa: 4.Dxf7#" en vez de "Jugada correcta" para soluciones de una sola jugada: `hayLinea` compara la línea (con número de jugada) contra la jugada suelta y nunca son iguales.
+- **N2.** `sanDeJugada` (`ui/state/chessBoardUtils.ts`) cae a UCI si la jugada no es legal en la posición: caso degenerado, pero rompe RNF-9.
+- **N3.** `EvalGraph` ubica los marcadores de error en `(i + 1) / puntos.length` y la curva en `i / (puntos.length − 1)`: los puntos quedan corridos respecto de la curva. Su `aria-label` está escrito a mano aunque existe la clave de i18n.
+- **N4.** `conversion.perdidaTexto` dice "la ventaja bajó de la mitad de lo que tenías", pero `evaluarConversion` compara contra 1,5 peones fijos (la mitad de `VENTAJA_GANADORA_CP`), no contra la mitad del pico.
+- **N5.** El hito "Juicio calibrado" mide calibración en promedio, no resolución: quien declara siempre 70 en la banda 60–80% lo obtiene. El texto ya dice solo lo que mide; un criterio más fuerte (por ejemplo, que la confianza media en los aciertos supere a la de los fallos) queda como opción. Con 15 registros la brecha tiene mucho ruido: subir el mínimo a 30 bajaría los falsos positivos.
+- **N6.** El porqué de los bloques congelados en el plan del día se calcula con la dieta de este momento, no con la de cuando se armó el plan: si el motivo cambia durante el día, el texto dice el motivo actual (es cierto, pero puede no ser el que sumó el bloque). Arreglarlo exige guardar el motivo en `DailyAssignment`.
+
 **Cómo se verificaron los bugs.** Los marcados *verificado* se reprodujeron con un test temporal (no incluido en el repo) o con un script sobre el catálogo real. Los marcados *por inspección* surgen de leer el código y, en el caso de Lichess, de la documentación pública de su API: no se pueden ejercitar desde este entorno.
 
 ---

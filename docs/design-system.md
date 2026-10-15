@@ -230,6 +230,14 @@ el costo de una jugada va sin signo, porque es una magnitud. Un costo se informa
 siempre junto al salto de evaluación que lo produjo: la magnitud sola no dice si
 la partida se entregó o si seguía ganada.
 
+El costo que acompaña al salto se calcula con **los mismos números que se
+muestran**, ya redondeados (`fraseSaltoVentaja`): el lector tiene que poder
+reconstruirlo restando. Un **mate** no se expresa en peones: se nombra
+("mate a favor", "mate en contra"; `esMate` y `formatVentaja`), y si uno de los
+dos extremos del salto es mate no se informa costo. Cuando la jugada fue del
+rival, se dice y la evaluación se cuenta desde el lado del usuario
+(`fraseLecturaMomento`).
+
 ## Anotaciones sobre el tablero
 
 Flechas y círculos del usuario (RF-5.10), en los cuatro colores de chessground
