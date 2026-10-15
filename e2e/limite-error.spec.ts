@@ -22,11 +22,11 @@ test('un error al dibujar una pantalla deja exportar, navegar y volver a Hoy', a
     };
   }, ROMPER);
   await page.goto('./');
-  await page.getByRole('heading', { name: 'Tu sesión de hoy' }).waitFor();
+  await page.getByRole('heading', { name: 'Tu sesión de hoy', exact: true }).waitFor();
 
   await romperRender(page, true);
   await page.locator('button[aria-label="Ajustes"]:visible').click();
-  const titulo = page.getByRole('heading', { name: 'Esta pantalla no se pudo mostrar' });
+  const titulo = page.getByRole('heading', { name: 'Esta pantalla no se pudo mostrar', exact: true });
   await expect(titulo).toBeVisible();
   await expect(titulo).toBeFocused();
 
@@ -40,7 +40,7 @@ test('un error al dibujar una pantalla deja exportar, navegar y volver a Hoy', a
   // La navegación quedó en pie, y la otra pantalla se dibuja limpia.
   await romperRender(page, false);
   await page.locator('nav:visible button', { hasText: 'Jugar' }).first().click();
-  await expect(page.getByRole('heading', { name: 'Jugar' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Jugar', exact: true })).toBeVisible();
 
   // "Volver a Hoy" recarga la app desde lo guardado.
   await romperRender(page, true);
@@ -49,5 +49,5 @@ test('un error al dibujar una pantalla deja exportar, navegar y volver a Hoy', a
   await romperRender(page, false);
   await page.getByRole('button', { name: 'Volver a Hoy' }).click();
   await expect(page).toHaveURL(/#\/hoy$/);
-  await page.getByRole('heading', { name: 'Tu sesión de hoy' }).waitFor();
+  await page.getByRole('heading', { name: 'Tu sesión de hoy', exact: true }).waitFor();
 });
