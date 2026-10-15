@@ -24,7 +24,13 @@ export function FeedbackPanel({
   // La línea completa ya empieza por la jugada correcta, así que cuando hay
   // línea de varias jugadas mostrar además "Jugada correcta: X" repite el mismo
   // dato en dos renglones. Se muestra una cosa o la otra, nunca las dos.
-  const hayLinea = Boolean(linea) && linea !== jugadaCorrecta;
+  //
+  // Se cuentan las jugadas: `formatearLinea` las separa con un espacio y pega
+  // el número a la suya ("27...Td8 28.Dxd8+ Axd8"). Antes se comparaba la
+  // línea contra la jugada suelta, y nunca eran iguales —"4.Dxf7#" lleva el
+  // número y "Dxf7#" no—: una solución de una jugada salía como "Línea
+  // completa" en vez de "Jugada correcta" (auditoría 2026-10-15, N1).
+  const lineaDeVariasJugadas = (linea?.split(' ').length ?? 0) > 1;
 
   return (
     <div
@@ -37,7 +43,7 @@ export function FeedbackPanel({
     >
       <p className="m-0 font-display text-xl font-medium">{acierto ? t.radar.acertaste : t.radar.fallaste}</p>
       <p className="m-0 text-sm text-primary">{texto}</p>
-      {hayLinea ? (
+      {lineaDeVariasJugadas ? (
         <p className="m-0 font-mono text-xs text-secondary">
           {t.radar.lineaCompleta}: {linea}
         </p>

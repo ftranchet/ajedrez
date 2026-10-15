@@ -220,7 +220,10 @@ test.describe('sesión simple: Radar', () => {
     // repartidas entre las 116 del catálogo.
     const explicacion = await page.locator('p.text-primary').first().innerText();
     expect(explicacion.length).toBeGreaterThan(10);
-    await expect(page.getByText('Línea completa:')).toBeVisible();
+    // La solución del fixture es una sola jugada, la que se acaba de hacer:
+    // mostrarla como "Línea completa: 4...Dh5" la repetía con el número
+    // adelante (auditoría 2026-10-15, N1).
+    await expect(page.getByText('Línea completa:')).toHaveCount(0);
 
     // La sesión no puede terminar debajo de la barra de navegación fija. El
     // contenedor de pantalla era `h-full`, así que lo que sobrepasaba el alto
