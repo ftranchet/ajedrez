@@ -47,6 +47,12 @@ interface GameState {
   userMove(from: Square, to: Square, promotion?: string): Promise<void>;
   cancelPromotion(): void;
   resign(): Promise<void>;
+  /**
+   * Tras una caída del motor, le vuelve a pedir su jugada en la misma posición.
+   * El adaptador re-bootea el worker en la consulta siguiente, así que no hace
+   * falta tirar la partida: antes la única salida era empezar otra (B15).
+   */
+  reintentarMotor(): Promise<void>;
   reset(): void;
 }
 
@@ -121,7 +127,7 @@ export const useGameStore = create<GameState>((set, get) => {
   }
 
   async function engineTurn() {
-    snapshot({ thinking: true });
+    snapshot({ thinking: true, engineError: false });
     try {
       const uci = await engine.bestMove(chess.fen(), levelById(get().levelId));
       // La partida pudo terminar mientras el motor pensaba (p. ej. el usuario
@@ -207,6 +213,12 @@ export const useGameStore = create<GameState>((set, get) => {
     async resign() {
       if (get().phase !== 'playing') return;
       await finish(get().playerColor);
+    },
+
+    async reintentarMotor() {
+      const s = get();
+      if (s.phase !== 'playing' || !s.engineError || s.thinking) return;
+      await engineTurn();
     },
 
     reset() {

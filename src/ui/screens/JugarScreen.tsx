@@ -142,10 +142,16 @@ function PartidaScreen() {
 
         {/* Fallo del motor durante la partida: antes solo se veía en la pantalla
             de configuración, así que en juego el usuario quedaba sin turno del
-            motor y sin explicación. */}
+            motor y sin explicación. Después, la única salida era empezar otra
+            y se perdía la partida entera; el adaptador re-bootea el worker en
+            la consulta siguiente, así que reintentar retoma en la misma
+            posición (B15). */}
         {s.engineError && s.phase === 'playing' && (
-          <div className="flex flex-col gap-2 rounded-lg border border-error/35 bg-error-subtle p-3">
+          <div role="alert" className="flex flex-col gap-2 rounded-lg border border-error/35 bg-error-subtle p-3">
             <p className="m-0 text-sm text-primary">{t.jugar.errorMotorEnJuego}</p>
+            <button onClick={() => void s.reintentarMotor()} className="btn-primary">
+              {t.jugar.reintentarMotor}
+            </button>
             <button onClick={() => s.reset()} className="btn-secondary">
               {t.jugar.nuevaPartida}
             </button>
