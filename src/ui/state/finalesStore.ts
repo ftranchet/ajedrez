@@ -136,6 +136,9 @@ export function createFinalesStore(deps: FinalesDeps) {
           // Si la última jugada propia era la mejor, el final no se perdió ahí
           // (típico al no llegar al mate en 50 jugadas): guardarla como error a
           // repasar enseñaría a no repetir la jugada correcta.
+          // La tarjeta nace con la jugada del motor y sin alternativas: en el
+          // repaso, sin motor, la Cola acepta además cualquier mate si esta lo
+          // era, y nada más (ver `esAciertoEnRepaso`).
           if (best.move !== lastUserMove) {
             const cards = await deps.errors.list();
             const alta = altaErrorCard(cards, {

@@ -362,6 +362,24 @@ describe('diagnosticoStore — el diagnóstico deja línea base (RF-11.4)', () =
     }
   });
 
+  it('un fallo crea la tarjeta con las jugadas que el Radar también aceptaba (B13)', async () => {
+    await db.errorCards.clear();
+    const tranquila: RadarItem = { ...radarFixture, tipo: 'tranquila', jugadasAceptables: ['d5a5'] };
+    vi.spyOn(radarItemRepo, 'ensureSeeded').mockResolvedValue(undefined);
+    vi.spyOn(radarItemRepo, 'list').mockResolvedValue([tranquila]);
+    useDiagnosticoStore.setState({ phase: 'radar', radarLoadStatus: 'listo' });
+    await useDiagnosticoStore.getState().reintentarRadar();
+    useDiagnosticoStore.setState({ radarServidos: 0, radarAciertos: 0, radarRespuestas: [], radarCalibraciones: [] });
+
+    useDiagnosticoStore.getState().radarEval('igual');
+    await useDiagnosticoStore.getState().radarUserMove('d5' as never, 'd8' as never);
+
+    expect(useDiagnosticoStore.getState().radarUltimoAcierto).toBe(false);
+    const cards = await db.errorCards.toArray();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ jugadaCorrecta: 'd5h5', jugadasAceptables: ['d5a5'] });
+  });
+
   it('marca sus respuestas del Radar como del diagnóstico, para no contaminar la banda 60–80%', async () => {
     await cargarPosicion(0);
     useDiagnosticoStore.getState().radarEval('igual');

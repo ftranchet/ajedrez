@@ -8,10 +8,11 @@ import { Chess, type Square } from 'chess.js';
 import type { CalibrationRecord, Color, CurriculumItem, CurriculumProgress, DailyAssignment, ErrorCard, EvalGuess, Profile, RadarItem, RadarProgress, SessionBlockType, SessionRecord, TipoRadar, TrainingEvent } from '../../core/types';
 import { fugasPrincipales, perfilVigente, sesgoPorFugas } from '../../core/leakProfile';
 import { minutosPendientesDelPlan } from '../../core/duracion';
-import { dueErrorCards, reviewErrorCard } from '../../core/errorCard';
+import { dueErrorCards, esAciertoEnRepaso, reviewErrorCard } from '../../core/errorCard';
 import {
   RADAR_INITIAL_STATE,
   adjustDifficulty,
+  alternativasAceptadasRadar,
   categoriaFromTipo,
   dificultadNormalizada,
   esRespuestaCorrectaRadar,
@@ -136,6 +137,8 @@ interface SessionState {
   colaSubPhase: ColaSubPhase;
   colaUltimoAcierto: boolean | null;
   colaJugadaCorrecta: string | null;
+  /** El acierto fue con otra jugada que la tarjeta acepta (B13): el feedback nombra igual la registrada. */
+  colaAciertoConOtra: boolean;
 
   // Currículo (E6): patrones tácticos vencidos, entre la Cola y el Radar (RF-11.2).
   curriculumItemsAll: CurriculumItem[];
@@ -454,6 +457,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       colaSubPhase: 'jugando',
       colaUltimoAcierto: null,
       colaJugadaCorrecta: null,
+      colaAciertoConOtra: false,
       ...loadSnapshot(),
       lastMove: null,
     });
@@ -572,6 +576,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     colaSubPhase: 'jugando',
     colaUltimoAcierto: null,
     colaJugadaCorrecta: null,
+    colaAciertoConOtra: false,
 
     curriculumItemsAll: [],
     curriculumQueue: [],
@@ -965,7 +970,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
       const jugadaUsuario = from + to + (promo ?? '');
       const card = s.colaCards[s.colaIndex];
-      const acierto = jugadaUsuario === card.jugadaCorrecta;
+      // Con la misma vara que la fuente del fallo (B13): también aciertan las
+      // alternativas que el Radar aceptaba en esa posición, y cualquier mate
+      // si la correcta lo era. El feedback nombra la correcta de la tarjeta
+      // tanto en un fallo como en un acierto con otra jugada.
+      const acierto = esAciertoEnRepaso(card, jugadaUsuario);
       chess.move({ from, to, promotion: promo });
 
       const revisada = reviewErrorCard(card, acierto);
@@ -980,6 +989,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         colaSubPhase: 'feedback',
         colaUltimoAcierto: acierto,
         colaJugadaCorrecta: sanDeJugada(card.fen, card.jugadaCorrecta),
+        colaAciertoConOtra: acierto && jugadaUsuario !== card.jugadaCorrecta,
         revision: acierto ? null : revisionDelError(card.fen, jugadaUsuario, card.jugadaCorrecta),
         ...boardSnapshot(),
         lastMove: [from, to],
@@ -1197,6 +1207,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
         ladoAMover: item.fen.split(' ')[1] === 'b' ? 'b' : 'w',
         jugadaUsuario,
         jugadaCorrecta: item.solucion[0],
+        // Lo que el Radar también aceptaba: sin esto, en la Cola contaba como fallo (B13).
+        jugadasAceptables: alternativasAceptadasRadar(item),
         categoria: categoriaFromTipo(item.tipo),
         origen: 'radar',
       });

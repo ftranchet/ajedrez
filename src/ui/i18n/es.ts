@@ -308,6 +308,9 @@ export const es = {
     titulo: 'Repaso de errores',
     progreso: 'Repaso {actual} de {total}',
     consigna: 'Jugá la respuesta correcta en el tablero.',
+    // Acierto con una jugada que la tarjeta también acepta (B13): se nombra
+    // la registrada para que el repaso no la esconda.
+    aciertoConOtra: 'Tu jugada también vale. La registrada como correcta es {jugada}.',
   },
   curriculo: {
     titulo: 'Patrones clave',

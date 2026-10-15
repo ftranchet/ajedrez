@@ -758,7 +758,7 @@ function ColaPanel() {
       {s.colaSubPhase === 'feedback' && (
         <FeedbackPanel
           acierto={s.colaUltimoAcierto ?? false}
-          texto=""
+          texto={s.colaAciertoConOtra ? t.cola.aciertoConOtra.replace('{jugada}', s.colaJugadaCorrecta ?? '') : ''}
           jugadaCorrecta={s.colaJugadaCorrecta ?? ''}
           onContinuar={() => s.colaContinuar()}
         />

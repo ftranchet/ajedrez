@@ -576,7 +576,88 @@ describe('sessionStore — bloque Cola', () => {
 
     await useSessionStore.getState().colaUserMove('e7' as never, 'e5' as never);
     expect(useSessionStore.getState().colaUltimoAcierto).toBe(true);
+    expect(useSessionStore.getState().colaAciertoConOtra).toBe(false);
     expect(useSessionStore.getState().revision).toBeNull();
+  });
+
+  // B13: la tarjeta de un fallo del Radar guarda lo que el Radar también
+  // aceptaba. Antes se exigía la correcta exacta, y jugar en el repaso una
+  // alternativa que el Radar da por buena contaba como fallo: un lapso que
+  // reiniciaba el FSRS de una tarjeta ya en repaso.
+  const enRepaso = {
+    due: '2026-01-01T00:00:00.000Z',
+    stability: 5,
+    difficulty: 5,
+    elapsedDays: 0,
+    scheduledDays: 30,
+    reps: 2,
+    lapses: 0,
+    learningSteps: 0,
+    state: 'review' as const,
+    lastReview: '2025-12-02T00:00:00.000Z',
+  };
+
+  it('una alternativa que la tarjeta acepta cuenta como acierto y no reinicia el FSRS (B13)', async () => {
+    const card = buildErrorCard({
+      fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
+      ladoAMover: 'b',
+      jugadaUsuario: 'h7h6',
+      jugadaCorrecta: 'f8c5',
+      jugadasAceptables: ['g8f6'],
+      categoria: 'posicional',
+      origen: 'radar',
+    });
+    await db.errorCards.put({ ...card, fsrs: enRepaso });
+    await useSessionStore.getState().start();
+
+    await useSessionStore.getState().colaUserMove('g8' as never, 'f6' as never);
+    const s = useSessionStore.getState();
+    expect(s.colaUltimoAcierto).toBe(true);
+    expect(s.revision).toBeNull();
+    // El feedback sigue nombrando la registrada, en la notación elegida.
+    expect(s.colaAciertoConOtra).toBe(true);
+    expect(s.colaJugadaCorrecta).toBe('Ac5');
+    const revisada = await db.errorCards.get(card.id);
+    expect(revisada!.fsrs.lapses).toBe(0);
+    expect(revisada!.fsrs.state).toBe('review');
+  });
+
+  describe('final de dama contra rey: otro mate acierta, ahogar no (B13)', () => {
+    const tarjetaDeFinal = () =>
+      buildErrorCard({
+        fen: '7k/5K2/8/8/8/8/8/6Q1 w - - 0 1',
+        ladoAMover: 'w',
+        jugadaUsuario: 'g1g6', // ahogado
+        jugadaCorrecta: 'g1g7',
+        categoria: 'posicional',
+        origen: 'final',
+      });
+
+    it('cualquier mate cuenta como acierto, y el feedback nombra el registrado', async () => {
+      const card = tarjetaDeFinal();
+      await db.errorCards.put({ ...card, fsrs: enRepaso });
+      await useSessionStore.getState().start();
+
+      await useSessionStore.getState().colaUserMove('g1' as never, 'h1' as never);
+      const s = useSessionStore.getState();
+      expect(s.colaUltimoAcierto).toBe(true);
+      expect(s.colaAciertoConOtra).toBe(true);
+      expect(s.colaJugadaCorrecta).toBe('Dg7#');
+      expect((await db.errorCards.get(card.id))!.fsrs.lapses).toBe(0);
+    });
+
+    it('volver a ahogar sigue siendo fallo y muestra la jugada correcta', async () => {
+      const card = tarjetaDeFinal();
+      await db.errorCards.put({ ...card, fsrs: enRepaso });
+      await useSessionStore.getState().start();
+
+      await useSessionStore.getState().colaUserMove('g1' as never, 'g6' as never);
+      const s = useSessionStore.getState();
+      expect(s.colaUltimoAcierto).toBe(false);
+      expect(s.colaAciertoConOtra).toBe(false);
+      expect(s.colaJugadaCorrecta).toBe('Dg7#');
+      expect((await db.errorCards.get(card.id))!.fsrs.lapses).toBe(1);
+    });
   });
 });
 

@@ -117,4 +117,28 @@ describe('sessionStore — doble solución (RF-5.7)', () => {
     expect(attempts).toHaveLength(1);
     expect(attempts[0].resultado).toBe('otra');
   });
+
+  it('en el repaso de esa tarjeta, la familiar también acierta, como en el Radar (B13)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    await useSessionStore.getState().start();
+    useSessionStore.getState().radarEval('igual');
+    await useSessionStore.getState().radarUserMove('d5' as never, 'd4' as never);
+    vi.restoreAllMocks();
+
+    const [card] = await db.errorCards.toArray();
+    expect(card.jugadaCorrecta).toBe('d5c6');
+    expect(card.jugadasAceptables).toEqual(['f1b5']);
+
+    // La tarjeta nace vencida: la sesión siguiente la sirve en la Cola.
+    useSessionStore.getState().volver();
+    await useSessionStore.getState().start();
+    expect(useSessionStore.getState().phase).toBe('cola');
+    await useSessionStore.getState().colaUserMove('f1' as never, 'b5' as never);
+
+    const s = useSessionStore.getState();
+    expect(s.colaUltimoAcierto).toBe(true);
+    // Sin esconder la superior: el feedback la nombra.
+    expect(s.colaAciertoConOtra).toBe(true);
+    expect(s.colaJugadaCorrecta).toBe('Dxc6+');
+  });
 });

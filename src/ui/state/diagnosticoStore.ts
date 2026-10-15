@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { Chess, type Square } from 'chess.js';
 import type { CalibrationRecord, Color, EvalGuess, PerfilDeFugas, PlanSemanal, RadarAttempt, RadarItem, RatingExterno } from '../../core/types';
-import { RADAR_INITIAL_STATE, categoriaFromTipo, centroInicialDesdeDiagnostico, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
+import { RADAR_INITIAL_STATE, alternativasAceptadasRadar, categoriaFromTipo, centroInicialDesdeDiagnostico, esRespuestaCorrectaRadar, explainFeedback, recordServed, selectNextRadarItem, type RadarSelectionState } from '../../core/radar';
 import { lineaParaMostrar } from '../../core/radarExplicacion';
 import { revisionDelError, type RevisionDelError } from '../../core/revision';
 import { perfilDeFugasDesdeIntentos } from '../../core/leakProfile';
@@ -435,6 +435,8 @@ export const useDiagnosticoStore = create<DiagnosticoState>((set, get) => {
           ladoAMover: item.fen.split(' ')[1] === 'b' ? 'b' : 'w',
           jugadaUsuario,
           jugadaCorrecta: item.solucion[0],
+          // Lo que el Radar también aceptaba, para que la Cola lo acepte igual (B13).
+          jugadasAceptables: alternativasAceptadasRadar(item),
           categoria: categoriaFromTipo(item.tipo),
           origen: 'radar',
         });
