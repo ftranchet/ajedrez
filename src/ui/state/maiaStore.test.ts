@@ -89,10 +89,10 @@ describe('maiaStore — el tablero es un espejo del estado remoto', () => {
     expect(store.getState().enviando).toBe(false);
   });
 
-  it('si Lichess rechaza la jugada, el tablero vuelve a la posición confirmada', async () => {
+  it('si Lichess rechaza la jugada de forma definitiva, el tablero vuelve a la posición confirmada', async () => {
     const { store, emitir } = crearDoble({
       enviarJugada: async () => {
-        throw new LichessError('desconocido');
+        throw new LichessError('token-invalido');
       },
     });
     await store.getState().empezar('token', 'maia1');
@@ -102,6 +102,7 @@ describe('maiaStore — el tablero es un espejo del estado remoto', () => {
 
     expect(store.getState().sanMoves).toEqual([]);
     expect(store.getState().phase).toBe('error');
+    expect(store.getState().fallo).toBe('token-invalido');
   });
 
   // La respuesta de Maia llega como una jugada nueva sobre la posición que el
@@ -127,6 +128,93 @@ describe('maiaStore — el tablero es un espejo del estado remoto', () => {
 
     await store.getState().userMove('e7' as never, 'e5' as never);
     expect(enviarJugada).not.toHaveBeenCalled();
+  });
+});
+
+// B12: cualquier fallo al mandar una jugada pasaba a 'error' y la pantalla
+// volvía a la configuración, con la partida todavía corriendo en Lichess.
+describe('maiaStore — un fallo pasajero al mandar una jugada no saca de la partida', () => {
+  it('un corte de red se reintenta y la jugada llega', async () => {
+    vi.useFakeTimers();
+    const enviarJugada = vi
+      .fn<LichessPort['enviarJugada']>()
+      .mockRejectedValueOnce(new LichessError('sin-conexion'))
+      .mockResolvedValueOnce(undefined);
+    const { store } = crearDoble({ enviarJugada });
+    await store.getState().empezar('token', 'maia1');
+
+    const jugada = store.getState().userMove('e2' as never, 'e4' as never);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(store.getState().phase).toBe('jugando');
+    expect(store.getState().avisoEnvio).toEqual({ estado: 'reintentando', fallo: 'sin-conexion' });
+    expect(store.getState().sanMoves).toEqual(['e4']);
+    expect(store.getState().enviando).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await jugada;
+
+    expect(enviarJugada).toHaveBeenCalledTimes(2);
+    expect(store.getState().avisoEnvio).toBeNull();
+    expect(store.getState().enviando).toBe(false);
+    expect(store.getState().phase).toBe('jugando');
+  });
+
+  it('ante un 429 espera el minuto que pide Lichess antes de reintentar', async () => {
+    vi.useFakeTimers();
+    const enviarJugada = vi
+      .fn<LichessPort['enviarJugada']>()
+      .mockRejectedValueOnce(new LichessError('limite-de-tasa'))
+      .mockResolvedValueOnce(undefined);
+    const { store } = crearDoble({ enviarJugada });
+    await store.getState().empezar('token', 'maia1');
+
+    const jugada = store.getState().userMove('e2' as never, 'e4' as never);
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(enviarJugada).toHaveBeenCalledTimes(1);
+    expect(store.getState().avisoEnvio).toEqual({ estado: 'reintentando', fallo: 'limite-de-tasa' });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await jugada;
+    expect(enviarJugada).toHaveBeenCalledTimes(2);
+    expect(store.getState().phase).toBe('jugando');
+  });
+
+  it('agotados los reintentos, la jugada vuelve al tablero y la partida sigue', async () => {
+    vi.useFakeTimers();
+    const enviarJugada = vi.fn<LichessPort['enviarJugada']>().mockRejectedValue(new LichessError('sin-conexion'));
+    const { store } = crearDoble({ enviarJugada });
+    await store.getState().empezar('token', 'maia1');
+
+    const jugada = store.getState().userMove('e2' as never, 'e4' as never);
+    await vi.advanceTimersByTimeAsync(1_000 + 2_000 + 4_000);
+    await jugada;
+
+    expect(enviarJugada).toHaveBeenCalledTimes(4);
+    const s = store.getState();
+    expect(s.phase).toBe('jugando');
+    expect(s.avisoEnvio).toEqual({ estado: 'sin-enviar', fallo: 'sin-conexion' });
+    expect(s.sanMoves).toEqual([]);
+    expect(s.enviando).toBe(false);
+    expect(s.turn).toBe('w');
+  });
+
+  it('si la jugada llegó y se perdió la respuesta, el stream la confirma y no se reintenta', async () => {
+    vi.useFakeTimers();
+    const enviarJugada = vi.fn<LichessPort['enviarJugada']>().mockRejectedValue(new LichessError('sin-conexion'));
+    const { store, emitir } = crearDoble({ enviarJugada });
+    await store.getState().empezar('token', 'maia1');
+
+    const jugada = store.getState().userMove('e2' as never, 'e4' as never);
+    await vi.advanceTimersByTimeAsync(0);
+    emitir({ moves: 'e2e4 e7e5', status: 'started' });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await jugada;
+
+    expect(enviarJugada).toHaveBeenCalledTimes(1);
+    expect(store.getState().avisoEnvio).toBeNull();
+    expect(store.getState().sanMoves).toEqual(['e4', 'e5']);
+    expect(store.getState().enviando).toBe(false);
   });
 });
 

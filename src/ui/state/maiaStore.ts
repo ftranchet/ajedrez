@@ -12,6 +12,8 @@ import type { EstadoPartidaLichess, LichessPort } from '../../core/ports';
 import {
   BOTS_MAIA,
   CONTROL_LENTO,
+  esFalloDefinitivo,
+  esperaParaReintentar,
   jugadasDeEstado,
   partidaEnCurso,
   resultadoDesdeLichess,
@@ -24,6 +26,18 @@ import { registrarTiempoEntrenado } from '../../services/storage/trainingEventRe
 import { computeDests } from './chessBoardUtils';
 
 type Phase = 'inactivo' | 'desafiando' | 'jugando' | 'terminada' | 'error';
+
+/**
+ * Una jugada propia que no llegó a Lichess por un fallo pasajero (B12). La
+ * partida sigue: o se está volviendo a mandar sola, o se agotaron los
+ * reintentos y volvió al tablero para que el usuario la haga de nuevo.
+ */
+export interface AvisoEnvio {
+  estado: 'reintentando' | 'sin-enviar';
+  fallo: FalloMaia;
+}
+
+const esperar = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export interface MaiaState {
   phase: Phase;
@@ -43,6 +57,7 @@ export interface MaiaState {
   sanMoves: string[];
   /** Una jugada propia viajando a Lichess: el tablero no acepta otra mientras tanto. */
   enviando: boolean;
+  avisoEnvio: AvisoEnvio | null;
   resultadoTexto: string | null;
 
   empezar(token: string, bot: string): Promise<void>;
@@ -69,11 +84,22 @@ export function createMaiaStore(deps: MaiaDeps) {
   return create<MaiaState>((set, get) => {
     /** Último estado confirmado por el servidor, para revertir una jugada rechazada. */
     let ultimoEstadoConfirmado: EstadoPartidaLichess | null = null;
+    /**
+     * La jugada propia que todavía no confirmó nadie, con el ply en el que se
+     * jugó. Mientras exista el tablero no acepta otra, aunque el stream lo
+     * reconstruya en el medio: así un reintento nunca viaja junto con una
+     * jugada nueva.
+     */
+    let jugadaEnViaje: { ply: number } | null = null;
 
     /** Reconstruye el tablero desde la lista de jugadas que manda Lichess. */
     function aplicarEstado(estado: EstadoPartidaLichess) {
       ultimoEstadoConfirmado = estado;
       const jugadas = jugadasDeEstado(estado.moves);
+      // Si Lichess ya tiene una jugada en ese ply, la propia llegó (aunque se
+      // haya perdido la respuesta del envío): no queda nada por reintentar.
+      const llego = jugadaEnViaje !== null && jugadas.length > jugadaEnViaje.ply;
+      if (llego) jugadaEnViaje = null;
       const replay = new Chess();
       let ultima: [Square, Square] | null = null;
       for (const uci of jugadas) {
@@ -95,7 +121,8 @@ export function createMaiaStore(deps: MaiaDeps) {
         check: chess.inCheck(),
         sanMoves: chess.history(),
         lastMove: ultima,
-        enviando: false,
+        enviando: jugadaEnViaje !== null,
+        ...(llego ? { avisoEnvio: null } : {}),
       });
 
       if (!partidaEnCurso(estado.status)) {
@@ -107,7 +134,8 @@ export function createMaiaStore(deps: MaiaDeps) {
       const s = get();
       if (s.phase === 'terminada') return;
       const resultado = resultadoDesdeLichess(estado.status, estado.winner);
-      set({ phase: 'terminada', resultadoTexto: estado.status });
+      jugadaEnViaje = null;
+      set({ phase: 'terminada', resultadoTexto: estado.status, enviando: false, avisoEnvio: null });
       abort?.abort();
 
       // La partida se guarda con `fuente: 'lichess'` para que entre al ciclo
@@ -158,6 +186,7 @@ export function createMaiaStore(deps: MaiaDeps) {
       check: false,
       sanMoves: [],
       enviando: false,
+      avisoEnvio: null,
       resultadoTexto: null,
 
       async empezar(token, bot) {
@@ -168,9 +197,10 @@ export function createMaiaStore(deps: MaiaDeps) {
         abort = intento;
         chess = new Chess();
         ultimoEstadoConfirmado = null;
+        jugadaEnViaje = null;
         set({
           phase: 'desafiando', bot, fallo: null, gameId: null, rival: '', guardada: false,
-          resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false,
+          resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false, avisoEnvio: null,
         });
         try {
           const partida = await deps.lichess.desafiarBot(token, bot, CONTROL_LENTO, intento.signal);
@@ -206,6 +236,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         }
         const promo = promotion ?? (candidate.promotion ? 'q' : undefined);
         const uci = from + to + (promo ?? '');
+        const enViaje = { ply: chess.history().length };
 
         // La jugada se aplica en el acto. La versión anterior esperaba a que el
         // stream la devolviera para pintarla, con la idea de "no mostrar lo que
@@ -216,6 +247,7 @@ export function createMaiaStore(deps: MaiaDeps) {
         // de jugadas y revierte esto si Lichess no la aceptó—, pero mientras
         // tanto el tablero muestra lo que el usuario hizo.
         chess.move({ from, to, promotion: promo });
+        jugadaEnViaje = enViaje;
         set({
           fen: chess.fen(),
           turn: chess.turn() as Color,
@@ -224,15 +256,40 @@ export function createMaiaStore(deps: MaiaDeps) {
           sanMoves: chess.history(),
           lastMove: [from, to],
           enviando: true,
+          avisoEnvio: null,
         });
 
-        try {
-          await deps.lichess.enviarJugada(tokenActual, s.gameId, uci);
-        } catch (error) {
-          // Rechazada: se vuelve a la posición confirmada por el servidor.
-          if (ultimoEstadoConfirmado) aplicarEstado(ultimoEstadoConfirmado);
-          const motivo = error instanceof LichessError ? error.motivo : 'desconocido';
-          set({ enviando: false, phase: 'error', fallo: motivo as FalloMaia });
+        // Un fallo pasajero (un 429, un corte de red) no saca de la partida:
+        // en Lichess sigue corriendo el reloj, y el stream sigue vivo. Se
+        // reintenta con espera; solo un fallo definitivo termina en error.
+        for (let intento = 0; ; intento++) {
+          try {
+            await deps.lichess.enviarJugada(tokenActual, s.gameId, uci);
+            if (jugadaEnViaje === enViaje) {
+              jugadaEnViaje = null;
+              set({ enviando: false, avisoEnvio: null });
+            }
+            return;
+          } catch (error) {
+            // El stream ya la confirmó, o el usuario salió de la partida.
+            if (jugadaEnViaje !== enViaje) return;
+            const fallo = (error instanceof LichessError ? error.motivo : 'desconocido') as FalloMaia;
+            const espera = esperaParaReintentar(fallo, intento);
+            if (espera === null) {
+              // Rechazada: se vuelve a la posición confirmada por el servidor.
+              jugadaEnViaje = null;
+              if (ultimoEstadoConfirmado) aplicarEstado(ultimoEstadoConfirmado);
+              set(
+                esFalloDefinitivo(fallo)
+                  ? { enviando: false, phase: 'error', fallo }
+                  : { enviando: false, avisoEnvio: { estado: 'sin-enviar', fallo } },
+              );
+              return;
+            }
+            set({ avisoEnvio: { estado: 'reintentando', fallo } });
+            await esperar(espera);
+            if (jugadaEnViaje !== enViaje) return;
+          }
         }
       },
 
@@ -256,9 +313,10 @@ export function createMaiaStore(deps: MaiaDeps) {
         abort = null;
         chess = new Chess();
         ultimoEstadoConfirmado = null;
+        jugadaEnViaje = null;
         set({
           phase: 'inactivo', gameId: null, rival: '', fallo: null, guardada: false,
-          resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false,
+          resultadoTexto: null, sanMoves: [], lastMove: null, enviando: false, avisoEnvio: null,
           fen: chess.fen(), turn: 'w', dests: new Map(), check: false,
         });
       },

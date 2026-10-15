@@ -173,6 +173,12 @@ export const es = {
     teToca: 'Te toca',
     esperando: 'Piensa {rival}…',
     enviando: 'Enviando tu jugada…',
+    // Un fallo pasajero al mandar la jugada no saca de la partida (B12): la
+    // partida sigue en Lichess, con el reloj corriendo, y eso hay que decirlo.
+    envioReintentando: 'Tu jugada no llegó a Lichess: la volvemos a mandar en unos segundos. La partida sigue.',
+    envioReintentandoTasa:
+      'Lichess está limitando las solicitudes: volvemos a mandar tu jugada en un minuto. La partida sigue.',
+    envioSinEnviar: 'No pudimos mandar tu jugada a Lichess. La partida sigue: volvé a hacerla.',
     abandonar: 'Abandonar la partida',
     terminada: 'Partida terminada',
     guardada: 'Quedó guardada en tus partidas. Analizala para convertir tus errores en repasos.',

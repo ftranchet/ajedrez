@@ -3,6 +3,8 @@ import {
   BOTS_MAIA,
   botParaBanda,
   colorDelUsuario,
+  esFalloDefinitivo,
+  esperaParaReintentar,
   esTurnoDelUsuario,
   falloDesdeEstadoHttp,
   jugadasDeEstado,
@@ -96,5 +98,31 @@ describe('falloDesdeEstadoHttp', () => {
     expect(falloDesdeEstadoHttp(404)).toBe('bot-no-disponible');
     expect(falloDesdeEstadoHttp(429)).toBe('limite-de-tasa');
     expect(falloDesdeEstadoHttp(500)).toBe('desconocido');
+  });
+});
+
+describe('reintentos de una jugada (B12)', () => {
+  it('solo 401, 403 y 404 son definitivos', () => {
+    expect(esFalloDefinitivo(falloDesdeEstadoHttp(401))).toBe(true);
+    expect(esFalloDefinitivo(falloDesdeEstadoHttp(403))).toBe(true);
+    expect(esFalloDefinitivo(falloDesdeEstadoHttp(404))).toBe(true);
+    expect(esFalloDefinitivo(falloDesdeEstadoHttp(429))).toBe(false);
+    expect(esFalloDefinitivo(falloDesdeEstadoHttp(503))).toBe(false);
+    expect(esFalloDefinitivo('sin-conexion')).toBe(false);
+  });
+
+  it('un corte de red se reintenta con esperas crecientes, y después se rinde', () => {
+    expect([0, 1, 2, 3].map((intento) => esperaParaReintentar('sin-conexion', intento))).toEqual([
+      1_000, 2_000, 4_000, null,
+    ]);
+  });
+
+  it('un 429 espera el minuto que pide Lichess, una sola vez', () => {
+    expect(esperaParaReintentar('limite-de-tasa', 0)).toBe(60_000);
+    expect(esperaParaReintentar('limite-de-tasa', 1)).toBeNull();
+  });
+
+  it('un fallo definitivo no se reintenta', () => {
+    expect(esperaParaReintentar('token-invalido', 0)).toBeNull();
   });
 });

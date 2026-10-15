@@ -121,3 +121,31 @@ export function falloDesdeEstadoHttp(status: number): FalloMaia {
   if (status === 429) return 'limite-de-tasa';
   return 'desconocido';
 }
+
+/**
+ * Fallos que reintentar no arregla: el token no sirve o no alcanza, o la
+ * partida no existe (401/403/404). Todo lo demás —un 429, un corte de red, un
+ * 5xx— es pasajero, y mientras tanto la partida sigue en Lichess con el reloj
+ * corriendo: sacar al usuario por eso es peor que insistir (B12).
+ */
+export function esFalloDefinitivo(fallo: FalloMaia): boolean {
+  return fallo === 'token-invalido' || fallo === 'sin-permisos' || fallo === 'bot-no-disponible' || fallo === 'sin-token';
+}
+
+/** Reintentos de una jugada que no llegó, antes de devolvérsela al usuario. */
+const REINTENTOS_JUGADA = 3;
+
+/** Lichess pide esperar un minuto entero después de un 429 antes de volver a llamar. */
+const ESPERA_TRAS_LIMITE_MS = 60_000;
+
+/**
+ * Cuánto esperar antes de volver a mandar una jugada que falló por
+ * `intento`-ésima vez (desde 0), o null si no hay que reintentar más: el fallo
+ * es definitivo o se agotaron los reintentos. Las esperas cortas crecen (1, 2 y
+ * 4 s); ante un límite de tasa se respeta el minuto que pide Lichess, una sola vez.
+ */
+export function esperaParaReintentar(fallo: FalloMaia, intento: number): number | null {
+  if (esFalloDefinitivo(fallo)) return null;
+  if (fallo === 'limite-de-tasa') return intento === 0 ? ESPERA_TRAS_LIMITE_MS : null;
+  return intento < REINTENTOS_JUGADA ? 1_000 * 2 ** intento : null;
+}

@@ -780,6 +780,16 @@ function MaiaScreen() {
           </p>
         </div>
 
+        {s.phase === 'jugando' && s.avisoEnvio && (
+          <p role="status" className="m-0 rounded-lg border border-info/35 bg-info-subtle p-3 text-sm text-primary">
+            {s.avisoEnvio.estado === 'sin-enviar'
+              ? t.maia.envioSinEnviar
+              : s.avisoEnvio.fallo === 'limite-de-tasa'
+                ? t.maia.envioReintentandoTasa
+                : t.maia.envioReintentando}
+          </p>
+        )}
+
         <MoveList moves={s.sanMoves} />
 
         {s.phase === 'jugando' && (
