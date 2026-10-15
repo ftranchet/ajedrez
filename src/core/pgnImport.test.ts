@@ -136,6 +136,7 @@ describe('parsePastedPgn', () => {
       // Una sola partida rota (1... d4 es ilegal) no pasa por dos partidas
       // porque un comentario diga "1-0".
       expect(parsePastedPgn('1. e4 {1-0} 1. d4 *')).toEqual({ ok: false, error: 'invalido' });
+      expect(parsePastedPgn('1. e4 ; abandonó 1-0\n1. d4 *')).toEqual({ ok: false, error: 'invalido' });
     });
 
     it('texto suelto después del resultado no es otra partida: sigue siendo inválido', () => {
