@@ -32,14 +32,17 @@ export const trainingEventRepo: TrainingEventRepo = new DexieTrainingEventRepo()
  * puede romper la actividad que lo produjo**. Si la duración no es utilizable
  * (no se midió, salió negativa, o quedó absurda porque la pestaña estuvo
  * abierta toda la noche) no se escribe nada.
+ *
+ * Devuelve la escritura, que nunca se rechaza, para quien sí necesite
+ * esperarla (`sessionRepo.abandonInProgress`).
  */
 export function registrarTiempoEntrenado(
   modalidad: ModalidadEntrenamiento,
   refId: string,
   ms: number,
   fecha: string = new Date().toISOString(),
-): void {
+): Promise<void> {
   const evento = buildTrainingEvent(modalidad, refId, ms, fecha);
-  if (!evento) return;
-  void trainingEventRepo.save(evento).catch(() => undefined);
+  if (!evento) return Promise.resolve();
+  return trainingEventRepo.save(evento).catch(() => undefined);
 }
