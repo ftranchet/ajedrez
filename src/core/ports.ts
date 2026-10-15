@@ -54,6 +54,13 @@ export interface EngineEvaluation {
   cp: number | null;
   /** Jugadas hasta el mate si `cp` es null (positivo = mate a favor de quien mueve). */
   mateIn: number | null;
+  /**
+   * Variante principal en UCI, empezando por `move`. Es la referencia de la
+   * profundidad vista del cálculo (RF-7.1a): con solo la mejor jugada no se
+   * puede medir más de un ply. Opcional porque solo el motor real la conoce;
+   * los dobles de test y las posiciones terminales del análisis no la traen.
+   */
+  pv?: string[];
 }
 
 export interface EnginePort {

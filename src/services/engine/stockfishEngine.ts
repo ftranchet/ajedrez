@@ -28,7 +28,16 @@ interface LineaMotor {
   move: string;
   cp: number | null;
   mateIn: number | null;
+  /** La variante entera; `move` es su primer ply. */
+  pv: string[];
 }
+
+/**
+ * Las jugadas que siguen a `pv` en una línea `info`. Se toman solo mientras
+ * tengan forma de UCI: en Stockfish la variante va al final, pero nada en el
+ * protocolo impide que otro campo venga después.
+ */
+const PV_UCI = /\bpv((?:\s+[a-h][1-8][a-h][1-8][nbrq]?)+)/;
 
 export class StockfishEngine implements EnginePort {
   private worker: Worker | null = null;
@@ -126,14 +135,18 @@ export class StockfishEngine implements EnginePort {
     const onInfo = (e: MessageEvent) => {
       const text = typeof e.data === 'string' ? e.data : '';
       const scoreMatch = /score (cp|mate) (-?\d+)/.exec(text);
-      const pvMatch = /\bpv\s+(\S+)/.exec(text);
+      const pvMatch = PV_UCI.exec(text);
       if (!scoreMatch || !pvMatch) return;
       const indice = Number(/\bmultipv\s+(\d+)/.exec(text)?.[1] ?? 1);
       const valor = Number(scoreMatch[2]);
+      // Antes se guardaba solo el primer ply y la variante se tiraba: el
+      // cálculo con posición propia no tenía contra qué medir la profundidad.
+      const pv = pvMatch[1].trim().split(/\s+/);
       lineas.set(indice, {
-        move: pvMatch[1],
+        move: pv[0],
         cp: scoreMatch[1] === 'cp' ? valor : null,
         mateIn: scoreMatch[1] === 'mate' ? valor : null,
+        pv,
       });
     };
     worker.addEventListener('message', onInfo);
@@ -160,7 +173,7 @@ export class StockfishEngine implements EnginePort {
       const ordenadas = [...lineas.entries()].sort(([a], [b]) => a - b).map(([, linea]) => linea);
       // Si no llegó ninguna línea `info` utilizable (posiciones de mate en 1,
       // búsquedas muy cortas), el `bestmove` sigue siendo una respuesta válida.
-      return ordenadas.length > 0 ? ordenadas : [{ move: match[1], cp: null, mateIn: null }];
+      return ordenadas.length > 0 ? ordenadas : [{ move: match[1], cp: null, mateIn: null, pv: [match[1]] }];
     } finally {
       worker.removeEventListener('message', onInfo);
     }

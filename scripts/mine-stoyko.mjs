@@ -20,6 +20,8 @@ const SCREEN_DEPTH = 14;
 const RECONFIRM_DEPTH = 17;
 const GAP_MAX_CP = 50; // best - tercera candidata: cuanto más chico, más "empatadas" están.
 const EVAL_CAP_CP = 150; // |mejor jugada| ≤ esto: posición sin definir, no una ventaja clara ya jugada.
+// Mismo valor que core/calculo.ts#PLIES_LINEA_MOTOR, la referencia de una
+// posición propia: si cambia uno, cambia el otro.
 const MEJOR_LINEA_PLIES = 3;
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));

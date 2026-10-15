@@ -38,6 +38,15 @@ export const RAMAS_CON_LINEA = 2;
 export const PLIES_MIN_LINEA = 2;
 
 /**
+ * Cuántos plies de la variante principal del motor hacen de referencia para la
+ * profundidad vista: los mismos que guarda el catálogo en `mejorLinea`
+ * (`MEJOR_LINEA_PLIES` en scripts/mine-stoyko.mjs). Con la misma vara para las
+ * dos fuentes, una profundidad de 3 dice lo mismo venga la posición de una
+ * partida propia o del catálogo, y una semana se puede comparar con la otra.
+ */
+export const PLIES_LINEA_MOTOR = 3;
+
+/**
  * Una rama declarada: la candidata (primer ply de `linea`) con la continuación
  * que el usuario calculó y la evaluación de la posición a la que llega esa
  * línea.

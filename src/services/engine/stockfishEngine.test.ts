@@ -10,6 +10,8 @@ class FakeWorker {
   /** Valor inicial de `respondeGo`: el worker nace dentro del adaptador, así
    * que la única forma de configurarlo antes del primer `go` es acá. */
   static respondeGoPorDefecto = true;
+  /** Lo que el motor informa antes del `bestmove`; null = ninguna línea `info`. */
+  static infoPorDefecto: string | null = 'info depth 20 multipv 1 score cp 35 pv e2e4 e7e5';
   terminado = false;
   enviados: string[] = [];
   /** Si es false, la búsqueda no contesta: sirve para forzar el timeout. */
@@ -39,7 +41,7 @@ class FakeWorker {
       if (cmd === 'uci') this.emitir('uciok');
       else if (cmd === 'isready') this.emitir('readyok');
       else if (cmd.startsWith('go') && this.respondeGo) {
-        this.emitir('info depth 20 multipv 1 score cp 35 pv e2e4 e7e5');
+        if (FakeWorker.infoPorDefecto !== null) this.emitir(FakeWorker.infoPorDefecto);
         this.emitir('bestmove e2e4');
       }
     };
@@ -72,6 +74,7 @@ async function hastaElGo(worker: FakeWorker): Promise<void> {
 beforeEach(() => {
   FakeWorker.instancias = [];
   FakeWorker.respondeGoPorDefecto = true;
+  FakeWorker.infoPorDefecto = 'info depth 20 multipv 1 score cp 35 pv e2e4 e7e5';
   vi.stubGlobal('Worker', FakeWorker);
   vi.stubGlobal(
     'fetch',
@@ -88,10 +91,28 @@ describe('StockfishEngine', () => {
   it('evalúa una posición con el protocolo UCI completo', async () => {
     const engine = new StockfishEngine();
     const evaluacion = await engine.evaluate(FEN, 20);
-    expect(evaluacion).toEqual({ move: 'e2e4', cp: 35, mateIn: null });
+    expect(evaluacion).toEqual({ move: 'e2e4', cp: 35, mateIn: null, pv: ['e2e4', 'e7e5'] });
     const [worker] = FakeWorker.instancias;
     expect(worker!.enviados).toContain('ucinewgame');
     expect(worker!.enviados).toContain(`position fen ${FEN}`);
+  });
+
+  // Auditoría 2026-10-15, B5: se guardaba solo el primer ply de la variante, y
+  // el cálculo con posición propia medía la profundidad vista contra una línea
+  // de una jugada.
+  it('devuelve la variante principal entera, no solo la primera jugada', async () => {
+    FakeWorker.infoPorDefecto =
+      'info depth 18 seldepth 24 multipv 1 score cp 41 nodes 81234 nps 401000 hashfull 12 tbhits 0 time 202 pv e2e4 e7e5 g1f3 b8c6 f1b5 a7a6';
+    const engine = new StockfishEngine();
+    const evaluacion = await engine.evaluate(FEN, 18);
+    expect(evaluacion.move).toBe('e2e4');
+    expect(evaluacion.pv).toEqual(['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5', 'a7a6']);
+  });
+
+  it('sin ninguna línea `info`, la variante es la jugada del `bestmove`', async () => {
+    FakeWorker.infoPorDefecto = null;
+    const engine = new StockfishEngine();
+    await expect(engine.evaluate(FEN, 18)).resolves.toEqual({ move: 'e2e4', cp: null, mateIn: null, pv: ['e2e4'] });
   });
 
   describe('timeout', () => {

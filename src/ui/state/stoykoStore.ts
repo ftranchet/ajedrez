@@ -13,12 +13,14 @@
 // La posición sale de tus **partidas propias analizadas** cuando hay alguna
 // (ADR-0015, punto 4): la jugada donde perdiste más centipeones o donde
 // consumiste más tiempo. Ahí no hay `mejorLinea` precalculada, así que el motor
-// evalúa en el dispositivo al revelar — es una sola posición, sin reloj, y el
-// motor ya está cargado. Sin partidas analizadas cae al catálogo minado.
+// evalúa en el dispositivo al revelar y su variante principal hace de
+// referencia — es una sola posición, sin reloj, y el motor ya está cargado.
+// Sin partidas analizadas cae al catálogo minado.
 import { create } from 'zustand';
 import type { EvalSymbol, StoykoItem } from '../../core/types';
 import { stoykoDisponible, stoykoProximaDisponibleEn } from '../../core/stoyko';
 import {
+  PLIES_LINEA_MOTOR,
   PLIES_MIN_LINEA,
   RAMAS_MAX_ABIERTO,
   declaracionCompleta,
@@ -324,7 +326,11 @@ export const useStoykoStore = create<StoykoState>((set, get) => ({
         const cpBlancas = evaluacion.cp === null
           ? (evaluacion.mateIn ?? 0) > 0 === !mueveNegras ? 10_000 : -10_000
           : mueveNegras ? -evaluacion.cp : evaluacion.cp;
-        referencia = { lineaMotor: [evaluacion.move], evaluacionMotor: evalToSymbol(cpBlancas) };
+        // La referencia son los primeros plies de la variante principal, como
+        // la `mejorLinea` del catálogo: con solo la mejor jugada, la
+        // profundidad vista no podía pasar de 1 por más que se calculara.
+        const variante = evaluacion.pv?.length ? evaluacion.pv : [evaluacion.move];
+        referencia = { lineaMotor: variante.slice(0, PLIES_LINEA_MOTOR), evaluacionMotor: evalToSymbol(cpBlancas) };
       } catch {
         motorError = true;
       }

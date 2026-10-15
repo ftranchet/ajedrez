@@ -7,8 +7,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStoykoStore } from './stoykoStore';
 import { db } from '../../services/storage/db';
 import { STOYKO_DATASET_VERSION } from '../../services/puzzles/stoykoSeedData';
-import type { EvalSymbol, GameRecord, Profile, StoykoItem } from '../../core/types';
+import type { EvalSymbol, GameRecord, MoveAnalysisEntry, Profile, StoykoItem } from '../../core/types';
 import { stoykoItemRepo } from '../../services/storage/stoykoItemRepo';
+import { engine } from '../../services/engine/stockfishEngine';
 
 const item: StoykoItem = {
   id: 'stoyko-test-1',
@@ -20,6 +21,38 @@ const item: StoykoItem = {
 
 async function seedProfile(overrides: Partial<Profile> = {}) {
   await db.profile.put({ id: 'principal', bandaElo: 'elemental', diagnosticoCompletadoEn: '2026-07-01T00:00:00.000Z', ...overrides });
+}
+
+/** Una partida propia analizada, con blancas, cuyas jugadas son las dadas. */
+function partidaAnalizada(id: string, jugadas: Partial<MoveAnalysisEntry>[]): GameRecord {
+  return {
+    id,
+    pgn: '1. e4 e5 *',
+    fuente: 'local',
+    ritmo: 'clasica',
+    resultado: '*',
+    tiemposPorJugadaMs: [],
+    analizada: true,
+    fecha: '2026-07-20T10:00:00.000Z',
+    jugadorColor: 'w',
+    analisis: {
+      jugadas: jugadas.map((jugada) => ({
+        ply: 4,
+        san: 'Nc3',
+        fenAntes: item.fen,
+        ladoQueMueve: 'w',
+        jugadaUsuario: 'b1c3',
+        jugadaMotor: 'f1c4',
+        cpAntes: 20,
+        cpDespues: -180,
+        cpPerdidos: 200,
+        clasificacion: 'error',
+        ...jugada,
+      })),
+      comparacionEvaluaciones: [],
+      analizadaEn: '2026-07-20T11:00:00.000Z',
+    },
+  };
 }
 
 /** Declara una rama completa: sus plies y su evaluación. */
@@ -286,5 +319,32 @@ describe('stoykoStore — preset abierto', () => {
     expect(s.phase).toBe('analizando');
     expect(s.origen).toMatchObject({ tipo: 'propia', posicion: { gameId: 'g-propia', motivo: 'mas-centipeones' } });
     expect(s.fen).toBe(game.analisis!.jugadas[0].fenAntes);
+  });
+
+  // Auditoría 2026-10-15, B5: la referencia de una posición propia era
+  // `[evaluacion.move]`, así que la profundidad vista no podía pasar de 1.
+  it('en una posición propia, la profundidad vista se mide contra la variante principal del motor', async () => {
+    await db.games.put(partidaAnalizada('g-propia', [{ ply: 4 }]));
+    vi.spyOn(engine, 'evaluate').mockResolvedValue({
+      move: 'f1c4',
+      cp: 30,
+      mateIn: null,
+      pv: ['f1c4', 'f8c5', 'e1g1', 'g8f6', 'd2d3'],
+    });
+
+    await useStoykoStore.getState().empezar(true);
+    expect(useStoykoStore.getState().origen).toMatchObject({ tipo: 'propia' });
+    declararRama(['f1c4', 'f8c5', 'e1g1', 'g8f6'], '=');
+    declararRama(['d2d4', 'e5d4'], '±');
+    useStoykoStore.getState().terminarAnalisis();
+    await useStoykoStore.getState().confirmarConfianza(60);
+
+    const s = useStoykoStore.getState();
+    // Tope en tres plies, igual que la `mejorLinea` del catálogo: la misma vara
+    // venga la posición de donde venga.
+    expect(s.resultado).toEqual({ cobertura: true, profundidadVista: 3, brechaEvaluacion: 0 });
+    expect(s.lineaMotorSan).toEqual(['Ac4', 'Ac5', 'O-O']);
+    const [intento] = await db.calculoAttempts.toArray();
+    expect(intento).toMatchObject({ origen: { gameId: 'g-propia', ply: 4 }, profundidadVista: 3 });
   });
 });
