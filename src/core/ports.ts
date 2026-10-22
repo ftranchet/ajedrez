@@ -67,7 +67,7 @@ export interface EnginePort {
   init(): Promise<void>;
   /** Devuelve la mejor jugada en notación UCI (p. ej. "e2e4", "e7e8q"). */
   bestMove(fen: string, level: EngineLevel): Promise<string>;
-  /** Análisis a máxima fuerza por profundidad, para el análisis de partidas (RNF-3): sin Skill Level limitado. */
+  /** Análisis a máxima fuerza por profundidad, para el análisis de partidas (RNF-3): sin `UCI_LimitStrength`. */
   evaluate(fen: string, depth: number): Promise<EngineEvaluation>;
   dispose(): void;
 }

@@ -134,7 +134,7 @@ export interface ContextoMigracion {
 }
 
 /**
- * Un paso de la cadena. `desde` es la versión que **produce**: se aplica a todo
+ * Un paso de la cadena. `version` es la versión que **produce**: se aplica a todo
  * paquete cuyo esquema sea menor.
  */
 interface PasoMigracion {

@@ -28,7 +28,7 @@ Si una herramienta de IA requiere su propio archivo de contexto (`CLAUDE.md`, `A
 Nunca duplicar reglas en esos archivos: la duplicación diverge, y la divergencia rompe la robustez del proceso.
 
 ## Comandos
-Requiere Node 20+.
+Requiere Node 20.19+, 22.13+ o 24+ (lo que piden Vite 8 y ESLint 10; CI corre en 22).
 
 ```
 npm install        # instala dependencias y copia el motor a public/engine/
@@ -38,7 +38,18 @@ npm run preview    # sirve el build de producción
 npm test           # tests (Vitest): dominio y migraciones
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit (TypeScript estricto)
-npm run verify:finales # valida FEN y resultado del catálogo de finales con Stockfish 18
+npm run verify:finales  # valida FEN y resultado del catálogo de finales con Stockfish 18
+npm run verify:patrones # valida las posiciones del currículo con chess.js
+```
+
+Medición y generación de contenido (se corren a mano, no en CI):
+
+```
+npm run measure:niveles # juega los niveles del motor entre sí y falla si uno no supera al inferior (RF-1.3b)
+npm run measure:elo     # Elo de cada nivel contra un rival de fuerza conocida (RF-1.3c)
+npm run measure:radar   # cada cuánto se repite una posición del Radar, por banda (RF-5.6a)
+npm run build:carnadas  # marca la captura carnada y su refutación en las envenenadas (RF-5.3c)
+npm run add:puzzles     # suma puzzles del export CC0 de Lichess al catálogo del Radar
 ```
 
 ```

@@ -3,12 +3,10 @@
 // —las dos primeras con la línea que calculó, el resto sueltas— cada una con su
 // evaluación, y recién ahí compara con el motor.
 //
-// El tablero nunca se mueve mientras se anota y el tiempo se registra en
-// silencio (RF-7.3). El estado del
-// corto vive en `compromisoStore`: comparten el modelo persistido
-// (`calculoAttempts`) y la pantalla, pero cada flujo se lee mejor con su propio
-// estado — uno declara una línea contra una solución verificada, el otro un
-// árbol contra una posición sin respuesta correcta.
+// El tablero nunca se mueve mientras se anota; el tiempo se registra y se
+// muestra recién en el Panel (RF-7.3). Desde ADR-0016 es el único ejercicio de
+// Cálculo: el corto, con su `compromisoStore`, se retiró, y sus intentos viejos
+// (`preset: 'forzado'`) solo se leen como historial.
 //
 // La posición sale de tus **partidas propias analizadas** cuando hay alguna
 // (ADR-0015, punto 4): la jugada donde perdiste más centipeones o donde

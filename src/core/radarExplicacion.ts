@@ -1,7 +1,8 @@
 // Explicación por posición del Radar (RF-5.3).
 //
 // **El problema que corrige.** `explainFeedback` devolvía una sola frase fija
-// por *tipo*: las 116 posiciones del catálogo compartían cinco textos. Fallabas
+// por *tipo*: las 116 posiciones que tenía entonces el catálogo compartían
+// cinco textos. Fallabas
 // una y leías "había una combinación ganadora que no se jugó" sin enterarte de
 // cuál era, y el panel mostraba únicamente la primera jugada de una línea que
 // muchas veces tiene cinco. Peor: la frase afirmaba cosas que no siempre eran

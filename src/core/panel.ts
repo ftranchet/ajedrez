@@ -1,9 +1,10 @@
-// Panel de verdad v1 (RF-12.1): media móvil de errores graves por partida
-// analizada, a partir de datos que E3 ya produce. La "rating de partidas
-// lentas" numérica que pide el PRD necesita un historial real (Lichess/
-// Chess.com, bloqueado por red en este entorno — ver docs/roadmap.md) para
-// calibrarse con sentido; mientras tanto se muestra la banda de Elo del
-// diagnóstico (E11), categórica, en vez de inventar un número sin base.
+// Panel de verdad (RF-12.1): media móvil de errores graves por partida
+// analizada, a partir de datos que E3 ya produce, y el rating de partidas
+// lentas. Mientras la importación automática de historial siga pendiente
+// (RF-2.1), el rating sale de la serie que declara el usuario (RF-12.1a) y se
+// muestra su cambio contra la primera toma, no un número inventado. La banda
+// de Elo del diagnóstico ya no está entre estas métricas (RF-12.1b): es un
+// insumo del Prescriptor, no una medida de mejora.
 import type { GameRecord, Profile } from './types';
 
 const VENTANA_PARTIDAS = 10;
@@ -12,7 +13,10 @@ export const TRUTH_IMPROVEMENT_MIN_GAMES = 3;
 export const TRUTH_IMPROVEMENT_THRESHOLD = 20;
 
 /**
- * Errores graves/error del USUARIO en una partida (RF-12.1). Cuenta solo las
+ * Errores graves del USUARIO en una partida (RF-12.1): sus jugadas que pierden
+ * un peón o más, o sea las clases `grave` (≥ 200 cp) y `error` (≥ 100 cp) del
+ * análisis. La métrica se llama "errores graves" en toda la interfaz y el PRD
+ * la define así (§3.2); la clase interna `grave` es solo la mitad. Cuenta solo las
  * jugadas del lado que jugó el usuario (`jugadorColor`): en los niveles bajos
  * el motor comete errores a propósito (RF-1.3), y sumarlos inflaría la métrica
  * con ruido que no es del usuario. Devuelve null si no se puede atribuir el

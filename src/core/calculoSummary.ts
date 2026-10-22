@@ -1,7 +1,8 @@
 // Resumen de Cálculo (E7) para el Panel: hacer estos ejercicios debe dejar un
-// rastro medible. Desde ADR-0015 hay un solo ejercicio con dos presets y un
-// solo formato de intento (`CalculoAttempt`), y cada preset se resume con su
-// propia vara: el forzado con la precisión de la línea declarada, el abierto
+// rastro medible. Hay un solo formato de intento (`CalculoAttempt`) y, desde
+// ADR-0016, un solo ejercicio vivo (el abierto); el preset forzado queda como
+// historial. Cada preset se resume con su propia vara: el forzado con la
+// precisión de la línea declarada, el abierto
 // con cobertura, profundidad vista y brecha de evaluación. Las varas **no se
 // promedian entre sí** — un número que mezcle una posición con respuesta
 // verificable y otra sin ella sube o baja según el contenido servido, no según

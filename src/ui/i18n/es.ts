@@ -440,7 +440,7 @@ export const es = {
     informeErroresLabel: 'Errores graves por partida',
     informeErroresPendiente: 'Falta analizar una partida',
     informeErroresAyuda:
-      'Es la métrica de mejora más importante que la app puede medir sola: por debajo de 1800, los errores graves deciden la mayoría de las partidas. Se llena en cuanto analices tu primera partida.',
+      'Es la métrica de mejora más importante que la app puede medir sola: cuenta tus jugadas que pierden un peón o más, y por debajo de 1800 esos errores deciden la mayoría de las partidas. Se llena en cuanto analices tu primera partida.',
     informeFugasTitulo: 'Dónde se te escapan las posiciones',
     informeFugasSinSenal:
       'Con 20 posiciones no aparece todavía una fuga clara. Vas a verla acá cuando el Radar acumule más respuestas: preferimos no señalar una debilidad que no podemos sostener.',
@@ -779,7 +779,7 @@ export const es = {
     medicionComoLeerTitulo: 'Cómo leer estas mediciones',
     medicionComoLeer: 'Transferencia, sobreajuste y experimentos necesitan semanas y partidas comparables. Un estado “sin datos” es una limitación honesta, no una tarea atrasada.',
     verdadTitulo: 'Panel de verdad',
-    verdadAyuda: 'Las tres cosas que, si mejoran, significan que estás jugando mejor. Ninguna depende de cuánto entrenaste.',
+    verdadAyuda: 'Las tres cosas que, si mejoran, significan que estás jugando mejor. Ninguna depende de cuánto entrenaste. Un error grave es una jugada tuya que pierde un peón o más.',
     verdadBandaPie: 'Tu banda de arranque es {banda}. Define cuánto trae tu sesión diaria; es un insumo para dosificar, no una medida de mejora.',
     verdadRating: 'Rating de partidas lentas',
     verdadSinRating: 'Cargalo en Ajustes',

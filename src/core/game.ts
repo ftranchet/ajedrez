@@ -26,7 +26,11 @@ export interface BuildGameArgs {
   ritmo: GameRecord['ritmo'];
   fecha?: string;
   id?: string;
-  /** Lado que jugó el usuario (partidas locales contra el motor, RF-9.1). */
+  /**
+   * Lado que jugó el usuario: separa sus jugadas de las del rival en las
+   * métricas de verdad (RF-12.1), las tarjetas de error y las posiciones de
+   * Cálculo (RF-7.2).
+   */
   jugadorColor?: Color;
   /** Elo del usuario en esta partida, cuando existe una fuente real. */
   ratingUsuario?: number;

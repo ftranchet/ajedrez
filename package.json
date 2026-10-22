@@ -6,7 +6,7 @@
   "description": "ELOmax — entrenador de ajedrez basado en evidencia (PWA local-first)",
   "license": "GPL-3.0-only",
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "scripts": {
     "postinstall": "node scripts/copy-engine.mjs",

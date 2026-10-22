@@ -3,8 +3,8 @@
 // La sesión diaria es una secuencia de posiciones de una jugada, y por eso
 // contiene Cola, patrones, criterio y Radar. Pero cuatro de los ejercicios con
 // más respaldo de la app **no caben en ese formato**: una partida lenta y su
-// análisis, un final jugado entero contra Stockfish, un Stoyko sin reloj y una
-// línea comprometida declarada por escrito. Vivían en otras pantallas y el
+// análisis, un final jugado entero contra Stockfish y el cálculo declarado de
+// la semana. Vivían en otras pantallas y el
 // Prescriptor no los nombraba nunca — Cálculo era una de las cuatro pestañas de
 // la navegación y ninguna prescripción la mencionaba salvo por una nota al pie
 // condicionada a una fuga que un usuario nuevo no puede tener. Es exactamente
@@ -75,7 +75,7 @@ const MINUTOS = {
 
 /**
  * Tope diario de finales prescriptos. Sin él, una cuenta nueva veía el catálogo
- * entero (8 técnicas no vistas) como deuda de hoy — con una estimación de 8
+ * entero (16 técnicas no vistas) como deuda de hoy — con una estimación de 8
  * minutos totales que en realidad eran más de 60. La deuda real sigue viva en
  * el catálogo; lo que se prescribe para hoy es una porción hacible.
  */
@@ -95,13 +95,13 @@ export interface EntradaPrescripciones {
 /**
  * Las prescripciones de hoy que se hacen en otra pantalla, ordenadas por valor
  * documentado: la partida lenta con su análisis es tier-S en `docs/evidence/`,
- * así que encabeza siempre; después las técnicas de final vencidas, el Stoyko
- * de la semana y, si hay señal de que las líneas forzadas se están fallando, el
- * cálculo comprometido.
+ * así que encabeza siempre; después las técnicas de final vencidas y el
+ * cálculo de la semana. La fuga de cálculo ya no prescribe un ejercicio aparte:
+ * desde ADR-0016 suma el bloque "¿Calcular o ya alcanza?" a la sesión.
  *
  * Las cumplidas no se ocultan: verlas cumplidas es la mitad del valor de tener
  * un plan. Lo que no aparece nunca es una prescripción sin motivo — si no hay
- * finales vencidos ni fuga de cálculo, esas entradas no se listan.
+ * finales vencidos ni jugados hoy, esa entrada no se lista.
  */
 export function prescripcionesExternas(entrada: EntradaPrescripciones): PrescripcionExterna[] {
   const now = entrada.now ?? new Date();

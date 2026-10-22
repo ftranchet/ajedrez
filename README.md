@@ -22,7 +22,7 @@ La mayoría de las apps de ajedrez optimizan el enganche: rachas, puntos, cofres
 4. **La sesión diaria** mezcla esos repasos con patrones del currículo, el Radar (posiciones mezcladas, sin avisarte si hay táctica) y, según tus fugas, un bloque de criterio de cálculo.
 5. **Se mide aparte.** Una batería de 30 posiciones reservadas, que nunca se entrenan ni se muestran resueltas, se repite cada siete semanas para ver si lo entrenado transfiere a contenido nuevo.
 
-Todo el contenido es local y se generó con verificación programática: 141 posiciones de Radar, 20 patrones, 16 finales teóricos, 8 posiciones de Stoyko y 30 de la batería de transferencia. Ninguna se escribió "de memoria": los scripts de `scripts/` las validan con chess.js y Stockfish. En cada push, CI vuelve a correr la verificación de los 20 patrones y los 16 finales; el catálogo del Radar y los niveles del motor se verifican al generarlos y con los tests unitarios, no re-midiendo con Stockfish en cada push (`measure:niveles` tarda demasiado para CI y se corre a mano).
+Todo el contenido es local y se generó con verificación programática: 141 posiciones de Radar, 20 patrones, 16 finales teóricos, 8 del cálculo semanal y 30 de la batería de transferencia. Ninguna se escribió "de memoria": los scripts de `scripts/` las validan con chess.js y Stockfish. En cada push, CI vuelve a correr la verificación de los 20 patrones y los 16 finales; el catálogo del Radar y los niveles del motor se verifican al generarlos y con los tests unitarios, no re-midiendo con Stockfish en cada push (`measure:niveles` tarda demasiado para CI y se corre a mano).
 
 ## Documentación
 
@@ -37,12 +37,14 @@ Todo el contenido es local y se generó con verificación programática: 141 pos
 | **`docs/radar-dataset.md`** | Origen, generación y validación del catálogo del Radar. |
 | **`docs/niveles-motor.md`** | Cómo se piden los niveles del oponente local y cómo se midieron. |
 | **`docs/maia-prueba.md`** | Guía para verificar a mano la partida contra Maia (la red a Lichess no es alcanzable desde CI). |
+| **`docs/adherencia-gamificacion.md`** | Por qué la adherencia se mide sin puntos, rachas diarias ni rankings. |
+| **`docs/auditoria-2026-10-15.md`** | Última auditoría de código y documentación, con el estado de cada hallazgo. |
 | **`docs/prototipos/`** | Referencia visual del design system (se abre en el navegador). |
 | **`CHANGELOG.md`** | Historia de cambios. |
 
 ## Desarrollo
 
-Requiere Node 20 o superior (CI corre en 22).
+Requiere Node 20.19+, 22.13+ o 24+ (CI corre en 22).
 
 ```bash
 npm install    # instala dependencias y copia el motor a public/engine/
@@ -58,6 +60,7 @@ npm run dev    # servidor de desarrollo
 | `npm run verify:patrones` | Revalida las posiciones del currículo con chess.js |
 | `npm run verify:finales` | Revalida los finales con Stockfish |
 | `npm run measure:niveles` | Mide los niveles del motor jugándolos entre sí (RF-1.3b) |
+| `npm run measure:radar` | Mide cada cuánto se repite una posición del Radar |
 | `npm run build` | Build de producción |
 
 La arquitectura separa `core/` (dominio puro, sin React ni base de datos), `services/` (adaptadores: almacenamiento, motor, análisis) y `ui/`. Los detalles y las reglas de contribución están en `CONTRIBUTING.md`.
@@ -77,10 +80,10 @@ Las fases, en el estado 2:
 - **Fase 1 — Radar + Cola Universal** ✅ *(falta la validación de uso real durante siete días, que no se puede automatizar)*
 - **Fase 2 — Partidas y análisis en dos fases** ✅
 - **Fase 3 — Prescriptor y currículo base**, con finales teóricos contra Stockfish ✅
-- **Fase 4 — Módulos avanzados**: criterio de cálculo, regla de candidatas, modificador a ciegas, doble solución y cálculo comprometido con Stoyko semanal ✅
+- **Fase 4 — Módulos avanzados**: criterio de cálculo, regla de candidatas, modificador a ciegas, doble solución, cálculo declarado semanal y conversión de ventajas ✅
 - **Fase 5 — Medición**: batería de transferencia, detector de sobreajuste, adherencia honesta (plan semanal, constancia de ocho semanas, hitos por capacidad, recordatorio opcional) y experimento individual ABAB ✅
 
-Quedan pendientes tres entregables que dependen de acceso de red bloqueado en el entorno de desarrollo: los bots Maia, la importación automática de historial y la conversión de ventajas. El detalle entregable por entregable está en `docs/roadmap.md`.
+Las partidas contra Maia (Lichess) están construidas y se verifican a mano, porque CI no llega a `lichess.org`. Queda pendiente la importación automática de historial de Lichess y Chess.com, por el mismo límite del entorno de desarrollo; mientras tanto, las partidas reales entran importando su PGN. El detalle entregable por entregable está en `docs/roadmap.md`, y la última auditoría de código y documentación, con lo que queda, en `docs/auditoria-2026-10-15.md`.
 
 ## Licencia y autoría
 

@@ -38,12 +38,13 @@ const VENTANA_TIPOS = seleccion.ventanaTipos; // cuántos tipos recientes penali
  * los últimos 8 ids: exactamente una sesión. Medido con
  * `npm run measure:radar` sobre el lote publicado, eso hacía que una posición
  * volviera **al día siguiente** en las cinco bandas de la dieta, y que a los
- * 30 días el usuario hubiera visto solo 33–48 de las 116 posiciones. Una
+ * 30 días el usuario hubiera visto solo 33–48 de las 116 que tenía entonces el
+ * catálogo (hoy son 141). Una
  * táctica que uno recuerda no entrena nada: repetirla al otro día es tiempo
  * tirado.
  *
  * Una ventana fija grande tampoco sirve, porque el pool alcanzable depende de
- * la dificultad del usuario (entre 30 y 57 posiciones en este catálogo): si la
+ * la dificultad del usuario (entre 30 y 70 posiciones en el catálogo de 141): si la
  * ventana lo supera, el filtro se vacía y el selector termina repitiendo igual,
  * pero encima perdiendo el control de dificultad. Atada al tamaño del pool,
  * siempre queda al menos un 40% disponible para elegir.
@@ -366,7 +367,7 @@ export function recordServed(state: RadarSelectionState, item: RadarItem): Radar
  * táctica.
  *
  * Hasta la ronda C esto era una tabla de cinco frases fijas —una por tipo—
- * que las 116 posiciones del catálogo se repartían. La composición por
+ * que las 116 posiciones que tenía entonces el catálogo se repartían. La composición por
  * posición vive en `core/radarExplicacion.ts`, que solo afirma lo que puede
  * comprobar sobre el tablero; acá queda la puerta de entrada que ya usaban
  * las dos pantallas. El idioma de notación (RNF-9) es obligatorio por la

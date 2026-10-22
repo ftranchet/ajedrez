@@ -1,6 +1,6 @@
 {
   "version": "engine-levels-v7",
-  "medicion": "Elo en la escala de Stockfish. MEDIDO por resultado de partidas en tres puntos (temperatura 210 = 900, 130 = 1320, 60 = 1737; anclaje contra Stockfish UCI_Elo 1320 y cadena entre pares contiguos, scripts/measure-elo-anclas.mjs, 2026-07-26). Los escalones intermedios se interpolan sobre esa curva. Incertidumbre +-200: con 6 partidas por par, dos niveles contiguos no se distinguen del ruido.",
+  "medicion": "Elo en la escala de Stockfish. MEDIDO por resultado de partidas en tres puntos (temperatura 210 = 900, 130 = 1320, 60 = 1737; anclaje contra Stockfish UCI_Elo 1320 y cadena entre pares contiguos, scripts/measure-elo-anclas.mjs, 2026-07-26). Los escalones entre las anclas se interpolan sobre esa curva; los dos extremos (temperatura 230 del nivel 1 y 55 del nivel 8) quedan fuera de las anclas y se extrapolan, con más incertidumbre. Incertidumbre +-200: con 6 partidas por par, dos niveles contiguos no se distinguen del ruido.",
   "anclasMedidas": [
     {
       "temperaturaCp": 210,
